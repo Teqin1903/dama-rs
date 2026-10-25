@@ -120,6 +120,15 @@ impl Board {
         Some(Piece { color, kind })
     }
 
+    /// The number of pieces of `color` and `kind` on the board.
+    pub fn count(&self, color: Color, kind: Kind) -> u32 {
+        let pieces = self.pieces(color);
+        match kind {
+            Kind::Man => (pieces & !self.kings).len(),
+            Kind::King => (pieces & self.kings).len(),
+        }
+    }
+
     /// Puts `piece` on `sq`, replacing what was there; `None` empties the square.
     pub fn set(&mut self, sq: Square, piece: Option<Piece>) {
         self.white = self.white.without(sq);
@@ -394,5 +403,22 @@ mod tests {
             board.to_string(),
             "......../......../......../......../...W..../......../......../........"
         );
+    }
+
+    #[test]
+    fn count_by_colour_and_kind() {
+        let start = Board::start();
+        assert_eq!(start.count(Color::White, Kind::Man), 16);
+        assert_eq!(start.count(Color::Black, Kind::Man), 16);
+        assert_eq!(start.count(Color::White, Kind::King), 0);
+        let board: Board =
+            "W......b/......../......../......../......../......../......../w......B"
+                .parse()
+                .unwrap();
+        for color in [Color::White, Color::Black] {
+            for kind in [Kind::Man, Kind::King] {
+                assert_eq!(board.count(color, kind), 1, "{color:?} {kind:?}");
+            }
+        }
     }
 }
