@@ -1,5 +1,7 @@
 //! U, the baseline agent's utility (docs/reference.md; `U` in reference/js/agent.js).
 
+use std::fmt;
+
 use crate::board::{Board, Color, Kind};
 
 /// U of a move after which the opponent has no legal move: a win.
@@ -30,6 +32,20 @@ impl Weights {
         king: 3.0,
         mob: 0.1,
     };
+
+    /// Material only: a king is worth three men and mobility does not count.
+    pub const MATERIAL: Weights = Weights {
+        man: 1.0,
+        king: 3.0,
+        mob: 0.0,
+    };
+}
+
+impl fmt::Display for Weights {
+    /// `man/king/mob`, the way we write weights: `1/2.5/-0.05`.
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}/{}/{}", self.man, self.king, self.mob)
+    }
 }
 
 /// The features of U on a board right after `side` has moved, so the opponent is to move.

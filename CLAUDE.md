@@ -13,6 +13,7 @@ match kish 1.1.2, and every number in our Assignment 3 talk came from it.
 - `docs/decisions.md`: changes we make on purpose after the baseline, with how we measured them
 - `docs/benchmarks.md`: measured speed against the JS prototype (perft), with the machine and the method
 - `bench/`: timing scripts for the JS prototype; the Rust timer is `engine/examples/perft.rs`
+- `results/arena.csv`: one row per `dama arena` run; its version column ignores changes under `results/`
 
 ## Commands
 - Build: `cargo build --release`
@@ -20,6 +21,7 @@ match kish 1.1.2, and every number in our Assignment 3 talk came from it.
 - Slow tests (perft 7-8 and others marked `#[ignore]`): `cargo test --release -- --ignored`
 - Lint: `cargo clippy --all-targets -- -D warnings`
 - Format: `cargo fmt`
+- Arena: `cargo run --release -p cli -- arena tuned random --games 200 --seed 1` (`--help` lists the agents)
 - Regenerate testdata (only when I ask): `node reference/js/make_testdata.js`
 
 ## Rules (TÜDAF): the parts that are easy to get wrong

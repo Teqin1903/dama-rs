@@ -1,15 +1,20 @@
-//! Command-line front end of the engine. The text protocol (position / go / bestmove) comes in a
-//! later session; for now it prints the start position and White's legal moves.
+//! The `dama` program. `dama arena` plays matches between agents; the text protocol (position /
+//! go / bestmove) comes in a later session.
 
-use engine::{Board, Color};
+mod arena;
 
-fn main() {
-    let board = Board::start();
-    let moves: Vec<String> = board
-        .legal_moves(Color::White)
-        .iter()
-        .map(|m| m.to_string())
-        .collect();
-    println!("{board}");
-    println!("{} legal moves for White: {}", moves.len(), moves.join(" "));
+use std::process::ExitCode;
+
+const USAGE: &str = "usage: dama arena <A> <B> [--games N] [--seed S] [--csv PATH] [--log PATH]
+       dama arena --help";
+
+fn main() -> ExitCode {
+    let mut args = std::env::args().skip(1);
+    match args.next().as_deref() {
+        Some("arena") => arena::main(args),
+        _ => {
+            eprintln!("{USAGE}");
+            ExitCode::from(2)
+        }
+    }
 }

@@ -35,4 +35,10 @@ impl Mulberry32 {
     pub fn next_f64(&mut self) -> f64 {
         f64::from(self.next_u32()) / 4_294_967_296.0
     }
+
+    /// An index below `len`, drawn as agent.js draws one: `Math.floor(rnd() * len)`. It draws a
+    /// number even when `len` is 1. `next_f64` is below 1, so the index is below `len`.
+    pub fn next_index(&mut self, len: usize) -> usize {
+        (self.next_f64() * len as f64).floor() as usize
+    }
 }

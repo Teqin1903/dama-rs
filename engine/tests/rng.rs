@@ -92,6 +92,20 @@ fn a_million_numbers_match_rng_js() {
     assert_eq!((xor, sum), (3_500_093_726, 2_146_967_370_412_502));
 }
 
+/// `Math.floor(rnd() * len)` in JS, from the repository root:
+///
+///     node -e "const r = require('./reference/js/rng.js')(2026);
+///       console.log([3, 10, 7, 1, 64, 2, 1000].map((n) => Math.floor(r() * n)).join(', '));"
+#[test]
+fn next_index_is_math_floor_of_rnd_times_len() {
+    let mut rng = Mulberry32::new(2026);
+    let picks: Vec<usize> = [3, 10, 7, 1, 64, 2, 1000]
+        .into_iter()
+        .map(|len| rng.next_index(len))
+        .collect();
+    assert_eq!(picks, [1, 3, 4, 0, 9, 0, 682]);
+}
+
 #[test]
 fn same_seed_same_sequence() {
     let draw = |rng: &mut Mulberry32| -> Vec<u32> { (0..1000).map(|_| rng.next_u32()).collect() };

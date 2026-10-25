@@ -50,18 +50,24 @@ pub fn decide(board: &Board, side: Color, weights: Weights) -> Decision {
 }
 
 impl Decision {
-    /// The move to play, or `None` if there is no legal move. Without `rng` it is the first move
-    /// with the highest U. With `rng` it is picked as agent.js does,
-    /// `top[Math.floor(rnd() * top.length)]`, which draws a number even when one move is best.
-    pub fn choose(&self, rng: Option<&mut Mulberry32>) -> Option<&Move> {
+    /// The index in `candidates` (so also in the legal move list) of the move to play, or `None`
+    /// if there is no legal move. Without `rng` it is the first move with the highest U. With
+    /// `rng` it is picked as agent.js does, `top[Math.floor(rnd() * top.length)]`, which draws a
+    /// number even when one move is best.
+    pub fn pick(&self, rng: Option<&mut Mulberry32>) -> Option<usize> {
         if self.top.is_empty() {
             return None;
         }
         let i = match rng {
-            Some(rng) => (rng.next_f64() * self.top.len() as f64).floor() as usize,
+            Some(rng) => rng.next_index(self.top.len()),
             None => 0,
         };
-        Some(&self.candidates[self.top[i]].mv)
+        Some(self.top[i])
+    }
+
+    /// The move to play, or `None` if there is no legal move: the candidate that `pick` gives.
+    pub fn choose(&self, rng: Option<&mut Mulberry32>) -> Option<&Move> {
+        self.pick(rng).map(|i| &self.candidates[i].mv)
     }
 }
 
@@ -103,6 +109,16 @@ mod tests {
             decision.choose(Some(&mut rng)),
             Some(&decision.candidates[1].mv)
         );
+    }
+
+    #[test]
+    fn pick_gives_the_index_of_the_chosen_move() {
+        let decision = tied(3);
+        assert_eq!(decision.pick(None), Some(0));
+        // Seed 2026 draws 0.455... and then 0.308...: floor(0.455 * 3) = 1, floor(0.308 * 3) = 0.
+        let mut rng = Mulberry32::new(2026);
+        assert_eq!(decision.pick(Some(&mut rng)), Some(1));
+        assert_eq!(decision.pick(Some(&mut rng)), Some(0));
     }
 
     #[test]
