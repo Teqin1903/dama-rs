@@ -4,6 +4,7 @@ use std::fmt::{self, Write as _};
 use std::str::FromStr;
 
 use crate::bitboard::Bitboard;
+use crate::movegen::Move;
 use crate::square::{Dir, Square};
 
 /// White moves up the board (towards rank 8), Black moves down.
@@ -133,6 +134,35 @@ impl Board {
                 self.kings = self.kings.with(sq);
             }
         }
+    }
+
+    /// The board after `mv`, a legal move on this board: the piece leaves `from`, the captured
+    /// pieces leave the board and the piece lands on `to`, crowned if the move promotes.
+    /// The port of `apply` in engine.js.
+    #[must_use]
+    pub fn apply(&self, mv: &Move) -> Board {
+        let (from, to, captured) = (mv.from(), mv.to(), mv.captured());
+        debug_assert!(
+            self.white.contains(from) || self.black.contains(from),
+            "no piece on {from}"
+        );
+        let white = self.white.contains(from);
+        let king = self.kings.contains(from) || mv.promotes();
+        // `from` is cleared before `to` is set: a king's capture may end on its own start square.
+        let mut next = Board {
+            white: self.white.without(from) & !captured,
+            black: self.black.without(from) & !captured,
+            kings: self.kings.without(from) & !captured,
+        };
+        if white {
+            next.white = next.white.with(to);
+        } else {
+            next.black = next.black.with(to);
+        }
+        if king {
+            next.kings = next.kings.with(to);
+        }
+        next
     }
 
     /// All pieces of `color`, men and kings.
@@ -320,6 +350,49 @@ mod tests {
                 square: Square::new(2, 4),
                 found: 'x'
             })
+        );
+    }
+
+    /// The board after the legal move of `side` written `notation`.
+    fn after(board: &str, side: Color, notation: &str) -> Board {
+        let board: Board = board.parse().unwrap();
+        let mv = board
+            .legal_moves(side)
+            .into_iter()
+            .find(|mv| mv.to_string() == notation)
+            .unwrap_or_else(|| panic!("{notation} is not a legal move"));
+        board.apply(&mv)
+    }
+
+    #[test]
+    fn apply_moves_captures_and_crowns() {
+        assert_eq!(
+            after(START, Color::White, "d3-d4").to_string(),
+            "......../bbbbbbbb/bbbbbbbb/......../...w..../www.wwww/wwwwwwww/........"
+        );
+        // man_continues_as_man in testdata/rules.json: crowned only at the end of the move.
+        assert_eq!(
+            after(
+                "..b...../...b..../...w..../......../......../......../......../........",
+                Color::White,
+                "d6xd8xb8=K"
+            )
+            .to_string(),
+            ".W....../......../......../......../......../......../......../........"
+        );
+    }
+
+    #[test]
+    fn apply_a_king_capture_that_ends_on_its_start_square() {
+        // The king takes f4, h6, b8, a6 and b4, and lands on d4 again.
+        let board = after(
+            ".b....../......../b......b/......../.b.W.b../......../......../........",
+            Color::White,
+            "d4xh4xh8xa8xa4xd4",
+        );
+        assert_eq!(
+            board.to_string(),
+            "......../......../......../......../...W..../......../......../........"
         );
     }
 }

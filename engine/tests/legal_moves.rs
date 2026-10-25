@@ -1,9 +1,9 @@
 //! Referee 2 of CLAUDE.md: for every position in testdata/rules.json and testdata/movegen.json,
 //! our legal move list must equal the expected list exactly.
 
-use std::path::Path;
+mod common;
 
-use engine::{Board, Color};
+use engine::Board;
 use serde::Deserialize;
 
 /// One position. `name` and `rule` exist only in rules.json, `kind` only in movegen.json.
@@ -17,21 +17,9 @@ struct Case {
     moves: Vec<String>,
 }
 
-fn side(name: &str) -> Color {
-    match name {
-        "white" => Color::White,
-        "black" => Color::Black,
-        other => panic!("unknown side {other:?}"),
-    }
-}
-
 /// Runs every case of `testdata/<file>` and reports all failing cases together.
 fn check(file: &str) {
-    let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../testdata")
-        .join(file);
-    let text = std::fs::read_to_string(&path)
-        .unwrap_or_else(|e| panic!("cannot read {}: {e}", path.display()));
+    let text = common::read_testdata(file);
     let cases: Vec<Case> = serde_json::from_str(&text).unwrap_or_else(|e| panic!("{file}: {e}"));
     assert!(!cases.is_empty(), "{file} has no cases");
 
@@ -48,7 +36,7 @@ fn check(file: &str) {
         );
 
         let mut got: Vec<String> = board
-            .legal_moves(side(&case.side))
+            .legal_moves(common::side(&case.side))
             .iter()
             .map(|m| m.to_string())
             .collect();

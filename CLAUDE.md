@@ -11,6 +11,8 @@ match kish 1.1.2, and every number in our Assignment 3 talk came from it.
 - `testdata/`: perft counts, rule cases, move lists of sampled positions, decisions of the baseline agent
 - `docs/reference.md`: board and move formats, the baseline agent's U, our match settings
 - `docs/decisions.md`: changes we make on purpose after the baseline, with how we measured them
+- `docs/benchmarks.md`: measured speed against the JS prototype (perft), with the machine and the method
+- `bench/`: timing scripts for the JS prototype; the Rust timer is `engine/examples/perft.rs`
 
 ## Commands
 - Build: `cargo build --release`
