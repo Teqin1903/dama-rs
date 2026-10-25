@@ -1,0 +1,13 @@
+[package]
+name = "cli"
+description = "Text protocol front end for the draughts engine"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "dama"
+path = "src/main.rs"
+
+[dependencies]
+engine = { path = "../engine" }
