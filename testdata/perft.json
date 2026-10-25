@@ -1,0 +1,17 @@
+{
+ "board": "......../bbbbbbbb/bbbbbbbb/......../......../wwwwwwww/wwwwwwww/........",
+ "side": "white",
+ "counts": {
+  "1": 8,
+  "2": 64,
+  "3": 708,
+  "4": 7538,
+  "5": 85090,
+  "6": 931312,
+  "7": 10782382,
+  "8": 123290300,
+  "9": 1454144462
+ },
+ "leafRule": "a position with no legal move counts as one leaf",
+ "source": "depths 1-8 equal the regression tests of kish 1.1.2 (crates.io/crates/kish); depth 9 from our JS engine only"
+}

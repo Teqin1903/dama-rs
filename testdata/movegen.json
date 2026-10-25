@@ -1,0 +1,5769 @@
+[
+ {
+  "kind": "multiCapture",
+  "board": "......W./.......b/......../.......b/W......w/......w./.w..w..w/........",
+  "side": "white",
+  "moves": [
+   "h4xh6xh8=K"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": ".......W/..b....b/b......w/......../w......w/.ww...../w.ww.www/........",
+  "side": "black",
+  "moves": [
+   "h7xh5xh3xh1=K"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../..b...../......../......../.....w.B/..w...../......w./........",
+  "side": "black",
+  "moves": [
+   "h4xc4xc2xh2"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../b......./bb...b../....b.../..www.../w...w..w/w..ww.../........",
+  "side": "white",
+  "moves": [
+   "e4xe6xg6"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../......w./......../.b....../b..w..../w....w.w/w.w.w.../........",
+  "side": "white",
+  "moves": [
+   "a3xa5xc5"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../bbbbbbbb/b....bbb/b.b.b.../...b.w../wwwww.ww/wwww.www/........",
+  "side": "white",
+  "moves": [
+   "d3xd5xb5",
+   "d3xd5xf5"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../bbbbbbb./bbbb.b.b/..w..bb./...w.w../w.w..ww./wwwwwww./.......B",
+  "side": "black",
+  "moves": [
+   "c6xc4xe4xg4"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../b..bbbbb/b..b.b.b/....b.../.B....../.w.wwww./w.w.ww../........",
+  "side": "black",
+  "moves": [
+   "b4xb2xd2xd4",
+   "b4xb2xd2xd5"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../bbbbbbbb/..b.bbbb/.b..b.../.w.w..../..wwwwww/bww.wwww/........",
+  "side": "black",
+  "moves": [
+   "b5xb3xb1=K"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../b.b..w../.bb....b/......../.....w../..b....w/.....B../........",
+  "side": "black",
+  "moves": [
+   "f2xf5xf8",
+   "f2xf6xf8"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../..bb.b../...b..b./..Ww..../....w..W/w.ww.www/w.w.ww.w/........",
+  "side": "black",
+  "moves": [
+   "d6xd4xd2xb2"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../.b....b./.b..bb.b/.b.....B/...w..../.ww.w.b./www...../....B...",
+  "side": "black",
+  "moves": [
+   "e1xe4xa4xa1"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../b.bbbwbb/b..bb.../.b.....b/w...w.b./.....w.w/w.www.ww/B.......",
+  "side": "black",
+  "moves": [
+   "a1xa3xg3xg1"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../b.....bb/bb....../......b./...wwb../b.w...../..ww..w./........",
+  "side": "white",
+  "moves": [
+   "e4xg4xg6xg8=K"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": ".W....../.....bbb/....bb.b/......bW/....w..w/..w.wwww/www.www./........",
+  "side": "white",
+  "moves": [
+   "h5xe5xe7",
+   "h5xe5xe8"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": ".......W/....bb../......../......../....w.ww/.......w/w.w.w.../B.......",
+  "side": "black",
+  "moves": [
+   "a1xa4xf4"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......W./b.....bb/b.b....b/.w....../......w./Bww..www/..www.ww/........",
+  "side": "white",
+  "moves": [
+   "g8xg6xb6"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../bb.bbbbb/b.b..bbb/.b.b..../..b..w../w.w..www/www..www/........",
+  "side": "white",
+  "moves": [
+   "c3xc5xa5",
+   "c3xc5xc7",
+   "c3xc5xe5"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": ".......W/bb.w.b../b.b....b/.b....../...w..../ww...ww./ww.....w/........",
+  "side": "white",
+  "moves": [
+   "h8xh5xa5"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../b.bbbbbb/..b..b.b/......../..W.B.../www..w.w/w.ww.www/........",
+  "side": "white",
+  "moves": [
+   "c4xg4xg8"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../bbbbbbbw/.b.bbbb./.b....../.B..w.../.w...w.w/..www.../........",
+  "side": "black",
+  "moves": [
+   "b4xf4xf1",
+   "b4xf4xf2",
+   "b4xh4xh1",
+   "b4xh4xh2",
+   "b4xh4xh8"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../..W..b../......bb/.w....../......../w.w...../w.wwww../........",
+  "side": "white",
+  "moves": [
+   "c7xg7xg1",
+   "c7xg7xg2",
+   "c7xg7xg3",
+   "c7xg7xg4",
+   "c7xg7xg5",
+   "c7xh7xh1",
+   "c7xh7xh2",
+   "c7xh7xh3",
+   "c7xh7xh4",
+   "c7xh7xh5"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../bbbbbbbb/.bbbbbbb/b......./w......./.wwwwwww/wwwwwwww/........",
+  "side": "white",
+  "moves": [
+   "a4xa6xa8=K"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../..bbbbbb/bb..b.b./...w..../......../w......./..ww.ww./B...B..B",
+  "side": "black",
+  "moves": [
+   "a1xa5xf5xf1",
+   "a1xa5xg5xg1"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../bbbb..b./b.bbbb.b/....b.../ww.b.w../..www.../wwwwww.w/........",
+  "side": "white",
+  "moves": [
+   "d3xd5xf5xf7xh7"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../W...bbb./...bbb.b/..b...b./..w....w/w......./..w.ww../........",
+  "side": "black",
+  "moves": [
+   "c5xc3xc1=K"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../bbbbbbbb/bbb.bbbb/...b..../.w.w..../w.w.wwww/wwwwwwww/........",
+  "side": "black",
+  "moves": [
+   "d5xd3xb3xb1=K"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../bbbbbbb./bbbbb..b/......bb/.w....w./w.wwwwww/wwwww.ww/........",
+  "side": "white",
+  "moves": [
+   "g4xg6xg8=K"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../b..bbbbw/bbbb.bb./......../......../.....w.w/...ww..w/.B.B....",
+  "side": "black",
+  "moves": [
+   "d1xd3xg3"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../bbbbbbbb/bb.bbbb./.......b/.w..w.../w....www/wwwww.ww/....B...",
+  "side": "black",
+  "moves": [
+   "e1xe3xe5"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../......B./......W./......../......../.....w../.....w../........",
+  "side": "black",
+  "moves": [
+   "g7xg2xa2",
+   "g7xg2xb2",
+   "g7xg2xc2",
+   "g7xg2xd2",
+   "g7xg2xe2",
+   "g7xg3xa3",
+   "g7xg3xb3",
+   "g7xg3xc3",
+   "g7xg3xd3",
+   "g7xg3xe3"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../bbbbbbbb/b..b.bbb/b.b.b.../w.w...../www.wwww/.wwwwwww/........",
+  "side": "white",
+  "moves": [
+   "c4xc6xe6xe8=K"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../..b...../......../..b..w.w/wb....w./ww..w..W/..ww.w../........",
+  "side": "white",
+  "moves": [
+   "a4xc4xc6xc8=K"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../b...b.bb/.b.bbb../...w..b./...ww.../w..w.w.w/..ww.w../........",
+  "side": "white",
+  "moves": [
+   "d5xd7xf7"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../b......./..bW..../......../b...www./...w...w/www.wwww/........",
+  "side": "white",
+  "moves": [
+   "d6xa6xa3",
+   "d6xa6xa8"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../bbbbbbbb/b.bbb.b./.....b.b/.....w../wwww..ww/ww.w.www/....B...",
+  "side": "black",
+  "moves": [
+   "f5xf3xf1=K"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "...W..../.b..w.../b.b...../.b....../.www..w./.w.....w/wwwww.w./........",
+  "side": "white",
+  "moves": [
+   "b4xb6xb8=K",
+   "b4xb6xd6"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../bbbbbbbb/b.bbbbbb/.b....../.w....../w.wwwwww/wwwwwwww/........",
+  "side": "white",
+  "moves": [
+   "b4xb6xb8=K"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../bbbbbbbb/bb..bb.b/...b..b./...w...w/wwwwwwww/wwwww.w./........",
+  "side": "white",
+  "moves": [
+   "d4xd6xd8=K"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../bbbbbbbb/.bbbb.bb/b....b../ww....../..wwwwww/wwwwwwww/........",
+  "side": "white",
+  "moves": [
+   "a4xa6xa8=K"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../b.bb.bbb/.b.bb.bb/B......./......../w..ww.ww/.w.w..ww/........",
+  "side": "black",
+  "moves": [
+   "a5xa2xc2xe2xe4",
+   "a5xa2xc2xe2xe5"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../bbbb.bbb/..bbbb.b/.......w/....b..w/..w.wwww/wwwww..w/........",
+  "side": "white",
+  "moves": [
+   "e3xe5xe7"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../Wb....bB/...b..b./.....b../......../......../w......./........",
+  "side": "white",
+  "moves": [
+   "a7xd7xd5xh5xh8"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../bbbbbbbb/bbbb..bb/..w...../.......w/ww....w./wwwww.ww/..B.....",
+  "side": "black",
+  "moves": [
+   "c1xc3xh3xh5xa5",
+   "c1xc3xh3xh5xb5"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../bbbbbbbb/bbb.b.bb/.....b../...b.w../www.w.ww/wwwwwwww/........",
+  "side": "black",
+  "moves": [
+   "f5xf3xd3xd1=K"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "...W..../bbbb.bbb/bbb...bb/...b..../......../wwww.www/wwwwwwww/........",
+  "side": "white",
+  "moves": [
+   "d8xd6xd4"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../bbbbbbbb/b..b.b../..b..bbb/.w....w./ww..ww.w/wwwwwwww/........",
+  "side": "black",
+  "moves": [
+   "g5xg3xg1=K"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": ".W....../.b....b./b......./b.b...../.......w/....w.../...b..../........",
+  "side": "white",
+  "moves": [
+   "b8xb2xg2xg8",
+   "b8xb5xd5xd1",
+   "b8xb5xg5xg8"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../...bbb.b/Wb..bbb./w......./w......./....wwww/...w.w.w/........",
+  "side": "white",
+  "moves": [
+   "a6xd6xd8"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../bbbbbbbb/.b.bbb.b/b.b...../w......w/wwwww.w./w.www.ww/.....B..",
+  "side": "white",
+  "moves": [
+   "a4xa6xc6xc8=K"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "..W...../..bbbbbb/b.b.bb../..b.B.../w...wb../wwww..w./..www.w./........",
+  "side": "black",
+  "moves": [
+   "e5xe3xe1",
+   "e5xe3xh3"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../..b..bbb/..b.b..b/......b./......w./..w..w.w/.w.w..ww/........",
+  "side": "white",
+  "moves": [
+   "g4xg6xg8=K"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../......../.......b/.wW..b../...w..../.ww.ww../wwwww.../........",
+  "side": "white",
+  "moves": [
+   "c5xh5xh7",
+   "c5xh5xh8"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../bbbbbb.b/b.bbb.bb/.....Bb./.w....bw/......../wwwww..w/........",
+  "side": "white",
+  "moves": [
+   "h4xf4xf6xf8=K"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../bbbbbbbb/b.bbbb.b/.b....b./....www./wwww...w/wwwwwwww/........",
+  "side": "black",
+  "moves": [
+   "g5xg3xg1=K"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../bbbbbbbb/b.bbbb.b/.b....../.w..ww../w.ww...w/wwwwww.w/......B.",
+  "side": "black",
+  "moves": [
+   "b5xb3xb1=K"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../......Ww/.W.b..../......../w...b.../.www.ww./www.wwww/........",
+  "side": "white",
+  "moves": [
+   "b6xe6xe3"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../bbbbbbbw/.b.bb.bb/w......./.w..w.../..w..w../www.wwww/......B.",
+  "side": "black",
+  "moves": [
+   "g1xg3xd3xa3xa1",
+   "g1xg3xd3xa3xa6",
+   "g1xg3xd3xb3xb1",
+   "g1xg3xd3xb3xb5",
+   "g1xg3xe3xa3xa1",
+   "g1xg3xe3xa3xa6",
+   "g1xg3xe3xb3xb1",
+   "g1xg3xe3xb3xb5",
+   "g1xg4xc4xa4xa1",
+   "g1xg4xc4xa4xa6",
+   "g1xg4xd4xa4xa1",
+   "g1xg4xd4xa4xa6"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../bbbbbbbb/bbbbbbb./.......b/.......w/wwwwwww./wwwwwwww/........",
+  "side": "white",
+  "moves": [
+   "h4xh6xh8=K"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "WW...W../..bb.bbb/......b./.......w/......../.ww.ww../wwwwwwww/........",
+  "side": "white",
+  "moves": [
+   "f8xf6xh6xh8"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../bbbbb.bb/B.b.b.b./.bb..b../.....w../.w.ww.ww/.www.w../........",
+  "side": "black",
+  "moves": [
+   "f5xf3xf1=K"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": ".....W../b.w...../.b....../b.w...../w......b/..ww..../ww.wwwww/........",
+  "side": "black",
+  "moves": [
+   "a5xa3xa1=K"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../..bbb.b./b.bb.b.b/..b.b.../......../.......w/....W.../........",
+  "side": "white",
+  "moves": [
+   "e2xe6xg6xg8"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../bbbb.bbb/b..bb.bb/......../..w....w/.....ww./.wwwww../B.....B.",
+  "side": "black",
+  "moves": [
+   "g1xg4xb4xb1"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../bbb.bbbb/.bb.bb../....w.../.B...w.b/......../..ww...w/B.......",
+  "side": "black",
+  "moves": [
+   "e6xe4xg4"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../bbbbb.b./......../..b...../.w.b..../w..www../.wwwww.b/........",
+  "side": "white",
+  "moves": [
+   "d3xd5xb5"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../b....bb./.bb....b/wb....../......../....b.../...b..../........",
+  "side": "white",
+  "moves": [
+   "a5xc5xc7"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../bbbbbbbb/bbbbb.b./.....b.b/......ww/wwwwww../wwwwwwww/........",
+  "side": "white",
+  "moves": [
+   "h4xh6xf6xf8=K"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../bbbbbbbb/b.b.bbbb/.b.b..../www...../...wwwww/wwwwwwww/........",
+  "side": "black",
+  "moves": [
+   "b5xb3xb1=K"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../bb.bbbb./b.bb.bbb/.bb.w.b./..w....B/ww.w..../wwww.ww./........",
+  "side": "black",
+  "moves": [
+   "c5xc3xc1=K",
+   "c5xc3xe3"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "....W..W/bbb..bbb/.....bbb/b.b...../.....w.w/Bw.w.ww./.wwww.ww/........",
+  "side": "black",
+  "moves": [
+   "a3xc3xe3xe1"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "W......./.......b/..b....b/......../.b.w.b../...w.W../www..www/........",
+  "side": "white",
+  "moves": [
+   "f3xf6xb6xb3"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": ".......W/..bb.b.b/.b....../b....w.w/......../.ww.w.../..www.ww/........",
+  "side": "white",
+  "moves": [
+   "h8xh6xa6xa1",
+   "h8xh6xa6xa2",
+   "h8xh6xa6xa3",
+   "h8xh6xa6xa4"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../.bbbbb.b/bb.bbbbb/b.b.b.../w.w..w../w.wwwwww/ww.www.w/........",
+  "side": "white",
+  "moves": [
+   "c4xc6xc8=K"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../bbbbbbbb/bb..b.bb/..bb.b../...w..w./www.wwww/wwwwww.w/........",
+  "side": "white",
+  "moves": [
+   "d4xd6xf6xf8=K"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../bbb...../......b./..b...wW/w......w/.www..ww/..wwww.w/........",
+  "side": "black",
+  "moves": [
+   "g6xg4xg2"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../.bb.b.bb/.bb...../b...b.../..w.w.../......../....ww../........",
+  "side": "black",
+  "moves": [
+   "e5xe3xe1=K"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": ".....W../bbbb.bbb/.b....bb/w.....b./w......w/ww..wwww/.www.www/........",
+  "side": "white",
+  "moves": [
+   "f8xf6xa6xa8"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "W......./.....b.w/..b...../...wb.../..w...../....w..w/www.wwww/........",
+  "side": "black",
+  "moves": [
+   "e5xc5xc3xc1=K"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../......../......../w....W../......../www....w/w.....w./..B.....",
+  "side": "black",
+  "moves": [
+   "c1xc5xh5xh2xb2xb4",
+   "c1xc5xh5xh2xb2xb5",
+   "c1xc5xh5xh2xb2xb6",
+   "c1xc5xh5xh2xb2xb7",
+   "c1xc5xh5xh2xb2xb8"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../bbb.bbbb/.bbbbb.b/...B..b./b.....w./.w...w.w/ww..wwww/........",
+  "side": "black",
+  "moves": [
+   "g5xg3xe3xe1=K"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../bbbbbbbb/bbbb.bbb/w..b..../......../wwwwwwww/.wwwwwww/........",
+  "side": "black",
+  "moves": [
+   "a6xa4xa2"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../.w....../.w.b..../w......./..w...../ww..ww.b/....w.wb/........",
+  "side": "black",
+  "moves": [
+   "h2xf2xd2"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../bbbbbbbb/.bb.bb.b/.B....b./......w./....ww.w/b.wwwwww/........",
+  "side": "black",
+  "moves": [
+   "g5xg3xg1=K"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../..bbbbb./.b...bbb/w....w../..b.w.../....ww../ww..wwww/........",
+  "side": "black",
+  "moves": [
+   "f6xf4xd4"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../bbbbbbbb/.bbb.bb./b....bb./w.w...../w..wwwww/wwwwwwww/........",
+  "side": "white",
+  "moves": [
+   "a4xa6xa8=K"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../bb.bbbb./.bbbbb.w/b......./wwww..../.w.w...w/www..www/........",
+  "side": "white",
+  "moves": [
+   "a4xa6xa8=K"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": ".......W/.....b../....b.b./.....w../..w.w..w/.w...ww./..wwww.w/.B......",
+  "side": "black",
+  "moves": [
+   "b1xb4xd4xf4xf6",
+   "b1xb4xd4xg4xg1",
+   "b1xb4xd4xg4xg2",
+   "b1xb5xh5xh3xh1"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../.bbbbbbb/b.bb..b./b..B..b./.w.w...w/.ww...ww/w..w..../........",
+  "side": "black",
+  "moves": [
+   "d5xd3xd1"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../bbbbbbbb/bbbbb.bb/.....b../.....w../wwwww.ww/wwwwwwww/........",
+  "side": "white",
+  "moves": [
+   "f4xf6xf8=K"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "....W.../bbbb.bbb/bbb.b..b/...b..../..w....w/ww.www../wwwwwwww/........",
+  "side": "white",
+  "moves": [
+   "e8xe5xa5",
+   "e8xe5xb5",
+   "e8xe5xc5"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../b..bbbb./bbbbb.b./.b...bb./bb....../w.w.ww../wwww.www/........",
+  "side": "white",
+  "moves": [
+   "a3xa5xc5xc7"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "W......./b.b.bb.b/.b..b.bb/......bB/.....w../w......./...b..../...B....",
+  "side": "white",
+  "moves": [
+   "a8xa6xc6xf6xf8",
+   "a8xa6xd6xf6xf8"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../......w./......../..w..b../..w.w.../.w.w...w/.ww...../....B...",
+  "side": "black",
+  "moves": [
+   "e1xe7xh7xh1",
+   "e1xe7xh7xh2"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../bbbbbbb./...bb.bb/.....b../......../..B..bw./.......w/B..B....",
+  "side": "black",
+  "moves": [
+   "f3xh3xh1=K"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "..W...../bbb.bbbb/bb.bbb.b/......b./...w..../ww..wwww/wwwwwwww/........",
+  "side": "white",
+  "moves": [
+   "c8xc5xh5"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../bbbb.bb./bbb.b.b./.b...B../..B...../w...ww.w/.w.w..w./........",
+  "side": "black",
+  "moves": [
+   "f5xf2xc2xa2xa4",
+   "f5xf2xc2xa2xa5"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../bbbb.bb./bbb.bb../Bb....../..B.w.../.......w/.....w../........",
+  "side": "black",
+  "moves": [
+   "c4xh4xh2xa2",
+   "c4xh4xh2xb2",
+   "c4xh4xh2xc2",
+   "c4xh4xh2xd2",
+   "c4xh4xh2xe2"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": ".W....../b.bb...b/b..b..../..b...../..w..b../w.wwwwww/wwww.www/........",
+  "side": "white",
+  "moves": [
+   "c4xc6xc8=K",
+   "c4xc6xe6"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": ".WW...../.b.b...b/b..b..../....w.../......../w.ww.www/wwww.www/........",
+  "side": "white",
+  "moves": [
+   "b8xb6xh6xh8"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "...W..../bbb.bbbb/.bb...bb/b...b.../w......./.wwwwwww/wwww.www/........",
+  "side": "black",
+  "moves": [
+   "a5xa3xa1=K"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": ".W....../bbb.bbbb/.bb...bb/....b.../......../.wwwwwww/Bw.w.www/........",
+  "side": "black",
+  "moves": [
+   "a2xc2xe2xe4"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "...W..../bb.bb.b./bb..b.../.b...b../......../ww..w.w./wwwww.ww/........",
+  "side": "white",
+  "moves": [
+   "d8xd5xg5xg8",
+   "d8xd6xf6xf1",
+   "d8xd6xf6xf2",
+   "d8xd6xf6xf3",
+   "d8xd6xf6xf4",
+   "d8xd6xg6xg8"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../bbbbbbb./..bb.bbb/....b.../...b..../...www.w/wwwwww../........",
+  "side": "white",
+  "moves": [
+   "d3xd5xf5"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../bbbbbbbb/bbb.b.bb/....b.../..w...w./ww....ww/wwww.www/.....B..",
+  "side": "black",
+  "moves": [
+   "f1xf4xa4",
+   "f1xf4xb4",
+   "f1xf4xh4"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../bbbbbbbb/bb.bbbbb/..b...../..w...../ww.wwwww/wwwwwwww/........",
+  "side": "white",
+  "moves": [
+   "c4xc6xc8=K"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../bbbbbbbb/bb.b.bbb/..b...../..w...../w.w.w.ww/w.w..www/..B.....",
+  "side": "white",
+  "moves": [
+   "c4xc6xe6xe8=K"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......W./b.bb.bbb/.bb..bbb/...b..../......w./w..w...w/.ww..www/..B.....",
+  "side": "black",
+  "moves": [
+   "c1xc3xf3xf1",
+   "c1xc3xg3xg1",
+   "c1xc3xg3xg5"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../..bbbbbw/..b.bb../w...b.../....ww../w.w...w./wwwwwwww/........",
+  "side": "black",
+  "moves": [
+   "e5xe3xe1=K"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../.b...b../......../..b...../.ww...../W...www./wwwwwwww/........",
+  "side": "black",
+  "moves": [
+   "c5xc3xc1=K"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../b.bbbb.b/b.bbb.../....W.../.....Bb./.ww.w.../www...w./........",
+  "side": "black",
+  "moves": [
+   "e6xe4xe2"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": ".......W/.bbbbb.b/bbbbbb../b.....b./.....w../wwwww..w/wwwwwwww/........",
+  "side": "white",
+  "moves": [
+   "h8xh5xb5",
+   "h8xh5xc5",
+   "h8xh5xd5",
+   "h8xh5xe5",
+   "h8xh5xf5"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../b.bbbb../b.bb..bb/......../b..w...b/bw....../..w.ww../........",
+  "side": "black",
+  "moves": [
+   "a3xc3xc1=K"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": ".....W../......../w...bb../......../...b..../w......./w..ww..w/........",
+  "side": "white",
+  "moves": [
+   "f8xf4xa4",
+   "f8xf4xb4",
+   "f8xf4xc4"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../......../.w....../......../w......./......../w..ww.../....B...",
+  "side": "black",
+  "moves": [
+   "e1xe6xa6xa3xa1"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../bbbbbbbb/.b.bbbbb/b.b..w../......../wwwwwwww/wwwww.ww/........",
+  "side": "black",
+  "moves": [
+   "f6xf4xf2"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../bbbb.bbb/.b.bbb.b/b.bb..../..w...w./.wwww..w/wwwwwbww/........",
+  "side": "white",
+  "moves": [
+   "c4xc6xa6xa8=K"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../b..b..../.b..b.../w......w/.b.w..ww/.www.w../ww...w.w/........",
+  "side": "white",
+  "moves": [
+   "b3xb5xb7"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../.b.bbb.b/...b..../b...b.../..b.b..w/ww..w.../..ww.w.w/........",
+  "side": "black",
+  "moves": [
+   "e4xe2xg2"
+  ]
+ },
+ {
+  "kind": "multiCapture",
+  "board": "......../bbbbbbbb/b.b.bbbb/.b.b..../...w...w/www.www./wwwwwwww/........",
+  "side": "white",
+  "moves": [
+   "d4xd6xb6xb8=K"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": "......../.bbbbbbb/bbbb.b.b/....b.../......../...w...w/.w....../...B....",
+  "side": "black",
+  "moves": [
+   "d1xd4",
+   "d1xd5"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": "......../bb.bbb.b/bbbb.b../......../..wwww../.w.....w/w.ww..../.B......",
+  "side": "black",
+  "moves": [
+   "b1xb4",
+   "b1xb5"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": "......../bb..bb.b/b..b..../.b.b..../..w...../......../..w..B../........",
+  "side": "black",
+  "moves": [
+   "f2xa2",
+   "f2xb2"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": "......../..bbbb../.b....../w......w/......../....wWw./wwwwwwww/........",
+  "side": "white",
+  "moves": [
+   "f3xf8"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": ".....W../..bbb.bb/......b./b..b.b.b/......../wwwwwwww/.wwwwwww/........",
+  "side": "white",
+  "moves": [
+   "f8xf4"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": "......../..b.b.bb/..b...b./.......b/..w.W.w./.w.w.w.w/..ww.www/.B...B..",
+  "side": "white",
+  "moves": [
+   "e4xe8"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": ".....W../.w....../....b..b/.....b../......../.....w.w/b.w.w.ww/........",
+  "side": "white",
+  "moves": [
+   "f8xf4"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": "......../.bb..bbb/.b..b.b./..W....w/..w...../.w..www./wwwwwwww/........",
+  "side": "white",
+  "moves": [
+   "c5xc8"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": "......../bbbbbbbb/b.b..bbb/..b...B./...b...w/ww...w../www.wwww/........",
+  "side": "black",
+  "moves": [
+   "g5xg1"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": "....W.../bbbb.bbb/bbbb.b.b/......../......../wwww...w/www.wwww/....B...",
+  "side": "black",
+  "moves": [
+   "e1xe3",
+   "e1xe4",
+   "e1xe5",
+   "e1xe6",
+   "e1xe7"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": "......../bb.w..b./...B..../......../......ww/....w.../......../........",
+  "side": "black",
+  "moves": [
+   "d6xd8"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": "......../.b.bbbb./b..b.b../..w.b.../.......W/wW.wwww./wwwwwwww/........",
+  "side": "white",
+  "moves": [
+   "b3xb8"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": "......../.......w/......../..w...../......../b.B...../......../........",
+  "side": "black",
+  "moves": [
+   "c3xc6",
+   "c3xc7",
+   "c3xc8"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": ".....W.W/......../......../w....b../.......w/ww...ww./.www.www/........",
+  "side": "white",
+  "moves": [
+   "f8xf4"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": "W......./b.bbbbbb/.bbbbbbb/......../......../.wwwwwww/wwwwwwww/........",
+  "side": "white",
+  "moves": [
+   "a8xa3",
+   "a8xa4",
+   "a8xa5",
+   "a8xa6"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": "......../bbbbbbbb/bbb.bbbb/......../.w....../w.w.wwww/w..wwwww/.B......",
+  "side": "black",
+  "moves": [
+   "b1xb5"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": "......../bbbbbbbb/bb.bb..b/......../......../.w..ww../...w.w../.B......",
+  "side": "black",
+  "moves": [
+   "b1xb4",
+   "b1xb5"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": "..W...../b...bbbb/....bbb./b.B...../...w..../.w.w..w./.w..w.w./........",
+  "side": "white",
+  "moves": [
+   "c8xc1",
+   "c8xc2",
+   "c8xc3",
+   "c8xc4"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": "......../bbbbbb../.bb..b.B/......../..w...../w.www.../w..ww.ww/........",
+  "side": "black",
+  "moves": [
+   "h6xh1"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": "...W..../bb.bbbbb/bbb....b/...w..b./..w...../ww...www/wwwwwwww/........",
+  "side": "white",
+  "moves": [
+   "d8xd6"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": "......../b...b.../..b.bb../......../W......./.www..ww/wwwww..w/........",
+  "side": "white",
+  "moves": [
+   "a4xa8"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": "..W..W../bb..b.bb/bb..b.bb/.....b../......../w.w.wwww/wwwwwwww/........",
+  "side": "white",
+  "moves": [
+   "f8xf4"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": "......../bbbbbbbb/bb.bbbb./......Bb/w...w.../..ww..ww/w..www.w/........",
+  "side": "black",
+  "moves": [
+   "g5xg1",
+   "g5xg2"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": ".......W/..b.bb.b/....bbb./......../......../w.w.w.ww/.wwwwwww/........",
+  "side": "white",
+  "moves": [
+   "h8xh4",
+   "h8xh5",
+   "h8xh6"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": "......../b.bbb..b/..bbbb.b/.b....b./b......./B..w..../......../.......B",
+  "side": "black",
+  "moves": [
+   "a3xe3",
+   "a3xf3",
+   "a3xg3",
+   "a3xh3"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": "......../..W.b.bb/.......b/.....w../.w.....w/w.www..w/wwwww.ww/........",
+  "side": "white",
+  "moves": [
+   "c7xf7"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": "......../bbbbbbbb/b..bb.bb/.b....B./.....w../w.www.../wwbwwww./........",
+  "side": "black",
+  "moves": [
+   "g5xg1"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": "......../bb.bbbbb/bbb.bbbb/b......./.ww.w.ww/w......w/www.ww../......B.",
+  "side": "black",
+  "moves": [
+   "g1xg5"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": "......../...b.b.b/.....bb./w......./w..W..../....wwww/...w.w.w/........",
+  "side": "white",
+  "moves": [
+   "d4xd8"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": "......../b..b..bb/.b....bb/......../...W..../wwww.www/wwwwwwww/........",
+  "side": "white",
+  "moves": [
+   "d4xd8"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": "......../b..bbbb./...bb.../b.b...../b...wW../..ww.ww./wwwwwwww/........",
+  "side": "white",
+  "moves": [
+   "f4xf8"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": "W......./.bbbb.bb/..bb.bbb/......../.....W../.wwwww.w/wwwwwwww/........",
+  "side": "white",
+  "moves": [
+   "f4xf7",
+   "f4xf8"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": "......../bbbbb.bb/B.b.b.b./..b...../......../..w.ww.w/..ww..../B....B..",
+  "side": "black",
+  "moves": [
+   "f1xf4",
+   "f1xf5",
+   "f1xf6",
+   "f1xf7",
+   "f1xf8"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": "......../..bbb.b./......../...b..../.b.....W/w.wwww../ww.wwwww/........",
+  "side": "white",
+  "moves": [
+   "h4xa4"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": ".......W/bb.b.bb./..bbw.../.......w/.......w/..www.w./.wwwww.w/......B.",
+  "side": "black",
+  "moves": [
+   "d6xf6",
+   "g1xg4",
+   "g1xg5",
+   "g1xg6"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": "......../bbbbb.bb/b.bb.bb./.......b/..b.w.B./.......w/......../..B.....",
+  "side": "black",
+  "moves": [
+   "g4xd4"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": "......../.bb.b.bb/.b.b.b../b....B../..w...../.w....../www.ww../........",
+  "side": "black",
+  "moves": [
+   "f5xf1"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": "......../bb.bbbbb/b...bb.b/W.....b./w......./.w.wwwww/wwwwwwww/........",
+  "side": "white",
+  "moves": [
+   "a5xh5"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": "...W...W/......../....b.b./...bb.../ww...w../w..ww..w/w..wwwww/........",
+  "side": "white",
+  "moves": [
+   "d8xd4"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": ".B....../b.b.bbbb/....bbbb/..w.B.../...w...w/.....www/..ww.w.w/........",
+  "side": "black",
+  "moves": [
+   "e5xa5",
+   "e5xb5"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": "......../b..b.bb./.....bb./.......b/..b...../.....w.w/.....B.w/........",
+  "side": "black",
+  "moves": [
+   "f2xf4",
+   "f2xf5"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": "......W./bbbbbb.b/bbbbb.bb/......../......../wwwwww.w/wwwwwwww/........",
+  "side": "white",
+  "moves": [
+   "g8xg3",
+   "g8xg4",
+   "g8xg5"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": "......../bbbbbbbb/b..bbbbb/......../......../w..wwwww/..wwwwww/..B.....",
+  "side": "black",
+  "moves": [
+   "c1xc3",
+   "c1xc4",
+   "c1xc5",
+   "c1xc6"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": ".....W../b..bb.bb/...bbb.b/.....W../......../w.www.ww/wwwwwwww/........",
+  "side": "white",
+  "moves": [
+   "f5xf7"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": ".....W../bbbb...b/..bb.b../w......w/......../.w.ww.w./wwwwwwww/........",
+  "side": "white",
+  "moves": [
+   "f8xf3",
+   "f8xf4",
+   "f8xf5"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": "......../.bbbb.bb/b.bbb..b/...w..../W..w..../.ww..w.w/wwwwwwww/........",
+  "side": "white",
+  "moves": [
+   "a4xa7",
+   "a4xa8"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": "..W...../bb.bbbbb/bbb.bbbb/......../......../ww.wwwww/wwwwwwww/........",
+  "side": "white",
+  "moves": [
+   "c8xc3",
+   "c8xc4",
+   "c8xc5"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": "......../b.b..bbb/b....bbb/.b....../w.W...w./.wwwwwww/wwww..ww/........",
+  "side": "white",
+  "moves": [
+   "c4xc8"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": "......../..W...../......../.......b/......../......../..B...../........",
+  "side": "black",
+  "moves": [
+   "c2xc8"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": "......W./..bbbb.b/bb.bbb.b/.b...B../..w...../w.w..w.w/.www..ww/........",
+  "side": "black",
+  "moves": [
+   "f5xf1",
+   "f5xf2"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": "....W.../.bbb.bbb/b.....b./..b.b.b./......../.wwww.ww/wwwwwbww/........",
+  "side": "white",
+  "moves": [
+   "e8xe4"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": ".W....../b.bbb.../..b.bb.b/......../.....w../.......W/ww.wwwww/..B.....",
+  "side": "white",
+  "moves": [
+   "h3xh7",
+   "h3xh8"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": "......W./......../.b.b..../.b....../..b...../......B./......../........",
+  "side": "white",
+  "moves": [
+   "g8xg1",
+   "g8xg2"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": "......../b.bbbbbb/.bb.b..b/b..b..../......../....w..w/w.w.www./.......B",
+  "side": "black",
+  "moves": [
+   "h1xh4",
+   "h1xh5"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": "......../..b..bbb/.b.b..b./.......W/.......w/w.wwwwww/w.www.w./......B.",
+  "side": "white",
+  "moves": [
+   "h5xh8"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": ".W....../.bbbbbbb/b...bbbb/.w....../.......w/w.w.www./wwwwwwww/........",
+  "side": "white",
+  "moves": [
+   "b8xb6"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": "......../b..bbbbb/...bbbb./.....b.b/W.....w./w.www..w/wwwwwwww/........",
+  "side": "white",
+  "moves": [
+   "a4xa8"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": "......../bbbbbbbb/bbbb.bb./.......w/....w..w/www..ww./ww.w..w./....B...",
+  "side": "black",
+  "moves": [
+   "e1xe5",
+   "e1xe6"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": "......../b.bbbbb./.bbbb.bb/.....B.b/......../..w...w./.ww....w/W.......",
+  "side": "white",
+  "moves": [
+   "a1xa8"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": "......../bbbbbbbb/b.bb.bbb/......../w..w..w./.......w/w.b..w.w/......B.",
+  "side": "black",
+  "moves": [
+   "g1xg5"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": "......../bbbbbbbb/b.bbb.bb/.....b../w..w...w/....www./www.wwww/...B....",
+  "side": "black",
+  "moves": [
+   "d1xd5"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": "......../bbbbb.bb/.bb.b.bb/...b..../w......./.w....w./...w...b/.B......",
+  "side": "black",
+  "moves": [
+   "b1xb4",
+   "b1xb5"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": "......../b...b.bb/b..b..../......../......../w......w/.W.ww..w/.B......",
+  "side": "black",
+  "moves": [
+   "b1xb3",
+   "b1xb4",
+   "b1xb5",
+   "b1xb6",
+   "b1xb7",
+   "b1xb8"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": "......../bbwbbbbb/..bbbbb./......../..w....w/.ww.w.ww/Bw.ww.w./........",
+  "side": "black",
+  "moves": [
+   "a2xc2"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": "W......./.......W/.....b../.......b/......../w.wwww.w/wwwwwwww/........",
+  "side": "white",
+  "moves": [
+   "h7xh4"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": "......../bbbbb..b/b.b.bbb./...w..../.b....../.ww.wwWw/wwwwwwww/........",
+  "side": "white",
+  "moves": [
+   "b3xb5",
+   "g3xg7",
+   "g3xg8"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": "..W...../b.b.bb.b/b.bb..../.......w/....w.../Bwww.w../w.ww.www/........",
+  "side": "black",
+  "moves": [
+   "a3xa1"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": "......../W.....B./....bb../......../......../......../......../........",
+  "side": "white",
+  "moves": [
+   "a7xh7"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": "......../......../......../..w...../......../....bww./.....w.w/....W...",
+  "side": "white",
+  "moves": [
+   "e1xe4",
+   "e1xe5",
+   "e1xe6",
+   "e1xe7",
+   "e1xe8",
+   "f3xd3"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": "......W./...b..../.......w/......b./......../w......./.......b/........",
+  "side": "white",
+  "moves": [
+   "g8xg1",
+   "g8xg2",
+   "g8xg3",
+   "g8xg4"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": "......../.....b../.b..W..b/......../.B....../w.www.../w.w.w.w./.B......",
+  "side": "white",
+  "moves": [
+   "e6xa6"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": "......W./bbbbbbb./..bbbb.b/b......b/....w.../w.www.ww/..www.ww/........",
+  "side": "white",
+  "moves": [
+   "g8xg4",
+   "g8xg5",
+   "g8xg6"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": ".W....../..bb.b../b......b/bb...b../w......w/wwwww.../w.wwwwww/........",
+  "side": "white",
+  "moves": [
+   "b8xb4"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": "......../bbbbb..b/bbbbbb../......W./w...ww../w..www../wwwwww../......B.",
+  "side": "black",
+  "moves": [
+   "g1xg6",
+   "g1xg7",
+   "g1xg8"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": "...W..../.bb.b.bb/Wbb...bb/...b...b/......../.wwww.ww/wwwwwwww/........",
+  "side": "white",
+  "moves": [
+   "d8xd4"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": "......../bbbbbbbb/..bbbbBb/.......B/b......./.w....w./......../........",
+  "side": "black",
+  "moves": [
+   "g6xg1",
+   "g6xg2"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": "......../bb.bbbbb/b.b.bb.b/.....ww./......../.......w/.w.www../.....B..",
+  "side": "black",
+  "moves": [
+   "f1xf3",
+   "f1xf4",
+   "f6xf4"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": "......../bbbb.bbb/bb.bbbbb/B......./......b./......../ww...w../........",
+  "side": "black",
+  "moves": [
+   "a5xa1"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": "......../b..bb.bb/b..bb..b/b......b/...ww.../w......w/.ww.w.w./...B....",
+  "side": "black",
+  "moves": [
+   "d1xd5"
+  ]
+ },
+ {
+  "kind": "kingCapture",
+  "board": "W......./b.bbbbbb/.bbbbb.b/.......b/....w.../w.ww.www/wwwwwwww/........",
+  "side": "white",
+  "moves": [
+   "a8xa4",
+   "a8xa5",
+   "a8xa6"
+  ]
+ },
+ {
+  "kind": "promotion",
+  "board": "......../b.bb..b./....bbb./...b.b../..w.w.../.....www/wbwwwww./........",
+  "side": "black",
+  "moves": [
+   "a7-a6",
+   "a7-b7",
+   "b2-b1=K",
+   "c7-b7",
+   "c7-c6",
+   "d5-c5",
+   "d5-d4",
+   "d5-e5",
+   "d7-d6",
+   "d7-e7",
+   "e6-d6",
+   "e6-e5",
+   "f5-e5",
+   "f5-f4",
+   "f5-g5",
+   "g6-g5",
+   "g6-h6",
+   "g7-f7",
+   "g7-h7"
+  ]
+ },
+ {
+  "kind": "promotion",
+  "board": ".....W../b..b..b./......bb/....bb../...w...w/.....ww./wbwwwww./........",
+  "side": "black",
+  "moves": [
+   "a7-a6",
+   "a7-b7",
+   "b2-b1=K",
+   "d7-c7",
+   "d7-d6",
+   "d7-e7",
+   "e5-d5",
+   "e5-e4",
+   "f5-f4",
+   "f5-g5",
+   "g6-f6",
+   "g6-g5",
+   "g7-f7",
+   "g7-h7",
+   "h6-h5"
+  ]
+ },
+ {
+  "kind": "promotion",
+  "board": "......../bbbbbb.w/...b..../..b.bbb./......../...ww.../wwww.www/........",
+  "side": "white",
+  "moves": [
+   "a2-a3",
+   "b2-b3",
+   "c2-c3",
+   "d2-e2",
+   "d3-c3",
+   "d3-d4",
+   "e3-e4",
+   "e3-f3",
+   "f2-e2",
+   "f2-f3",
+   "g2-g3",
+   "h2-h3",
+   "h7-g7",
+   "h7-h8=K"
+  ]
+ },
+ {
+  "kind": "promotion",
+  "board": "......../.w..b.../.....b../..b....b/....w.../w....w../..b...../........",
+  "side": "black",
+  "moves": [
+   "c2-b2",
+   "c2-c1=K",
+   "c2-d2",
+   "c5-b5",
+   "c5-c4",
+   "c5-d5",
+   "e7-d7",
+   "e7-e6",
+   "e7-f7",
+   "f6-e6",
+   "f6-f5",
+   "f6-g6",
+   "h5-g5",
+   "h5-h4"
+  ]
+ },
+ {
+  "kind": "promotion",
+  "board": "......../.w...b../.....bbb/....b.bb/...w.w../......ww/b..ww.ww/........",
+  "side": "black",
+  "moves": [
+   "a2-a1=K",
+   "a2-b2",
+   "e5-d5",
+   "e5-e4",
+   "e5-f5",
+   "f6-e6",
+   "f6-f5",
+   "f7-e7",
+   "f7-g7",
+   "g5-f5",
+   "g5-g4",
+   "h5-h4"
+  ]
+ },
+ {
+  "kind": "promotion",
+  "board": "......../.w....../....b..b/.....W../......../.....w.w/b.w.w.ww/........",
+  "side": "white",
+  "moves": [
+   "b7-a7",
+   "b7-b8=K",
+   "b7-c7",
+   "c2-b2",
+   "c2-c3",
+   "c2-d2",
+   "e2-d2",
+   "e2-e3",
+   "e2-f2",
+   "f3-e3",
+   "f3-f4",
+   "f3-g3",
+   "f5-a5",
+   "f5-b5",
+   "f5-c5",
+   "f5-d5",
+   "f5-e5",
+   "f5-f4",
+   "f5-f6",
+   "f5-f7",
+   "f5-f8",
+   "f5-g5",
+   "f5-h5",
+   "g2-f2",
+   "g2-g3",
+   "h3-g3",
+   "h3-h4"
+  ]
+ },
+ {
+  "kind": "promotion",
+  "board": "......../...w..../.b....../..b...../......../......../.....b../........",
+  "side": "white",
+  "moves": [
+   "d7-c7",
+   "d7-d8=K",
+   "d7-e7"
+  ]
+ },
+ {
+  "kind": "promotion",
+  "board": "......../bbbb...w/bb.bb.../.......b/ww...w../w.w.w.../.wwwww.w/........",
+  "side": "white",
+  "moves": [
+   "a3-b3",
+   "a4-a5",
+   "b2-a2",
+   "b2-b3",
+   "b4-b5",
+   "b4-c4",
+   "c3-b3",
+   "c3-c4",
+   "c3-d3",
+   "d2-d3",
+   "e3-d3",
+   "e3-e4",
+   "e3-f3",
+   "f2-f3",
+   "f2-g2",
+   "f4-e4",
+   "f4-f5",
+   "f4-g4",
+   "h2-g2",
+   "h2-h3",
+   "h7-g7",
+   "h7-h8=K"
+  ]
+ },
+ {
+  "kind": "promotion",
+  "board": "......../bb..w..w/..b...b./......../.......w/.b.ww.../w.w.ww../........",
+  "side": "white",
+  "moves": [
+   "a2-a3",
+   "a2-b2",
+   "c2-b2",
+   "c2-c3",
+   "c2-d2",
+   "d3-c3",
+   "d3-d4",
+   "e2-d2",
+   "e3-e4",
+   "e3-f3",
+   "e7-d7",
+   "e7-e8=K",
+   "e7-f7",
+   "f2-f3",
+   "f2-g2",
+   "h4-g4",
+   "h4-h5",
+   "h7-g7",
+   "h7-h8=K"
+  ]
+ },
+ {
+  "kind": "promotion",
+  "board": "......../.w....../.b.....b/......../ww.w..ww/w.ww...w/...b...w/........",
+  "side": "black",
+  "moves": [
+   "b6-a6",
+   "b6-b5",
+   "b6-c6",
+   "d2-c2",
+   "d2-d1=K",
+   "d2-e2",
+   "h6-g6",
+   "h6-h5"
+  ]
+ },
+ {
+  "kind": "promotion",
+  "board": "......../..w...../......../.W....../wwww..w./w..w...w/.......w/....B...",
+  "side": "white",
+  "moves": [
+   "a3-b3",
+   "a4-a5",
+   "b5-a5",
+   "b5-b6",
+   "b5-b7",
+   "b5-b8",
+   "b5-c5",
+   "b5-d5",
+   "b5-e5",
+   "b5-f5",
+   "b5-g5",
+   "b5-h5",
+   "c4-c5",
+   "c7-b7",
+   "c7-c8=K",
+   "c7-d7",
+   "d3-c3",
+   "d3-e3",
+   "d4-d5",
+   "d4-e4",
+   "g4-f4",
+   "g4-g5",
+   "g4-h4",
+   "h2-g2",
+   "h3-g3",
+   "h3-h4"
+  ]
+ },
+ {
+  "kind": "promotion",
+  "board": "......../b.b.b.bb/b.bb.bb./....b.b./.ww...../.w....w./...ww..b/........",
+  "side": "black",
+  "moves": [
+   "a6-a5",
+   "a6-b6",
+   "a7-b7",
+   "c6-b6",
+   "c6-c5",
+   "c7-b7",
+   "c7-d7",
+   "d6-d5",
+   "d6-e6",
+   "e5-d5",
+   "e5-e4",
+   "e5-f5",
+   "e7-d7",
+   "e7-e6",
+   "e7-f7",
+   "f6-e6",
+   "f6-f5",
+   "g5-f5",
+   "g5-g4",
+   "g5-h5",
+   "g6-h6",
+   "g7-f7",
+   "h2-g2",
+   "h2-h1=K",
+   "h7-h6"
+  ]
+ },
+ {
+  "kind": "promotion",
+  "board": "......../b.bbb.../bb...bbb/....b..b/..w...../....w.w./....b..b/........",
+  "side": "black",
+  "moves": [
+   "a6-a5",
+   "a7-b7",
+   "b6-b5",
+   "b6-c6",
+   "c7-b7",
+   "c7-c6",
+   "d7-d6",
+   "e2-d2",
+   "e2-e1=K",
+   "e2-f2",
+   "e5-d5",
+   "e5-e4",
+   "e5-f5",
+   "e7-e6",
+   "e7-f7",
+   "f6-e6",
+   "f6-f5",
+   "g6-g5",
+   "h2-g2",
+   "h2-h1=K",
+   "h5-g5",
+   "h5-h4"
+  ]
+ },
+ {
+  "kind": "promotion",
+  "board": "......../b..bbbbw/bbbb.bb./......../......../.....ww./...ww..w/.B.B....",
+  "side": "white",
+  "moves": [
+   "d2-c2",
+   "d2-d3",
+   "e2-e3",
+   "e2-f2",
+   "f3-e3",
+   "f3-f4",
+   "g3-g4",
+   "g3-h3",
+   "h2-g2",
+   "h2-h3",
+   "h7-h8=K"
+  ]
+ },
+ {
+  "kind": "promotion",
+  "board": "......../w......./.....b../.....b../.....b../.w....ww/...w...w/........",
+  "side": "white",
+  "moves": [
+   "a7-a8=K",
+   "a7-b7",
+   "b3-a3",
+   "b3-b4",
+   "b3-c3",
+   "d2-c2",
+   "d2-d3",
+   "d2-e2",
+   "g3-f3",
+   "g3-g4",
+   "h2-g2",
+   "h3-h4"
+  ]
+ },
+ {
+  "kind": "promotion",
+  "board": "......../.b...w../....b.../b......./....w.../......../...www../........",
+  "side": "white",
+  "moves": [
+   "d2-c2",
+   "d2-d3",
+   "e2-e3",
+   "e4-d4",
+   "e4-e5",
+   "e4-f4",
+   "f2-f3",
+   "f2-g2",
+   "f7-e7",
+   "f7-f8=K",
+   "f7-g7"
+  ]
+ },
+ {
+  "kind": "promotion",
+  "board": "......../.....w../b...b.../...w..../b......./....w.../...w.w../........",
+  "side": "white",
+  "moves": [
+   "d2-c2",
+   "d2-d3",
+   "d2-e2",
+   "d5-c5",
+   "d5-d6",
+   "d5-e5",
+   "e3-d3",
+   "e3-e4",
+   "e3-f3",
+   "f2-e2",
+   "f2-f3",
+   "f2-g2",
+   "f7-e7",
+   "f7-f8=K",
+   "f7-g7"
+  ]
+ },
+ {
+  "kind": "promotion",
+  "board": ".....W../......../......../......../....w.b./.....w../b....w../........",
+  "side": "black",
+  "moves": [
+   "a2-a1=K",
+   "a2-b2",
+   "g4-f4",
+   "g4-g3",
+   "g4-h4"
+  ]
+ },
+ {
+  "kind": "promotion",
+  "board": "......../bb.bb.bb/...bbbb./......../...ww.../ww.w.ww./..wwww.b/........",
+  "side": "black",
+  "moves": [
+   "a7-a6",
+   "b7-b6",
+   "b7-c7",
+   "d6-c6",
+   "d6-d5",
+   "d7-c7",
+   "e6-e5",
+   "e7-f7",
+   "f6-f5",
+   "g6-g5",
+   "g6-h6",
+   "g7-f7",
+   "h2-g2",
+   "h2-h1=K",
+   "h7-h6"
+  ]
+ },
+ {
+  "kind": "promotion",
+  "board": ".....B../bbbbb.../.b.bbb../.....b../......../...w..../b.....w./........",
+  "side": "black",
+  "moves": [
+   "a2-a1=K",
+   "a2-b2",
+   "a7-a6",
+   "b6-a6",
+   "b6-b5",
+   "b6-c6",
+   "c7-c6",
+   "d6-c6",
+   "d6-d5",
+   "e6-e5",
+   "e7-f7",
+   "f5-e5",
+   "f5-f4",
+   "f5-g5",
+   "f6-g6",
+   "f8-a8",
+   "f8-b8",
+   "f8-c8",
+   "f8-d8",
+   "f8-e8",
+   "f8-f7",
+   "f8-g8",
+   "f8-h8"
+  ]
+ },
+ {
+  "kind": "promotion",
+  "board": "......../.b.b...b/b...bbb./..w...../w......./.w.w..ww/wwwww..b/........",
+  "side": "black",
+  "moves": [
+   "a6-a5",
+   "a6-b6",
+   "b7-a7",
+   "b7-b6",
+   "b7-c7",
+   "d7-c7",
+   "d7-d6",
+   "d7-e7",
+   "e6-d6",
+   "e6-e5",
+   "f6-f5",
+   "g6-g5",
+   "g6-h6",
+   "h2-g2",
+   "h2-h1=K",
+   "h7-g7",
+   "h7-h6"
+  ]
+ },
+ {
+  "kind": "promotion",
+  "board": "......../..b...../.....b../.w.....b/..b...../......../.....b../........",
+  "side": "black",
+  "moves": [
+   "c4-b4",
+   "c4-c3",
+   "c4-d4",
+   "c7-b7",
+   "c7-c6",
+   "c7-d7",
+   "f2-e2",
+   "f2-f1=K",
+   "f2-g2",
+   "f6-e6",
+   "f6-f5",
+   "f6-g6",
+   "h5-g5",
+   "h5-h4"
+  ]
+ },
+ {
+  "kind": "promotion",
+  "board": "......../...bbbbw/..b...../.b....../......../......../..b...../.....B..",
+  "side": "black",
+  "moves": [
+   "b5-a5",
+   "b5-b4",
+   "b5-c5",
+   "c2-b2",
+   "c2-c1=K",
+   "c2-d2",
+   "c6-b6",
+   "c6-c5",
+   "c6-d6",
+   "d7-c7",
+   "d7-d6",
+   "e7-e6",
+   "f1-a1",
+   "f1-b1",
+   "f1-c1",
+   "f1-d1",
+   "f1-e1",
+   "f1-f2",
+   "f1-f3",
+   "f1-f4",
+   "f1-f5",
+   "f1-f6",
+   "f1-g1",
+   "f1-h1",
+   "f7-f6",
+   "g7-g6"
+  ]
+ },
+ {
+  "kind": "promotion",
+  "board": "......../....b..w/....b.../......Bb/......../.......w/......../........",
+  "side": "white",
+  "moves": [
+   "h3-g3",
+   "h3-h4",
+   "h7-g7",
+   "h7-h8=K"
+  ]
+ },
+ {
+  "kind": "promotion",
+  "board": "......../.bbb..bb/b.bb.b../...b..../.w....../..w.w.ww/.www.b.w/........",
+  "side": "black",
+  "moves": [
+   "a6-a5",
+   "a6-b6",
+   "b7-a7",
+   "b7-b6",
+   "c6-b6",
+   "c6-c5",
+   "d5-c5",
+   "d5-d4",
+   "d5-e5",
+   "d6-e6",
+   "d7-e7",
+   "f2-e2",
+   "f2-f1=K",
+   "f2-g2",
+   "f6-e6",
+   "f6-f5",
+   "f6-g6",
+   "g7-f7",
+   "g7-g6",
+   "h7-h6"
+  ]
+ },
+ {
+  "kind": "promotion",
+  "board": "......../.......b/...b...b/......../b......./......../.w.....b/........",
+  "side": "black",
+  "moves": [
+   "a4-a3",
+   "a4-b4",
+   "d6-c6",
+   "d6-d5",
+   "d6-e6",
+   "h2-g2",
+   "h2-h1=K",
+   "h6-g6",
+   "h6-h5",
+   "h7-g7"
+  ]
+ },
+ {
+  "kind": "promotion",
+  "board": "......../bbbbbbbb/b..bb..b/.b....b./....w.../www.w.w./wwbww.../B.......",
+  "side": "black",
+  "moves": [
+   "a1-b1",
+   "a1-c1",
+   "a1-d1",
+   "a1-e1",
+   "a1-f1",
+   "a1-g1",
+   "a1-h1",
+   "a6-a5",
+   "a6-b6",
+   "b5-a5",
+   "b5-b4",
+   "b5-c5",
+   "b7-b6",
+   "c2-c1=K",
+   "c7-c6",
+   "d6-c6",
+   "d6-d5",
+   "e6-e5",
+   "e6-f6",
+   "f7-f6",
+   "g5-f5",
+   "g5-g4",
+   "g5-h5",
+   "g7-g6",
+   "h6-g6",
+   "h6-h5"
+  ]
+ },
+ {
+  "kind": "promotion",
+  "board": "......../w....b../......../b.b....b/......w./w...w..w/.wwwwww./........",
+  "side": "white",
+  "moves": [
+   "a3-a4",
+   "a3-b3",
+   "a7-a8=K",
+   "a7-b7",
+   "b2-a2",
+   "b2-b3",
+   "c2-c3",
+   "d2-d3",
+   "e3-d3",
+   "e3-e4",
+   "e3-f3",
+   "f2-f3",
+   "g2-g3",
+   "g2-h2",
+   "g4-f4",
+   "g4-g5",
+   "g4-h4",
+   "h3-g3",
+   "h3-h4"
+  ]
+ },
+ {
+  "kind": "promotion",
+  "board": "......../..b.b..b/..w.bb../......../......../..w..w.w/..w...ww/........",
+  "side": "white",
+  "moves": [
+   "c6xc8=K"
+  ]
+ },
+ {
+  "kind": "promotion",
+  "board": "......../bbbbb.../b..bb.../...b..../w.w....b/ww....../..w.w..b/........",
+  "side": "black",
+  "moves": [
+   "a6-a5",
+   "a6-b6",
+   "b7-b6",
+   "c7-c6",
+   "d5-c5",
+   "d5-d4",
+   "d5-e5",
+   "d6-c6",
+   "e6-e5",
+   "e6-f6",
+   "e7-f7",
+   "h2-g2",
+   "h2-h1=K",
+   "h4-g4",
+   "h4-h3"
+  ]
+ },
+ {
+  "kind": "promotion",
+  "board": "......../...b.b../...b..../......../......w./......../...b..../........",
+  "side": "black",
+  "moves": [
+   "d2-c2",
+   "d2-d1=K",
+   "d2-e2",
+   "d6-c6",
+   "d6-d5",
+   "d6-e6",
+   "d7-c7",
+   "d7-e7",
+   "f7-e7",
+   "f7-f6",
+   "f7-g7"
+  ]
+ },
+ {
+  "kind": "promotion",
+  "board": "......../..b..b../...b..../......../.......w/......../...b..../........",
+  "side": "black",
+  "moves": [
+   "c7-b7",
+   "c7-c6",
+   "c7-d7",
+   "d2-c2",
+   "d2-d1=K",
+   "d2-e2",
+   "d6-c6",
+   "d6-d5",
+   "d6-e6",
+   "f7-e7",
+   "f7-f6",
+   "f7-g7"
+  ]
+ },
+ {
+  "kind": "promotion",
+  "board": "......../b......w/..b..b../..b...../...w..../..w..w../bwwwwwww/........",
+  "side": "white",
+  "moves": [
+   "b2-b3",
+   "c3-b3",
+   "c3-c4",
+   "c3-d3",
+   "d2-d3",
+   "d4-c4",
+   "d4-d5",
+   "d4-e4",
+   "e2-e3",
+   "f3-e3",
+   "f3-f4",
+   "f3-g3",
+   "g2-g3",
+   "h2-h3",
+   "h7-g7",
+   "h7-h8=K"
+  ]
+ },
+ {
+  "kind": "promotion",
+  "board": "W......./.w.....b/.....bb./...b..../.....b../.ww.w.../.w....../........",
+  "side": "white",
+  "moves": [
+   "a8-a1",
+   "a8-a2",
+   "a8-a3",
+   "a8-a4",
+   "a8-a5",
+   "a8-a6",
+   "a8-a7",
+   "a8-b8",
+   "a8-c8",
+   "a8-d8",
+   "a8-e8",
+   "a8-f8",
+   "a8-g8",
+   "a8-h8",
+   "b2-a2",
+   "b2-c2",
+   "b3-a3",
+   "b3-b4",
+   "b7-a7",
+   "b7-b8=K",
+   "b7-c7",
+   "c3-c4",
+   "c3-d3",
+   "e3-d3",
+   "e3-e4",
+   "e3-f3"
+  ]
+ },
+ {
+  "kind": "promotion",
+  "board": "......../.w...b../.......b/......b./w.W...../.w...w../......../........",
+  "side": "white",
+  "moves": [
+   "a4-a5",
+   "a4-b4",
+   "b3-a3",
+   "b3-b4",
+   "b3-c3",
+   "b7-a7",
+   "b7-b8=K",
+   "b7-c7",
+   "c4-b4",
+   "c4-c1",
+   "c4-c2",
+   "c4-c3",
+   "c4-c5",
+   "c4-c6",
+   "c4-c7",
+   "c4-c8",
+   "c4-d4",
+   "c4-e4",
+   "c4-f4",
+   "c4-g4",
+   "c4-h4",
+   "f3-e3",
+   "f3-f4",
+   "f3-g3"
+  ]
+ },
+ {
+  "kind": "promotion",
+  "board": "......../bbbbbbbw/.b.bb.bb/w......./......../.ww.ww../www.wwww/...B....",
+  "side": "white",
+  "moves": [
+   "a2-a3",
+   "a5-a6",
+   "a5-b5",
+   "b3-a3",
+   "b3-b4",
+   "c2-d2",
+   "c3-c4",
+   "c3-d3",
+   "e2-d2",
+   "e3-d3",
+   "e3-e4",
+   "f3-f4",
+   "f3-g3",
+   "g2-g3",
+   "h2-h3",
+   "h7-h8=K"
+  ]
+ },
+ {
+  "kind": "promotion",
+  "board": "......../bbbbbbbw/.b.bb.bb/w......./......../..w..w../.ww.ww.w/B.......",
+  "side": "white",
+  "moves": [
+   "a5-a6",
+   "a5-b5",
+   "b2-a2",
+   "b2-b3",
+   "c2-d2",
+   "c3-b3",
+   "c3-c4",
+   "c3-d3",
+   "e2-d2",
+   "e2-e3",
+   "f2-g2",
+   "f3-e3",
+   "f3-f4",
+   "f3-g3",
+   "h2-g2",
+   "h2-h3",
+   "h7-h8=K"
+  ]
+ },
+ {
+  "kind": "promotion",
+  "board": ".....W../b.w...../.b....../b.w...../.......b/w.ww..../ww.wwwww/........",
+  "side": "white",
+  "moves": [
+   "a3-a4",
+   "a3-b3",
+   "b2-b3",
+   "b2-c2",
+   "c3-b3",
+   "c3-c4",
+   "c5-b5",
+   "c5-c6",
+   "c5-d5",
+   "c7-b7",
+   "c7-c8=K",
+   "c7-d7",
+   "d2-c2",
+   "d3-d4",
+   "d3-e3",
+   "e2-e3",
+   "f2-f3",
+   "f8-a8",
+   "f8-b8",
+   "f8-c8",
+   "f8-d8",
+   "f8-e8",
+   "f8-f3",
+   "f8-f4",
+   "f8-f5",
+   "f8-f6",
+   "f8-f7",
+   "f8-g8",
+   "f8-h8",
+   "g2-g3",
+   "h2-h3"
+  ]
+ },
+ {
+  "kind": "promotion",
+  "board": "......../wbbbbbbb/.bbbbb.b/......b./..wwww../.w...w.w/wwwwwwww/........",
+  "side": "white",
+  "moves": [
+   "a2-a3",
+   "a7-a8=K",
+   "b3-a3",
+   "b3-b4",
+   "b3-c3",
+   "c2-c3",
+   "c4-b4",
+   "c4-c5",
+   "d2-d3",
+   "d4-d5",
+   "e2-e3",
+   "e4-e5",
+   "f3-e3",
+   "f3-g3",
+   "f4-f5",
+   "f4-g4",
+   "g2-g3",
+   "h3-g3",
+   "h3-h4"
+  ]
+ },
+ {
+  "kind": "promotion",
+  "board": "......../bbb.bbbb/.bb..b../B......./.B....b./....w.../..w....b/........",
+  "side": "black",
+  "moves": [
+   "a5-a1",
+   "a5-a2",
+   "a5-a3",
+   "a5-a4",
+   "a5-a6",
+   "a5-b5",
+   "a5-c5",
+   "a5-d5",
+   "a5-e5",
+   "a5-f5",
+   "a5-g5",
+   "a5-h5",
+   "a7-a6",
+   "b4-a4",
+   "b4-b1",
+   "b4-b2",
+   "b4-b3",
+   "b4-b5",
+   "b4-c4",
+   "b4-d4",
+   "b4-e4",
+   "b4-f4",
+   "b6-a6",
+   "b6-b5",
+   "c6-c5",
+   "c6-d6",
+   "c7-d7",
+   "e7-d7",
+   "e7-e6",
+   "f6-e6",
+   "f6-f5",
+   "f6-g6",
+   "g4-f4",
+   "g4-g3",
+   "g4-h4",
+   "g7-g6",
+   "h2-g2",
+   "h2-h1=K",
+   "h7-h6"
+  ]
+ },
+ {
+  "kind": "king",
+  "board": "......../bbbbbbbb/bb.b.bb./.......b/.....ww./...www.w/B.ww.www/........",
+  "side": "black",
+  "moves": [
+   "a2-a1",
+   "a2-a3",
+   "a2-a4",
+   "a2-a5",
+   "a2-b2",
+   "a6-a5",
+   "b6-b5",
+   "b6-c6",
+   "c7-c6",
+   "d6-c6",
+   "d6-d5",
+   "d6-e6",
+   "e7-e6",
+   "f6-e6",
+   "f6-f5",
+   "g6-g5",
+   "g6-h6",
+   "h5-g5",
+   "h5-h4",
+   "h7-h6"
+  ]
+ },
+ {
+  "kind": "king",
+  "board": "......../bbbb.bbb/bb.bbbb./...B..B./....w.../....ww.w/....ww../........",
+  "side": "black",
+  "moves": [
+   "a6-a5",
+   "b6-b5",
+   "b6-c6",
+   "c7-c6",
+   "d5-a5",
+   "d5-b5",
+   "d5-c5",
+   "d5-d1",
+   "d5-d2",
+   "d5-d3",
+   "d5-d4",
+   "d5-e5",
+   "d5-f5",
+   "d6-c6",
+   "d7-e7",
+   "e6-e5",
+   "f6-f5",
+   "f7-e7",
+   "g5-e5",
+   "g5-f5",
+   "g5-g1",
+   "g5-g2",
+   "g5-g3",
+   "g5-g4",
+   "g5-h5",
+   "g6-h6",
+   "h7-h6"
+  ]
+ },
+ {
+  "kind": "king",
+  "board": "......../bb.bb.bb/bbbbbbb./......../......../....w..w/.......w/......B.",
+  "side": "white",
+  "moves": [
+   "e3-d3",
+   "e3-e4",
+   "e3-f3",
+   "h2-g2",
+   "h3-g3",
+   "h3-h4"
+  ]
+ },
+ {
+  "kind": "king",
+  "board": "......../bb.bb.bb/bbbbb.b./.....b../......w./....w.../.......w/.B......",
+  "side": "white",
+  "moves": [
+   "e3-d3",
+   "e3-e4",
+   "e3-f3",
+   "g4-f4",
+   "g4-g5",
+   "g4-h4",
+   "h2-g2",
+   "h2-h3"
+  ]
+ },
+ {
+  "kind": "king",
+  "board": "......../bb.bb.../bb.b.b.b/....Bb.b/..bb.w../......../......../........",
+  "side": "black",
+  "moves": [
+   "f5xf3"
+  ]
+ },
+ {
+  "kind": "king",
+  "board": "......../b.b.b..w/b.b.b.../......../...Ww.../wwww..w./w.wwwwww/........",
+  "side": "black",
+  "moves": [
+   "a6-a5",
+   "a6-b6",
+   "a7-b7",
+   "c6-b6",
+   "c6-c5",
+   "c6-d6",
+   "c7-b7",
+   "c7-d7",
+   "e6-d6",
+   "e6-e5",
+   "e6-f6",
+   "e7-d7",
+   "e7-f7"
+  ]
+ },
+ {
+  "kind": "king",
+  "board": "......../bbbbbbbb/bbbbb.bb/......../.w....../w.www.ww/wwwww.ww/.....B..",
+  "side": "white",
+  "moves": [
+   "a3-a4",
+   "a3-b3",
+   "b2-b3",
+   "b4-a4",
+   "b4-b5",
+   "b4-c4",
+   "c3-b3",
+   "c3-c4",
+   "d3-d4",
+   "e2-f2",
+   "e3-e4",
+   "e3-f3",
+   "g2-f2",
+   "g3-f3",
+   "g3-g4",
+   "h3-h4"
+  ]
+ },
+ {
+  "kind": "king",
+  "board": "......../bbbbbbbb/bbbb..bb/......../w......./....w.ww/w.w.wwww/...B....",
+  "side": "white",
+  "moves": [
+   "a2-a3",
+   "a2-b2",
+   "a4-a5",
+   "a4-b4",
+   "c2-b2",
+   "c2-c3",
+   "c2-d2",
+   "e2-d2",
+   "e3-d3",
+   "e3-e4",
+   "e3-f3",
+   "f2-f3",
+   "g3-f3",
+   "g3-g4",
+   "h3-h4"
+  ]
+ },
+ {
+  "kind": "king",
+  "board": "......../.b..b.bb/b...b.bb/b..b.b../......ww/......../w...w.ww/......W.",
+  "side": "black",
+  "moves": [
+   "a5-a4",
+   "a5-b5",
+   "a6-b6",
+   "b7-a7",
+   "b7-b6",
+   "b7-c7",
+   "d5-c5",
+   "d5-d4",
+   "d5-e5",
+   "e6-d6",
+   "e6-e5",
+   "e6-f6",
+   "e7-d7",
+   "e7-f7",
+   "f5-e5",
+   "f5-f4",
+   "f5-g5",
+   "g6-f6",
+   "g6-g5",
+   "g7-f7",
+   "h6-h5"
+  ]
+ },
+ {
+  "kind": "king",
+  "board": ".......W/bbbbbbb./b..bbbb./.bb...../.....w../wwwww.w./wwwwwwww/........",
+  "side": "white",
+  "moves": [
+   "a3-a4",
+   "b3-b4",
+   "c3-c4",
+   "d3-d4",
+   "e3-e4",
+   "e3-f3",
+   "f2-f3",
+   "f4-e4",
+   "f4-f5",
+   "f4-g4",
+   "g3-f3",
+   "g3-g4",
+   "g3-h3",
+   "h2-h3",
+   "h8-a8",
+   "h8-b8",
+   "h8-c8",
+   "h8-d8",
+   "h8-e8",
+   "h8-f8",
+   "h8-g8",
+   "h8-h3",
+   "h8-h4",
+   "h8-h5",
+   "h8-h6",
+   "h8-h7"
+  ]
+ },
+ {
+  "kind": "king",
+  "board": "W......./bbbbbbb./b....bb./...w..../.....w../w.w....w/wwww.www/....B...",
+  "side": "black",
+  "moves": [
+   "a6-a5",
+   "a6-b6",
+   "b7-b6",
+   "c7-c6",
+   "d7-d6",
+   "e1-a1",
+   "e1-b1",
+   "e1-c1",
+   "e1-d1",
+   "e1-e2",
+   "e1-e3",
+   "e1-e4",
+   "e1-e5",
+   "e1-e6",
+   "e1-f1",
+   "e1-g1",
+   "e1-h1",
+   "e7-e6",
+   "f6-e6",
+   "f6-f5",
+   "g6-g5",
+   "g6-h6",
+   "g7-h7"
+  ]
+ },
+ {
+  "kind": "king",
+  "board": ".......W/...b..b./.Wb...../.......w/......../www....w/w.ww.www/........",
+  "side": "black",
+  "moves": [
+   "c6xa6"
+  ]
+ },
+ {
+  "kind": "king",
+  "board": ".......W/..b...../b......./......../w......./.www..../w.w..ww./.......B",
+  "side": "black",
+  "moves": [
+   "a6-a5",
+   "a6-b6",
+   "c7-b7",
+   "c7-c6",
+   "c7-d7",
+   "h1-a1",
+   "h1-b1",
+   "h1-c1",
+   "h1-d1",
+   "h1-e1",
+   "h1-f1",
+   "h1-g1",
+   "h1-h2",
+   "h1-h3",
+   "h1-h4",
+   "h1-h5",
+   "h1-h6",
+   "h1-h7"
+  ]
+ },
+ {
+  "kind": "king",
+  "board": ".......W/..b...../w......./......../......../.www..../w.w..ww./.......B",
+  "side": "black",
+  "moves": [
+   "c7-b7",
+   "c7-c6",
+   "c7-d7",
+   "h1-a1",
+   "h1-b1",
+   "h1-c1",
+   "h1-d1",
+   "h1-e1",
+   "h1-f1",
+   "h1-g1",
+   "h1-h2",
+   "h1-h3",
+   "h1-h4",
+   "h1-h5",
+   "h1-h6",
+   "h1-h7"
+  ]
+ },
+ {
+  "kind": "king",
+  "board": "....W.../bbbb.bbb/bbb..bb./...b...b/w......./.wwww.ww/wwwwwwww/........",
+  "side": "black",
+  "moves": [
+   "a6-a5",
+   "b6-b5",
+   "c6-c5",
+   "c6-d6",
+   "d5-c5",
+   "d5-d4",
+   "d5-e5",
+   "d7-d6",
+   "d7-e7",
+   "f6-e6",
+   "f6-f5",
+   "f7-e7",
+   "g6-g5",
+   "g6-h6",
+   "h5-g5",
+   "h5-h4",
+   "h7-h6"
+  ]
+ },
+ {
+  "kind": "king",
+  "board": "....W.../.bb...b./.b...bbb/.......b/.w.ww.../.w...w.w/ww.wwwww/........",
+  "side": "black",
+  "moves": [
+   "b6-a6",
+   "b6-b5",
+   "b6-c6",
+   "b7-a7",
+   "c7-c6",
+   "c7-d7",
+   "f6-e6",
+   "f6-f5",
+   "g6-g5",
+   "g7-f7",
+   "g7-h7",
+   "h5-g5",
+   "h5-h4"
+  ]
+ },
+ {
+  "kind": "king",
+  "board": "......../..b...../....W.../......../......../.......B/......../........",
+  "side": "white",
+  "moves": [
+   "e6-a6",
+   "e6-b6",
+   "e6-c6",
+   "e6-d6",
+   "e6-e1",
+   "e6-e2",
+   "e6-e3",
+   "e6-e4",
+   "e6-e5",
+   "e6-e7",
+   "e6-e8",
+   "e6-f6",
+   "e6-g6",
+   "e6-h6"
+  ]
+ },
+ {
+  "kind": "king",
+  "board": "......../bbbbb.bb/.bb..b.b/...b...B/..w...../..b....w/ww...w.w/........",
+  "side": "white",
+  "moves": [
+   "a2-a3",
+   "b2-b3",
+   "b2-c2",
+   "c4-b4",
+   "c4-c5",
+   "c4-d4",
+   "f2-e2",
+   "f2-f3",
+   "f2-g2",
+   "h2-g2",
+   "h3-g3",
+   "h3-h4"
+  ]
+ },
+ {
+  "kind": "king",
+  "board": "......../bbbbbb.b/b.bbb.bb/b....b../..w....w/ww.www../wwwwww.w/......B.",
+  "side": "black",
+  "moves": [
+   "a5-a4",
+   "a5-b5",
+   "a6-b6",
+   "b7-b6",
+   "c6-b6",
+   "c6-c5",
+   "d6-d5",
+   "e6-e5",
+   "e6-f6",
+   "f5-e5",
+   "f5-f4",
+   "f5-g5",
+   "f7-f6",
+   "f7-g7",
+   "g1-a1",
+   "g1-b1",
+   "g1-c1",
+   "g1-d1",
+   "g1-e1",
+   "g1-f1",
+   "g1-g2",
+   "g1-g3",
+   "g1-g4",
+   "g1-g5",
+   "g1-h1",
+   "g6-f6",
+   "g6-g5",
+   "h6-h5",
+   "h7-g7"
+  ]
+ },
+ {
+  "kind": "king",
+  "board": ".......W/bbbbbb../b.bb.bb./..b.b.../......../.w.ww.../wwwwwww./........",
+  "side": "black",
+  "moves": [
+   "a6-a5",
+   "a6-b6",
+   "b7-b6",
+   "c5-b5",
+   "c5-c4",
+   "c5-d5",
+   "c6-b6",
+   "d6-d5",
+   "d6-e6",
+   "e5-d5",
+   "e5-e4",
+   "e5-f5",
+   "e7-e6",
+   "f6-e6",
+   "f6-f5",
+   "f7-g7",
+   "g6-g5",
+   "g6-h6"
+  ]
+ },
+ {
+  "kind": "king",
+  "board": "......W./bb.bbb../.bbb.bb./b.b.b.../......../.wwww.../ww.www.w/........",
+  "side": "black",
+  "moves": [
+   "a5-a4",
+   "a5-b5",
+   "a7-a6",
+   "b6-a6",
+   "b6-b5",
+   "b7-c7",
+   "c5-b5",
+   "c5-c4",
+   "c5-d5",
+   "d6-d5",
+   "d6-e6",
+   "d7-c7",
+   "e5-d5",
+   "e5-e4",
+   "e5-f5",
+   "e7-e6",
+   "f6-e6",
+   "f6-f5",
+   "f7-g7",
+   "g6-g5",
+   "g6-h6"
+  ]
+ },
+ {
+  "kind": "king",
+  "board": "W......./......../......b./......../w....w../..w.ww../...w.ww./........",
+  "side": "white",
+  "moves": [
+   "a4-a5",
+   "a4-b4",
+   "a8-a5",
+   "a8-a6",
+   "a8-a7",
+   "a8-b8",
+   "a8-c8",
+   "a8-d8",
+   "a8-e8",
+   "a8-f8",
+   "a8-g8",
+   "a8-h8",
+   "c3-b3",
+   "c3-c4",
+   "c3-d3",
+   "d2-c2",
+   "d2-d3",
+   "d2-e2",
+   "e3-d3",
+   "e3-e4",
+   "f2-e2",
+   "f3-g3",
+   "f4-e4",
+   "f4-f5",
+   "f4-g4",
+   "g2-g3",
+   "g2-h2"
+  ]
+ },
+ {
+  "kind": "king",
+  "board": "......../.b....../.b....b./......../......../.w....../ww.wW.ww/.....B..",
+  "side": "white",
+  "moves": [
+   "a2-a3",
+   "b2-c2",
+   "b3-a3",
+   "b3-b4",
+   "b3-c3",
+   "d2-c2",
+   "d2-d3",
+   "e2-e1",
+   "e2-e3",
+   "e2-e4",
+   "e2-e5",
+   "e2-e6",
+   "e2-e7",
+   "e2-e8",
+   "e2-f2",
+   "g2-f2",
+   "g2-g3",
+   "h2-h3"
+  ]
+ },
+ {
+  "kind": "king",
+  "board": "....B.../.b....../.......b/......../......../.w....../.....w.w/..B.....",
+  "side": "white",
+  "moves": [
+   "b3-a3",
+   "b3-b4",
+   "b3-c3",
+   "f2-e2",
+   "f2-f3",
+   "f2-g2",
+   "h2-g2",
+   "h2-h3"
+  ]
+ },
+ {
+  "kind": "king",
+  "board": "......../bbbb..bb/bb.bbb../.....bbb/ww...b../w....ww./.wwwwww./......B.",
+  "side": "white",
+  "moves": [
+   "a3-b3",
+   "a4-a5",
+   "b2-a2",
+   "b2-b3",
+   "b4-b5",
+   "b4-c4",
+   "c2-c3",
+   "d2-d3",
+   "e2-e3",
+   "f3-e3",
+   "g2-h2",
+   "g3-g4",
+   "g3-h3"
+  ]
+ },
+ {
+  "kind": "king",
+  "board": "......../bbbb..bb/bb.bbb../.....bbb/ww...b../w.w..ww./.w.wwww./......B.",
+  "side": "black",
+  "moves": [
+   "a6-a5",
+   "b6-b5",
+   "b6-c6",
+   "c7-c6",
+   "d6-c6",
+   "d6-d5",
+   "d7-e7",
+   "e6-e5",
+   "f4-e4",
+   "f4-g4",
+   "f5-e5",
+   "f6-g6",
+   "g1-a1",
+   "g1-b1",
+   "g1-c1",
+   "g1-d1",
+   "g1-e1",
+   "g1-f1",
+   "g1-h1",
+   "g5-g4",
+   "g7-f7",
+   "g7-g6",
+   "h5-h4",
+   "h7-h6"
+  ]
+ },
+ {
+  "kind": "king",
+  "board": "......../bbbb.b.b/.b..bb../..Bb.bbb/.....b../....w.ww/b..w..../........",
+  "side": "white",
+  "moves": [
+   "d2-c2",
+   "d2-d3",
+   "d2-e2",
+   "e3-d3",
+   "e3-e4",
+   "e3-f3",
+   "g3-f3",
+   "g3-g4",
+   "h3-h4"
+  ]
+ },
+ {
+  "kind": "king",
+  "board": "......../bbbb.b.b/.b..bb../..B..bbb/.......w/......../b.....b./...B....",
+  "side": "black",
+  "moves": [
+   "h5xh3"
+  ]
+ },
+ {
+  "kind": "king",
+  "board": "......../.bbbbbbb/bbbbbb.b/......../....w.../.w....../.w..ww.w/...B....",
+  "side": "white",
+  "moves": [
+   "b2-a2",
+   "b2-c2",
+   "b3-a3",
+   "b3-b4",
+   "b3-c3",
+   "e2-d2",
+   "e2-e3",
+   "e4-d4",
+   "e4-e5",
+   "e4-f4",
+   "f2-f3",
+   "f2-g2",
+   "h2-g2",
+   "h2-h3"
+  ]
+ },
+ {
+  "kind": "king",
+  "board": "......../.bbbbbbb/bbbb.b.b/....b.../......../..w...../.w.....w/.....B..",
+  "side": "white",
+  "moves": [
+   "b2-a2",
+   "b2-b3",
+   "b2-c2",
+   "c3-b3",
+   "c3-c4",
+   "c3-d3",
+   "h2-g2",
+   "h2-h3"
+  ]
+ },
+ {
+  "kind": "king",
+  "board": "......../.bbbbbbb/bbbb.b.b/....b.../......../..w....w/.w....../.....B..",
+  "side": "black",
+  "moves": [
+   "a6-a5",
+   "b6-b5",
+   "b7-a7",
+   "c6-c5",
+   "d6-d5",
+   "d6-e6",
+   "e5-d5",
+   "e5-e4",
+   "e5-f5",
+   "e7-e6",
+   "f1-a1",
+   "f1-b1",
+   "f1-c1",
+   "f1-d1",
+   "f1-e1",
+   "f1-f2",
+   "f1-f3",
+   "f1-f4",
+   "f1-f5",
+   "f1-g1",
+   "f1-h1",
+   "f6-e6",
+   "f6-f5",
+   "f6-g6",
+   "g7-g6",
+   "h6-g6",
+   "h6-h5"
+  ]
+ },
+ {
+  "kind": "king",
+  "board": "......../.bbbbbbb/bbbb.b.b/....b.../...B..../.......w/.w....../........",
+  "side": "white",
+  "moves": [
+   "b2-a2",
+   "b2-b3",
+   "b2-c2",
+   "h3-g3",
+   "h3-h4"
+  ]
+ },
+ {
+  "kind": "king",
+  "board": "......../.bbb.b.b/bbbbbb.b/....b.b./B......./.....w../......../........",
+  "side": "white",
+  "moves": [
+   "f3-e3",
+   "f3-f4",
+   "f3-g3"
+  ]
+ },
+ {
+  "kind": "king",
+  "board": "......../b..bbbbb/b..b.b.b/....b.../.B....../w..wwww./w.w.ww../........",
+  "side": "white",
+  "moves": [
+   "a2-b2",
+   "a3-a4",
+   "a3-b3",
+   "c2-b2",
+   "c2-c3",
+   "c2-d2",
+   "d3-c3",
+   "d3-d4",
+   "e2-d2",
+   "e3-e4",
+   "f2-g2",
+   "f3-f4",
+   "g3-g4",
+   "g3-h3"
+  ]
+ },
+ {
+  "kind": "king",
+  "board": "......../b.b..b.b/.....bbb/B......./......w./......../......../........",
+  "side": "black",
+  "moves": [
+   "a5-a1",
+   "a5-a2",
+   "a5-a3",
+   "a5-a4",
+   "a5-a6",
+   "a5-b5",
+   "a5-c5",
+   "a5-d5",
+   "a5-e5",
+   "a5-f5",
+   "a5-g5",
+   "a5-h5",
+   "a7-a6",
+   "a7-b7",
+   "c7-b7",
+   "c7-c6",
+   "c7-d7",
+   "f6-e6",
+   "f6-f5",
+   "f7-e7",
+   "f7-g7",
+   "g6-g5",
+   "h6-h5",
+   "h7-g7"
+  ]
+ },
+ {
+  "kind": "king",
+  "board": "......../b.b..b.b/....w..b/B......./......../......../......../........",
+  "side": "black",
+  "moves": [
+   "a5-a1",
+   "a5-a2",
+   "a5-a3",
+   "a5-a4",
+   "a5-a6",
+   "a5-b5",
+   "a5-c5",
+   "a5-d5",
+   "a5-e5",
+   "a5-f5",
+   "a5-g5",
+   "a5-h5",
+   "a7-a6",
+   "a7-b7",
+   "c7-b7",
+   "c7-c6",
+   "c7-d7",
+   "f7-e7",
+   "f7-f6",
+   "f7-g7",
+   "h6-g6",
+   "h6-h5",
+   "h7-g7"
+  ]
+ },
+ {
+  "kind": "king",
+  "board": "......../bbbbbbbb/....bbbb/..b.b.../...w...w/..wwwww./b..wwwww/B.......",
+  "side": "white",
+  "moves": [
+   "c3-b3",
+   "c3-c4",
+   "d2-c2",
+   "d4-c4",
+   "d4-d5",
+   "d4-e4",
+   "e3-e4",
+   "f3-f4",
+   "g3-g4",
+   "g3-h3",
+   "h2-h3",
+   "h4-g4",
+   "h4-h5"
+  ]
+ },
+ {
+  "kind": "king",
+  "board": "......../bbb.bb../..b....b/..b.w.../...w..../.....w.w/......../.B......",
+  "side": "white",
+  "moves": [
+   "d4-c4",
+   "d4-d5",
+   "d4-e4",
+   "e5-d5",
+   "e5-e6",
+   "e5-f5",
+   "f3-e3",
+   "f3-f4",
+   "f3-g3",
+   "h3-g3",
+   "h3-h4"
+  ]
+ },
+ {
+  "kind": "king",
+  "board": ".....B../b.b...../.b.b...b/.......w/......../..b...../......../........",
+  "side": "black",
+  "moves": [
+   "h6xh4"
+  ]
+ },
+ {
+  "kind": "king",
+  "board": "......../.....b../.....b../.......b/....w.../.w...w../......../.W......",
+  "side": "black",
+  "moves": [
+   "f6-e6",
+   "f6-f5",
+   "f6-g6",
+   "f7-e7",
+   "f7-g7",
+   "h5-g5",
+   "h5-h4"
+  ]
+ },
+ {
+  "kind": "king",
+  "board": "......../.....b../.W....../.....b.b/....w.../..w..w../......../........",
+  "side": "white",
+  "moves": [
+   "b6-a6",
+   "b6-b1",
+   "b6-b2",
+   "b6-b3",
+   "b6-b4",
+   "b6-b5",
+   "b6-b7",
+   "b6-b8",
+   "b6-c6",
+   "b6-d6",
+   "b6-e6",
+   "b6-f6",
+   "b6-g6",
+   "b6-h6",
+   "c3-b3",
+   "c3-c4",
+   "c3-d3",
+   "e4-d4",
+   "e4-e5",
+   "e4-f4",
+   "f3-e3",
+   "f3-f4",
+   "f3-g3"
+  ]
+ },
+ {
+  "kind": "king",
+  "board": ".......W/bbbbbbb./..bbbbb./b......./....w.../w...www./www.wwww/...B....",
+  "side": "black",
+  "moves": [
+   "a5-a4",
+   "a5-b5",
+   "a7-a6",
+   "b7-b6",
+   "c6-b6",
+   "c6-c5",
+   "d1-a1",
+   "d1-b1",
+   "d1-c1",
+   "d1-d2",
+   "d1-d3",
+   "d1-d4",
+   "d1-d5",
+   "d1-e1",
+   "d1-f1",
+   "d1-g1",
+   "d1-h1",
+   "d6-d5",
+   "e6-e5",
+   "f6-f5",
+   "g6-g5",
+   "g6-h6",
+   "g7-h7"
+  ]
+ },
+ {
+  "kind": "king",
+  "board": "......../..bbb.b./.bb.b.b./.b.Bb.../......../......../..w...../B.......",
+  "side": "white",
+  "moves": [
+   "c2-b2",
+   "c2-c3",
+   "c2-d2"
+  ]
+ },
+ {
+  "kind": "king",
+  "board": ".....W../.w.....b/......../......../......b./.....w../.......B/........",
+  "side": "black",
+  "moves": [
+   "g4-f4",
+   "g4-g3",
+   "g4-h4",
+   "h2-a2",
+   "h2-b2",
+   "h2-c2",
+   "h2-d2",
+   "h2-e2",
+   "h2-f2",
+   "h2-g2",
+   "h2-h1",
+   "h2-h3",
+   "h2-h4",
+   "h2-h5",
+   "h2-h6",
+   "h7-g7",
+   "h7-h6"
+  ]
+ },
+ {
+  "kind": "king",
+  "board": "..B...../bbb.bbbb/.bb.bb../.Bb...../.......w/......../......../B.......",
+  "side": "white",
+  "moves": [
+   "h4-g4",
+   "h4-h5"
+  ]
+ },
+ {
+  "kind": "king",
+  "board": "......../bb.bbb.b/bb.b.b../......../..b.ww../......../w.ww..../.......B",
+  "side": "white",
+  "moves": [
+   "a2-a3",
+   "a2-b2",
+   "c2-b2",
+   "c2-c3",
+   "d2-d3",
+   "d2-e2",
+   "e4-d4",
+   "e4-e5",
+   "f4-f5",
+   "f4-g4"
+  ]
+ },
+ {
+  "kind": "king",
+  "board": "......../bb.bbb.b/bb.b.b../......../......b./......../w.ww..../.......B",
+  "side": "white",
+  "moves": [
+   "a2-a3",
+   "a2-b2",
+   "c2-b2",
+   "c2-c3",
+   "d2-d3",
+   "d2-e2"
+  ]
+ },
+ {
+  "kind": "king",
+  "board": "......../...b..../.......w/w....W../......../...w.w.w/www.wwww/........",
+  "side": "black",
+  "moves": [
+   "d7-c7",
+   "d7-d6",
+   "d7-e7"
+  ]
+ },
+ {
+  "kind": "king",
+  "board": "......../.bb.bb.b/b..bb..b/b.b..b../.w....../ww..w..w/.w.w..w./..B.....",
+  "side": "white",
+  "moves": [
+   "a3-a4",
+   "b2-a2",
+   "b2-c2",
+   "b3-c3",
+   "b4-a4",
+   "b4-b5",
+   "b4-c4",
+   "d2-c2",
+   "d2-d3",
+   "d2-e2",
+   "e3-d3",
+   "e3-e4",
+   "e3-f3",
+   "g2-f2",
+   "g2-g3",
+   "g2-h2",
+   "h3-g3",
+   "h3-h4"
+  ]
+ },
+ {
+  "kind": "king",
+  "board": "......../.bbb.bb./b..bb..b/......../......w./...b.w../......../B.......",
+  "side": "white",
+  "moves": [
+   "f3-e3",
+   "f3-f4",
+   "f3-g3",
+   "g4-f4",
+   "g4-g5",
+   "g4-h4"
+  ]
+ },
+ {
+  "kind": "king",
+  "board": "......../b.bb.bb./b..bb..b/....w.../B......./.....b../......../........",
+  "side": "black",
+  "moves": [
+   "e6xe4"
+  ]
+ },
+ {
+  "kind": "king",
+  "board": "...W..../bbb.bbbb/b...bb.b/.bb...b./w...w.../w..wwwww/wwww.www/........",
+  "side": "black",
+  "moves": [
+   "a6-a5",
+   "a6-b6",
+   "b5-a5",
+   "b5-b4",
+   "b7-b6",
+   "c5-c4",
+   "c5-d5",
+   "c7-c6",
+   "c7-d7",
+   "e6-d6",
+   "e6-e5",
+   "e7-d7",
+   "f6-f5",
+   "f6-g6",
+   "g5-f5",
+   "g5-g4",
+   "g5-h5",
+   "g7-g6",
+   "h6-g6",
+   "h6-h5"
+  ]
+ },
+ {
+  "kind": "king",
+  "board": "......../.b...b../...bb..W/.b.b...w/....w.../w..wwww./wwww.www/........",
+  "side": "white",
+  "moves": [
+   "a3-a4",
+   "a3-b3",
+   "b2-b3",
+   "c2-c3",
+   "d2-e2",
+   "d3-c3",
+   "d3-d4",
+   "e4-d4",
+   "e4-e5",
+   "e4-f4",
+   "f2-e2",
+   "f3-f4",
+   "g3-g4",
+   "g3-h3",
+   "h2-h3",
+   "h5-g5",
+   "h6-f6",
+   "h6-g6",
+   "h6-h7",
+   "h6-h8"
+  ]
+ },
+ {
+  "kind": "king",
+  "board": "......../.b...b../...bb..W/.b.b...w/....w.../w.wwwww./ww.w.www/........",
+  "side": "black",
+  "moves": [
+   "b5-a5",
+   "b5-b4",
+   "b5-c5",
+   "b7-a7",
+   "b7-b6",
+   "b7-c7",
+   "d5-c5",
+   "d5-d4",
+   "d5-e5",
+   "d6-c6",
+   "e6-e5",
+   "e6-f6",
+   "f7-e7",
+   "f7-f6",
+   "f7-g7"
+  ]
+ },
+ {
+  "kind": "king",
+  "board": "......../......w./.b.b...W/......w./....w.../w..wwww./w.ww.www/........",
+  "side": "black",
+  "moves": [
+   "b6-a6",
+   "b6-b5",
+   "b6-c6",
+   "d6-c6",
+   "d6-d5",
+   "d6-e6"
+  ]
+ },
+ {
+  "kind": "king",
+  "board": ".W....../b.bbbbbb/b.bbbbb./.......b/......../ww.wwwww/wwwwwwww/........",
+  "side": "black",
+  "moves": [
+   "a6-a5",
+   "a6-b6",
+   "a7-b7",
+   "c6-b6",
+   "c6-c5",
+   "c7-b7",
+   "d6-d5",
+   "e6-e5",
+   "f6-f5",
+   "g6-g5",
+   "g6-h6",
+   "h5-g5",
+   "h5-h4",
+   "h7-h6"
+  ]
+ },
+ {
+  "kind": "king",
+  "board": "W......./.b.bbb.W/.....b../.....b../....w.../w.ww.w.w/w.wwwwww/........",
+  "side": "white",
+  "moves": [
+   "a2-b2",
+   "a3-a4",
+   "a3-b3",
+   "a8-a4",
+   "a8-a5",
+   "a8-a6",
+   "a8-a7",
+   "a8-b8",
+   "a8-c8",
+   "a8-d8",
+   "a8-e8",
+   "a8-f8",
+   "a8-g8",
+   "a8-h8",
+   "c2-b2",
+   "c3-b3",
+   "c3-c4",
+   "d3-d4",
+   "d3-e3",
+   "e2-e3",
+   "e4-d4",
+   "e4-e5",
+   "e4-f4",
+   "f3-e3",
+   "f3-f4",
+   "f3-g3",
+   "g2-g3",
+   "h3-g3",
+   "h3-h4",
+   "h7-g7",
+   "h7-h4",
+   "h7-h5",
+   "h7-h6",
+   "h7-h8"
+  ]
+ },
+ {
+  "kind": "king",
+  "board": "......../.......W/....b.b./......../..Ww..w./w.w..w.w/...www.w/........",
+  "side": "white",
+  "moves": [
+   "a3-a4",
+   "a3-b3",
+   "c3-b3",
+   "c3-d3",
+   "c4-a4",
+   "c4-b4",
+   "c4-c5",
+   "c4-c6",
+   "c4-c7",
+   "c4-c8",
+   "d2-c2",
+   "d2-d3",
+   "d4-d5",
+   "d4-e4",
+   "e2-e3",
+   "f2-g2",
+   "f3-e3",
+   "f3-f4",
+   "f3-g3",
+   "g4-f4",
+   "g4-g5",
+   "g4-h4",
+   "h2-g2",
+   "h3-g3",
+   "h3-h4",
+   "h7-a7",
+   "h7-b7",
+   "h7-c7",
+   "h7-d7",
+   "h7-e7",
+   "h7-f7",
+   "h7-g7",
+   "h7-h4",
+   "h7-h5",
+   "h7-h6",
+   "h7-h8"
+  ]
+ },
+ {
+  "kind": "king",
+  "board": "......../b.bbb.bb/b....W.b/....b.b./w......./wWwww.ww/www.wwww/........",
+  "side": "white",
+  "moves": [
+   "a4-a5",
+   "a4-b4",
+   "b3-b4",
+   "b3-b5",
+   "b3-b6",
+   "b3-b7",
+   "b3-b8",
+   "c2-d2",
+   "c3-c4",
+   "d3-d4",
+   "e2-d2",
+   "e3-e4",
+   "e3-f3",
+   "f2-f3",
+   "f6-b6",
+   "f6-c6",
+   "f6-d6",
+   "f6-e6",
+   "f6-f3",
+   "f6-f4",
+   "f6-f5",
+   "f6-f7",
+   "f6-f8",
+   "f6-g6",
+   "g3-f3",
+   "g3-g4",
+   "h3-h4"
+  ]
+ },
+ {
+  "kind": "king",
+  "board": "W......./.bbb.bbb/.bbbbbbb/......../.....w../.ww.wwww/wwwwwwww/........",
+  "side": "white",
+  "moves": [
+   "a2-a3",
+   "a8-a3",
+   "a8-a4",
+   "a8-a5",
+   "a8-a6",
+   "a8-a7",
+   "a8-b8",
+   "a8-c8",
+   "a8-d8",
+   "a8-e8",
+   "a8-f8",
+   "a8-g8",
+   "a8-h8",
+   "b3-a3",
+   "b3-b4",
+   "c3-c4",
+   "c3-d3",
+   "d2-d3",
+   "e3-d3",
+   "e3-e4",
+   "f4-e4",
+   "f4-f5",
+   "f4-g4",
+   "g3-g4",
+   "h3-h4"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../bbbbbbbb/bb.b.bbb/..b...../w..wb.w./.ww.ww.w/wwwwwwww/........",
+  "side": "white",
+  "moves": [
+   "d4xf4",
+   "e3xe5"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../bbbbbbbb/bbbb..bb/......../.w....../w.....ww/..ww..ww/........",
+  "side": "black",
+  "moves": [
+   "a6-a5",
+   "b6-b5",
+   "c6-c5",
+   "d6-d5",
+   "d6-e6",
+   "e7-e6",
+   "f7-f6",
+   "g6-f6",
+   "g6-g5",
+   "h6-h5"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../bbbbb.bb/b.bb.bbb/..b...../..w...../w.....ww/w..w..ww/........",
+  "side": "black",
+  "moves": [
+   "c5xc3"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../bbbbb.bb/..b.b.bb/b....b../.w....w./.......w/w.b.w.ww/........",
+  "side": "white",
+  "moves": [
+   "a2-a3",
+   "a2-b2",
+   "b4-a4",
+   "b4-b5",
+   "b4-c4",
+   "e2-d2",
+   "e2-e3",
+   "e2-f2",
+   "g2-f2",
+   "g2-g3",
+   "g4-f4",
+   "g4-g5",
+   "g4-h4",
+   "h3-g3",
+   "h3-h4"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../bbb.b.bb/..bbb.bb/b....b../..w...w./.......w/w.b.w.ww/........",
+  "side": "white",
+  "moves": [
+   "a2-a3",
+   "a2-b2",
+   "c4-b4",
+   "c4-c5",
+   "c4-d4",
+   "e2-d2",
+   "e2-e3",
+   "e2-f2",
+   "g2-f2",
+   "g2-g3",
+   "g4-f4",
+   "g4-g5",
+   "g4-h4",
+   "h3-g3",
+   "h3-h4"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../bbbbbbbb/.bb.bbbb/b......./...b..../www.wwww/wwwwwwww/........",
+  "side": "white",
+  "moves": [
+   "a3-a4",
+   "b3-b4",
+   "c3-c4",
+   "c3-d3",
+   "d2-d3",
+   "e3-d3",
+   "e3-e4",
+   "f3-f4",
+   "g3-g4",
+   "h3-h4"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../bbbbbbbb/bbbbb.bb/.....b../...w...w/www.www./wwwwwwww/........",
+  "side": "black",
+  "moves": [
+   "a6-a5",
+   "b6-b5",
+   "c6-c5",
+   "d6-d5",
+   "e6-e5",
+   "e6-f6",
+   "f5-e5",
+   "f5-f4",
+   "f5-g5",
+   "f7-f6",
+   "g6-f6",
+   "g6-g5",
+   "h6-h5"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../bbbbbb.b/b.bb.bbb/..b.b.../.......w/w..ww.../wwwwwww./........",
+  "side": "white",
+  "moves": [
+   "a3-a4",
+   "a3-b3",
+   "b2-b3",
+   "c2-c3",
+   "d3-c3",
+   "d3-d4",
+   "e3-e4",
+   "e3-f3",
+   "f2-f3",
+   "g2-g3",
+   "g2-h2",
+   "h4-g4",
+   "h4-h5"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../bbbbbb.b/b.bb.bbb/..b.b.../.......w/.w.ww.../wwwwwww./........",
+  "side": "black",
+  "moves": [
+   "a6-a5",
+   "a6-b6",
+   "b7-b6",
+   "c5-b5",
+   "c5-c4",
+   "c5-d5",
+   "c6-b6",
+   "d6-d5",
+   "d6-e6",
+   "e5-d5",
+   "e5-e4",
+   "e5-f5",
+   "e7-e6",
+   "f6-e6",
+   "f6-f5",
+   "f7-g7",
+   "g6-g5",
+   "h6-h5",
+   "h7-g7"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../b.....w./b.w...../......../...w..../w...w..w/w..ww.../........",
+  "side": "black",
+  "moves": [
+   "a6-a5",
+   "a6-b6",
+   "a7-b7"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../.b....w./.w....../b......./...w..../w....w.w/w..ww.../........",
+  "side": "black",
+  "moves": [
+   "b7xb5"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../bbbbbbbb/.bbbb.b./.....b.b/b......./w.wwwwww/wwwwwwww/........",
+  "side": "white",
+  "moves": [
+   "a3xa5"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../bbbbbbbb/.bbbbbbb/b......./.....w../wwwww.ww/wwwwwwww/........",
+  "side": "white",
+  "moves": [
+   "a3-a4",
+   "b3-b4",
+   "c3-c4",
+   "d3-d4",
+   "e3-e4",
+   "e3-f3",
+   "f2-f3",
+   "f4-e4",
+   "f4-f5",
+   "f4-g4",
+   "g3-f3",
+   "g3-g4",
+   "h3-h4"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../bbbbbbbb/b..b.bbb/b.bwb.../.....w../wwwww.ww/wwww.www/........",
+  "side": "black",
+  "moves": [
+   "d6xd4"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../bbbb.bbb/....bbbb/..bb..../b....w../.www.www/www..www/........",
+  "side": "black",
+  "moves": [
+   "a4-a3",
+   "a4-b4",
+   "a7-a6",
+   "b7-b6",
+   "c5-b5",
+   "c5-c4",
+   "c7-c6",
+   "d5-d4",
+   "d5-e5",
+   "d7-d6",
+   "d7-e7",
+   "e6-d6",
+   "e6-e5",
+   "f6-f5",
+   "f7-e7",
+   "g6-g5",
+   "h6-h5"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../.b..bb.b/b...bbbb/......../....ww../.w....ww/www..www/........",
+  "side": "black",
+  "moves": [
+   "a6-a5",
+   "a6-b6",
+   "b7-a7",
+   "b7-b6",
+   "b7-c7",
+   "e6-d6",
+   "e6-e5",
+   "e7-d7",
+   "f6-f5",
+   "f7-g7",
+   "g6-g5",
+   "h6-h5",
+   "h7-g7"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../.bb...bb/...bbb.b/......../......../w...ww../....w.w./........",
+  "side": "white",
+  "moves": [
+   "a3-a4",
+   "a3-b3",
+   "e2-d2",
+   "e2-f2",
+   "e3-d3",
+   "e3-e4",
+   "f3-f4",
+   "f3-g3",
+   "g2-f2",
+   "g2-g3",
+   "g2-h2"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../bbbbbbbb/bbbbbbbb/......../......../wwwwwwww/wwwwwwww/........",
+  "side": "white",
+  "moves": [
+   "a3-a4",
+   "b3-b4",
+   "c3-c4",
+   "d3-d4",
+   "e3-e4",
+   "f3-f4",
+   "g3-g4",
+   "h3-h4"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../bbbbbbbb/bbbbb.bb/.....b../ww....../..wwwwww/wwwwwwww/........",
+  "side": "black",
+  "moves": [
+   "a6-a5",
+   "b6-b5",
+   "c6-c5",
+   "d6-d5",
+   "e6-e5",
+   "e6-f6",
+   "f5-e5",
+   "f5-f4",
+   "f5-g5",
+   "f7-f6",
+   "g6-f6",
+   "g6-g5",
+   "h6-h5"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../bbb.bbbb/bbb.bbbb/......b./.w.wbw.w/w.w.ww.w/www.wwww/........",
+  "side": "white",
+  "moves": [
+   "e3xe5"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../..b.bb../bb.bbb.b/...b..w./.b....../..ww..w./w.w..w.w/........",
+  "side": "white",
+  "moves": [
+   "a2-a3",
+   "a2-b2",
+   "c2-b2",
+   "c2-d2",
+   "c3-b3",
+   "c3-c4",
+   "d3-d4",
+   "d3-e3",
+   "f2-e2",
+   "f2-f3",
+   "f2-g2",
+   "g3-f3",
+   "g3-g4",
+   "g3-h3",
+   "g5-f5",
+   "g5-g6",
+   "g5-h5",
+   "h2-g2",
+   "h2-h3"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../..b.bb../bb.bbb.b/...b..w./.b....../..ww.w../w.w..w.w/........",
+  "side": "black",
+  "moves": [
+   "a6-a5",
+   "b4-a4",
+   "b4-b3",
+   "b4-c4",
+   "b6-b5",
+   "b6-c6",
+   "c7-b7",
+   "c7-c6",
+   "c7-d7",
+   "d5-c5",
+   "d5-d4",
+   "d5-e5",
+   "d6-c6",
+   "e6-e5",
+   "e7-d7",
+   "f6-f5",
+   "f6-g6",
+   "f7-g7",
+   "h6-g6",
+   "h6-h5"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../..b.bb../bb.bbb.b/...b..w./.b....../..ww.w../ww...w.w/........",
+  "side": "white",
+  "moves": [
+   "a2-a3",
+   "b2-b3",
+   "b2-c2",
+   "c3-b3",
+   "c3-c4",
+   "d3-d4",
+   "d3-e3",
+   "f2-e2",
+   "f2-g2",
+   "f3-e3",
+   "f3-f4",
+   "f3-g3",
+   "g5-f5",
+   "g5-g6",
+   "g5-h5",
+   "h2-g2",
+   "h2-h3"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../bbbbbbbb/bb.bbbbb/..b.w.../......../wwww.www/wwwwwwww/........",
+  "side": "black",
+  "moves": [
+   "e6xe4"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../bbb.bbbb/bb.b.bbb/.w....../..b..w../www.wwww/wwww..ww/........",
+  "side": "black",
+  "moves": [
+   "b6xb4"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../bbb.bbbb/b..b.bbb/.w....../..b..w../w.w.wwww/wwww..ww/........",
+  "side": "black",
+  "moves": [
+   "a6-a5",
+   "a6-b6",
+   "b7-b6",
+   "c4-b4",
+   "c4-d4",
+   "c7-c6",
+   "c7-d7",
+   "d6-c6",
+   "d6-d5",
+   "d6-e6",
+   "e7-d7",
+   "e7-e6",
+   "f6-e6",
+   "f6-f5",
+   "g6-g5",
+   "h6-h5"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../bbbb.bbb/...b.bbb/..w...../.b...w.w/w...ww.w/wwww..ww/........",
+  "side": "black",
+  "moves": [
+   "a7-a6",
+   "b4-a4",
+   "b4-b3",
+   "b4-c4",
+   "b7-b6",
+   "c7-c6",
+   "d6-c6",
+   "d6-d5",
+   "d6-e6",
+   "d7-e7",
+   "f6-e6",
+   "f6-f5",
+   "f7-e7",
+   "g6-g5",
+   "h6-h5"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../bbbb..bb/....bbbb/......../b......b/....ww.w/wwww..ww/........",
+  "side": "white",
+  "moves": [
+   "h3xh5"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../bbbb..bb/....bbb./......w./b......./....w.../wwww..ww/........",
+  "side": "black",
+  "moves": [
+   "g6xg4"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../...ww..b/......b./.......w/......../b......./....w.w./........",
+  "side": "black",
+  "moves": [
+   "a3-a2",
+   "a3-b3",
+   "g6-f6",
+   "g6-g5",
+   "g6-h6",
+   "h7-g7",
+   "h7-h6"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../bbb.bbbb/bbbbbbb./..w.b..b/....w.../w.w.wwww/wwwwwwww/........",
+  "side": "black",
+  "moves": [
+   "c6xc4"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../bbbbbbbb/bbbbb.bb/......b./..w....w/ww.wwww./wwwwwwww/........",
+  "side": "white",
+  "moves": [
+   "a3-a4",
+   "b3-b4",
+   "b3-c3",
+   "c2-c3",
+   "c4-b4",
+   "c4-c5",
+   "c4-d4",
+   "d3-c3",
+   "d3-d4",
+   "e3-e4",
+   "f3-f4",
+   "g3-g4",
+   "g3-h3",
+   "h2-h3",
+   "h4-g4",
+   "h4-h5"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../bbbbb.bb/bbbb.b.b/......../w...ww../w.w.ww../wwwwwwww/........",
+  "side": "white",
+  "moves": [
+   "a3-b3",
+   "a4-a5",
+   "a4-b4",
+   "b2-b3",
+   "c3-b3",
+   "c3-c4",
+   "c3-d3",
+   "d2-d3",
+   "e3-d3",
+   "e4-d4",
+   "e4-e5",
+   "f3-g3",
+   "f4-f5",
+   "f4-g4",
+   "g2-g3",
+   "h2-h3"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../bbbbb.bb/b.bb.b.b/.b....../w..w.w../w.w.www./wwwwww.w/........",
+  "side": "black",
+  "moves": [
+   "a6-a5",
+   "a6-b6",
+   "b5-a5",
+   "b5-b4",
+   "b5-c5",
+   "b7-b6",
+   "c6-b6",
+   "c6-c5",
+   "d6-d5",
+   "d6-e6",
+   "e7-e6",
+   "e7-f7",
+   "f6-e6",
+   "f6-f5",
+   "f6-g6",
+   "g7-f7",
+   "g7-g6",
+   "h6-g6",
+   "h6-h5"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../bbb.bbbb/.b.bbb../b...bb../.w....../.w..w.w./wwwwww.w/........",
+  "side": "white",
+  "moves": [
+   "a2-a3",
+   "b3-a3",
+   "b3-c3",
+   "b4-a4",
+   "b4-b5",
+   "b4-c4",
+   "c2-c3",
+   "d2-d3",
+   "e3-d3",
+   "e3-e4",
+   "e3-f3",
+   "f2-f3",
+   "f2-g2",
+   "g3-f3",
+   "g3-g4",
+   "g3-h3",
+   "h2-g2",
+   "h2-h3"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../bbbbbbbb/.bb.bbbb/b..b..../.w....../.wwwwwww/wwwwwwww/........",
+  "side": "white",
+  "moves": [
+   "a2-a3",
+   "b3-a3",
+   "b4-a4",
+   "b4-b5",
+   "b4-c4",
+   "c3-c4",
+   "d3-d4",
+   "e3-e4",
+   "f3-f4",
+   "g3-g4",
+   "h3-h4"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../b.bbbbbb/b.bbb.../.b...w.b/.bw.w.b./.ww..w.w/wwwww.ww/........",
+  "side": "white",
+  "moves": [
+   "c4xa4"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../b.bbb.bb/b.bbbb../.b...w.b/w...w.b./.ww..w.w/wwwww.ww/........",
+  "side": "white",
+  "moves": [
+   "f5xf7"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../b.b.b.bb/b..bb.../.......b/......b./...b...w/....w.../........",
+  "side": "black",
+  "moves": [
+   "a6-a5",
+   "a6-b6",
+   "a7-b7",
+   "c7-b7",
+   "c7-c6",
+   "c7-d7",
+   "d3-c3",
+   "d3-d2",
+   "d3-e3",
+   "d6-c6",
+   "d6-d5",
+   "e6-e5",
+   "e6-f6",
+   "e7-d7",
+   "e7-f7",
+   "g4-f4",
+   "g4-g3",
+   "g4-h4",
+   "g7-f7",
+   "g7-g6",
+   "h5-g5",
+   "h5-h4",
+   "h7-h6"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../b.b..bbb/b..bb.../......../......b./...b...b/....w.../........",
+  "side": "white",
+  "moves": [
+   "e2-d2",
+   "e2-e3",
+   "e2-f2"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../....b..b/...b..../b......./..w....b/....w.w./..ww...w/........",
+  "side": "black",
+  "moves": [
+   "a5-a4",
+   "a5-b5",
+   "d6-c6",
+   "d6-d5",
+   "d6-e6",
+   "e7-d7",
+   "e7-e6",
+   "e7-f7",
+   "h4-g4",
+   "h4-h3",
+   "h7-g7",
+   "h7-h6"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../.....b.b/...b..../......../.b.w..w./....w..b/..ww..w./........",
+  "side": "white",
+  "moves": [
+   "c2-b2",
+   "c2-c3",
+   "d2-d3",
+   "d2-e2",
+   "d4-c4",
+   "d4-d5",
+   "d4-e4",
+   "e3-d3",
+   "e3-e4",
+   "e3-f3",
+   "g2-f2",
+   "g2-g3",
+   "g2-h2",
+   "g4-f4",
+   "g4-g5",
+   "g4-h4"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../b.....bb/bb....../.....bb./...ww.../b.w...../..ww..w./........",
+  "side": "black",
+  "moves": [
+   "a3-a2",
+   "a3-b3",
+   "a6-a5",
+   "a7-b7",
+   "b6-b5",
+   "b6-c6",
+   "f5-e5",
+   "f5-f4",
+   "g5-g4",
+   "g5-h5",
+   "g7-f7",
+   "g7-g6",
+   "h7-h6"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../bbbbbbbb/.bbbbbb./b......b/....w.w./wwwwww.w/wwww.www/........",
+  "side": "black",
+  "moves": [
+   "a5-a4",
+   "a5-b5",
+   "a7-a6",
+   "b6-a6",
+   "b6-b5",
+   "c6-c5",
+   "d6-d5",
+   "e6-e5",
+   "f6-f5",
+   "g6-g5",
+   "g6-h6",
+   "h5-g5",
+   "h5-h4",
+   "h7-h6"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../.w..bb.b/b..b..bb/b....b.b/..w...../ww.ww.ww/w.ww.www/........",
+  "side": "black",
+  "moves": [
+   "a5-a4",
+   "a5-b5",
+   "a6-b6",
+   "d6-c6",
+   "d6-d5",
+   "d6-e6",
+   "e7-d7",
+   "e7-e6",
+   "f5-e5",
+   "f5-f4",
+   "f5-g5",
+   "f7-f6",
+   "f7-g7",
+   "g6-f6",
+   "g6-g5",
+   "h5-g5",
+   "h5-h4",
+   "h7-g7"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../.w...b../.....bbb/...b..bb/...w.w../......ww/b..ww.ww/........",
+  "side": "white",
+  "moves": [
+   "d4xd6"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../bbbbbbbb/bbbb.bbb/.....b../w.ww..../.w..wwww/wwwwwwww/........",
+  "side": "black",
+  "moves": [
+   "a6-a5",
+   "b6-b5",
+   "c6-c5",
+   "d6-d5",
+   "d6-e6",
+   "e7-e6",
+   "f5-e5",
+   "f5-f4",
+   "f5-g5",
+   "f6-e6",
+   "g6-g5",
+   "h6-h5"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../bbbbbbbb/b.bbbbb./.b....b./w....w../.wwwww.w/wwwwwwww/........",
+  "side": "white",
+  "moves": [
+   "a2-a3",
+   "a4-a5",
+   "a4-b4",
+   "b3-a3",
+   "b3-b4",
+   "c3-c4",
+   "d3-d4",
+   "e3-e4",
+   "f3-g3",
+   "f4-e4",
+   "f4-f5",
+   "f4-g4",
+   "g2-g3",
+   "h3-g3",
+   "h3-h4"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../bbbbbbbb/b.bb.bbb/.b...b../..ww.w../ww...www/wwwwwwww/........",
+  "side": "black",
+  "moves": [
+   "a6-a5",
+   "a6-b6",
+   "b5-a5",
+   "b5-b4",
+   "b5-c5",
+   "b7-b6",
+   "c6-b6",
+   "c6-c5",
+   "d6-d5",
+   "d6-e6",
+   "e7-e6",
+   "f5-e5",
+   "f5-g5",
+   "f6-e6",
+   "g6-g5",
+   "h6-h5"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../..b.b.../b......./b......./....w.b./w......./....w.w./........",
+  "side": "white",
+  "moves": [
+   "a3-a4",
+   "a3-b3",
+   "e2-d2",
+   "e2-e3",
+   "e2-f2",
+   "e4-d4",
+   "e4-e5",
+   "e4-f4",
+   "g2-f2",
+   "g2-g3",
+   "g2-h2"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../..b.b.../b......./b......./w...w.b./......../....w.w./........",
+  "side": "black",
+  "moves": [
+   "a5xa3"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../......../.b..w.../..b...../......../....b.../......../........",
+  "side": "white",
+  "moves": [
+   "e6-d6",
+   "e6-e7",
+   "e6-f6"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../bb..bbbb/bb.bwbbb/.b....../.....w.w/w...w..w/www..www/........",
+  "side": "black",
+  "moves": [
+   "e7xe5"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../bb...bbb/bb.b.bbb/.b..b.../.....w.w/w...w..w/www..www/........",
+  "side": "white",
+  "moves": [
+   "a3-a4",
+   "a3-b3",
+   "b2-b3",
+   "c2-c3",
+   "c2-d2",
+   "e3-d3",
+   "e3-e4",
+   "e3-f3",
+   "f2-e2",
+   "f2-f3",
+   "f4-e4",
+   "f4-f5",
+   "f4-g4",
+   "g2-g3",
+   "h3-g3",
+   "h4-g4",
+   "h4-h5"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../bb.w.b../..b...../......../b..w..../ww...ww./ww.....w/........",
+  "side": "white",
+  "moves": [
+   "a3xa5"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../bbbbbbbb/bbbb.bbb/....b.../.w....../w.wwwwww/wwwwwwww/........",
+  "side": "white",
+  "moves": [
+   "a3-a4",
+   "a3-b3",
+   "b2-b3",
+   "b4-a4",
+   "b4-b5",
+   "b4-c4",
+   "c3-b3",
+   "c3-c4",
+   "d3-d4",
+   "e3-e4",
+   "f3-f4",
+   "g3-g4",
+   "h3-h4"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../bbbbbbbb/bbbb.bbb/....w.../w......./w.ww.www/wwwwwwww/........",
+  "side": "black",
+  "moves": [
+   "a6-a5",
+   "b6-b5",
+   "c6-c5",
+   "d6-d5",
+   "d6-e6",
+   "e7-e6",
+   "f6-e6",
+   "f6-f5",
+   "g6-g5",
+   "h6-h5"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../...b..../......../......../......../w..b..../..w.w.w./........",
+  "side": "black",
+  "moves": [
+   "d3-c3",
+   "d3-d2",
+   "d3-e3",
+   "d7-c7",
+   "d7-d6",
+   "d7-e7"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../b......./......../..w...../......../w.....w./....w.../........",
+  "side": "white",
+  "moves": [
+   "a3-a4",
+   "a3-b3",
+   "c5-b5",
+   "c5-c6",
+   "c5-d5",
+   "e2-d2",
+   "e2-e3",
+   "e2-f2",
+   "g3-f3",
+   "g3-g4",
+   "g3-h3"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../..w...../......../......../.......w/wb....../...w..../........",
+  "side": "white",
+  "moves": [
+   "a3xc3"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../bbbbbbbb/bbbbbb.b/......b./.......w/wwwwww.w/wwwwwwww/........",
+  "side": "black",
+  "moves": [
+   "a6-a5",
+   "b6-b5",
+   "c6-c5",
+   "d6-d5",
+   "e6-e5",
+   "f6-f5",
+   "f6-g6",
+   "g5-f5",
+   "g5-g4",
+   "g5-h5",
+   "g7-g6",
+   "h6-g6",
+   "h6-h5"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../.bbbb..b/b.bb.bb./..b...../w......./w....ww./.w.w.w../........",
+  "side": "black",
+  "moves": [
+   "a6-a5",
+   "a6-b6",
+   "b7-a7",
+   "b7-b6",
+   "c5-b5",
+   "c5-c4",
+   "c5-d5",
+   "c6-b6",
+   "d6-d5",
+   "d6-e6",
+   "e7-e6",
+   "e7-f7",
+   "f6-e6",
+   "f6-f5",
+   "g6-g5",
+   "g6-h6",
+   "h7-g7",
+   "h7-h6"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../.bbb.b.b/b.bb.bb./..b...../w......./w....ww./.w.w.w../........",
+  "side": "white",
+  "moves": [
+   "a3-b3",
+   "a4-a5",
+   "a4-b4",
+   "b2-a2",
+   "b2-b3",
+   "b2-c2",
+   "d2-c2",
+   "d2-d3",
+   "d2-e2",
+   "f2-e2",
+   "f2-g2",
+   "f3-e3",
+   "f3-f4",
+   "g3-g4",
+   "g3-h3"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../.bbb.b.b/b.bb.b.b/..b...../w....w../w.....w./..ww.w../........",
+  "side": "black",
+  "moves": [
+   "a6-a5",
+   "a6-b6",
+   "b7-a7",
+   "b7-b6",
+   "c5-b5",
+   "c5-c4",
+   "c5-d5",
+   "c6-b6",
+   "d6-d5",
+   "d6-e6",
+   "d7-e7",
+   "f6-e6",
+   "f6-f5",
+   "f6-g6",
+   "f7-e7",
+   "f7-g7",
+   "h6-g6",
+   "h6-h5",
+   "h7-g7"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../.bbbb.b./b.bb...b/..b...../w....b../w.....w./..w.ww../........",
+  "side": "white",
+  "moves": [
+   "a3-b3",
+   "a4-a5",
+   "a4-b4",
+   "c2-b2",
+   "c2-c3",
+   "c2-d2",
+   "e2-d2",
+   "e2-e3",
+   "f2-f3",
+   "f2-g2",
+   "g3-f3",
+   "g3-g4",
+   "g3-h3"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../..bb..../.bbbb.bb/...b..../......../.......w/bb....../........",
+  "side": "white",
+  "moves": [
+   "h3-g3",
+   "h3-h4"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../bbbbbbbb/bbbbbbbb/......../.....w../wwwww.ww/wwwwwwww/........",
+  "side": "black",
+  "moves": [
+   "a6-a5",
+   "b6-b5",
+   "c6-c5",
+   "d6-d5",
+   "e6-e5",
+   "f6-f5",
+   "g6-g5",
+   "h6-h5"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../bbbbbb.b/bbb..bbb/......../.w..w.../w....www/wwwwwwww/........",
+  "side": "black",
+  "moves": [
+   "a6-a5",
+   "b6-b5",
+   "c6-c5",
+   "c6-d6",
+   "d7-d6",
+   "e7-e6",
+   "f6-e6",
+   "f6-f5",
+   "f7-g7",
+   "g6-g5",
+   "h6-h5",
+   "h7-g7"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../bbbb.b.b/bbb.bbbb/......../.w..ww../w.....ww/wwwwwwww/........",
+  "side": "black",
+  "moves": [
+   "a6-a5",
+   "b6-b5",
+   "c6-c5",
+   "c6-d6",
+   "d7-d6",
+   "d7-e7",
+   "e6-d6",
+   "e6-e5",
+   "f6-f5",
+   "f7-e7",
+   "f7-g7",
+   "g6-g5",
+   "h6-h5",
+   "h7-g7"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../bbb.bbb./bb.bbbb./.......b/.w..w.w./w.....ww/wwwwwwww/........",
+  "side": "white",
+  "moves": [
+   "a3-a4",
+   "a3-b3",
+   "b2-b3",
+   "b4-a4",
+   "b4-b5",
+   "b4-c4",
+   "c2-c3",
+   "d2-d3",
+   "e2-e3",
+   "e4-d4",
+   "e4-e5",
+   "e4-f4",
+   "f2-f3",
+   "g3-f3",
+   "g4-f4",
+   "g4-g5",
+   "g4-h4",
+   "h3-h4"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../b.b..bb./b...b..b/......../......../....w.../w..w.www/........",
+  "side": "white",
+  "moves": [
+   "a2-a3",
+   "a2-b2",
+   "d2-c2",
+   "d2-d3",
+   "d2-e2",
+   "e3-d3",
+   "e3-e4",
+   "e3-f3",
+   "f2-e2",
+   "f2-f3",
+   "g2-g3",
+   "h2-h3"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../b..b.bb./b....b.b/......../......../....w.../w..w.www/........",
+  "side": "white",
+  "moves": [
+   "a2-a3",
+   "a2-b2",
+   "d2-c2",
+   "d2-d3",
+   "d2-e2",
+   "e3-d3",
+   "e3-e4",
+   "e3-f3",
+   "f2-e2",
+   "f2-f3",
+   "g2-g3",
+   "h2-h3"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../..b..bb./bb.b...b/......../......../....www./.w..w..w/........",
+  "side": "black",
+  "moves": [
+   "a6-a5",
+   "b6-b5",
+   "b6-c6",
+   "c7-b7",
+   "c7-c6",
+   "c7-d7",
+   "d6-c6",
+   "d6-d5",
+   "d6-e6",
+   "f7-e7",
+   "f7-f6",
+   "g7-g6",
+   "g7-h7",
+   "h6-g6",
+   "h6-h5"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../..b..bb./bb.b..../.......b/......../....www./.w..w..w/........",
+  "side": "white",
+  "moves": [
+   "b2-a2",
+   "b2-b3",
+   "b2-c2",
+   "e2-d2",
+   "e2-f2",
+   "e3-d3",
+   "e3-e4",
+   "f3-f4",
+   "g3-g4",
+   "g3-h3",
+   "h2-g2",
+   "h2-h3"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../.....bb./bbb...../...b...b/....w.../.....w.w/.w..w.w./........",
+  "side": "black",
+  "moves": [
+   "a6-a5",
+   "b6-b5",
+   "c6-c5",
+   "c6-d6",
+   "d5-c5",
+   "d5-d4",
+   "d5-e5",
+   "f7-e7",
+   "f7-f6",
+   "g7-g6",
+   "g7-h7",
+   "h5-g5",
+   "h5-h4"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../......../.bb.w.bb/.b.....b/......../.ww.w..w/.......w/........",
+  "side": "black",
+  "moves": [
+   "b5-a5",
+   "b5-b4",
+   "b5-c5",
+   "b6-a6",
+   "c6-c5",
+   "c6-d6",
+   "g6-f6",
+   "g6-g5",
+   "h5-g5",
+   "h5-h4"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../......../.bb.w.bb/.b....b./......../.ww.w..w/.......w/........",
+  "side": "white",
+  "moves": [
+   "b3-a3",
+   "b3-b4",
+   "c3-c4",
+   "c3-d3",
+   "e3-d3",
+   "e3-e4",
+   "e3-f3",
+   "e6-d6",
+   "e6-e7",
+   "e6-f6",
+   "h2-g2",
+   "h3-g3",
+   "h3-h4"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../.......b/......../..bww.../w.....w./..w....w/.wwwww../........",
+  "side": "white",
+  "moves": [
+   "d5xb5"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../bbbbbbbb/bbbbbbbb/......../.......w/wwwwwww./wwwwwwww/........",
+  "side": "black",
+  "moves": [
+   "a6-a5",
+   "b6-b5",
+   "c6-c5",
+   "d6-d5",
+   "e6-e5",
+   "f6-f5",
+   "g6-g5",
+   "h6-h5"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../bbbbbbbb/b.bbbbbb/.b.....w/......../wwwwwww./wwwwwwww/........",
+  "side": "black",
+  "moves": [
+   "h6xh4"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../bbbbbbbb/bb.bbbb./.b....../...w...b/www.www./wwwwwwww/........",
+  "side": "white",
+  "moves": [
+   "a3-a4",
+   "b3-b4",
+   "c3-c4",
+   "c3-d3",
+   "d2-d3",
+   "d4-c4",
+   "d4-d5",
+   "d4-e4",
+   "e3-d3",
+   "e3-e4",
+   "f3-f4",
+   "g3-g4",
+   "g3-h3",
+   "h2-h3"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../.......b/.w....b./......b./......../......../......../........",
+  "side": "black",
+  "moves": [
+   "g5-f5",
+   "g5-g4",
+   "g5-h5",
+   "g6-f6",
+   "g6-h6",
+   "h7-g7",
+   "h7-h6"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../bb..b..b/.....bb./bb....../.....ww./wwww...w/wwww...w/........",
+  "side": "black",
+  "moves": [
+   "a5-a4",
+   "a7-a6",
+   "b5-b4",
+   "b5-c5",
+   "b7-b6",
+   "b7-c7",
+   "e7-d7",
+   "e7-e6",
+   "e7-f7",
+   "f6-e6",
+   "f6-f5",
+   "g6-g5",
+   "g6-h6",
+   "h7-g7",
+   "h7-h6"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../bb..b.../.....b.b/bb....../....b.../wwww...w/wwww...w/........",
+  "side": "white",
+  "moves": [
+   "a3-a4",
+   "b3-b4",
+   "c3-c4",
+   "d2-e2",
+   "d3-d4",
+   "d3-e3",
+   "h2-g2",
+   "h3-g3",
+   "h3-h4"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../bb..b.../.....b.b/bb....../......../wwww..../wwww.w../........",
+  "side": "black",
+  "moves": [
+   "a5-a4",
+   "a7-a6",
+   "b5-b4",
+   "b5-c5",
+   "b7-b6",
+   "b7-c7",
+   "e7-d7",
+   "e7-e6",
+   "e7-f7",
+   "f6-e6",
+   "f6-f5",
+   "f6-g6",
+   "h6-g6",
+   "h6-h5"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../.......w/b..b..../......../....w.../..w...../...w.w../........",
+  "side": "black",
+  "moves": [
+   "a6-a5",
+   "a6-b6",
+   "d6-c6",
+   "d6-d5",
+   "d6-e6"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../.......w/.b....../b......./...w..../..w.w.w./......../........",
+  "side": "black",
+  "moves": [
+   "a5-a4",
+   "a5-b5",
+   "b6-a6",
+   "b6-b5",
+   "b6-c6"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../bbbb.bbb/bb.bbb../..b.b.../.......b/wwwww..w/wwwwwwww/........",
+  "side": "white",
+  "moves": [
+   "h3xh5"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../bbbb.bbb/bb.bb.../...bb.../......b./wwww.w../wwwwwwww/........",
+  "side": "white",
+  "moves": [
+   "a3-a4",
+   "b3-b4",
+   "c3-c4",
+   "d3-d4",
+   "d3-e3",
+   "e2-e3",
+   "f3-e3",
+   "f3-f4",
+   "f3-g3",
+   "g2-g3",
+   "h2-h3"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../bbbb..b./b.bbbb.b/...bb.../.w...w../w.www.../wwwwww.w/........",
+  "side": "white",
+  "moves": [
+   "a3-a4",
+   "a3-b3",
+   "b2-b3",
+   "b4-a4",
+   "b4-b5",
+   "b4-c4",
+   "c3-b3",
+   "c3-c4",
+   "d3-d4",
+   "e3-e4",
+   "e3-f3",
+   "f2-f3",
+   "f2-g2",
+   "f4-e4",
+   "f4-f5",
+   "f4-g4",
+   "h2-g2",
+   "h2-h3"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../bbbbbbbb/bbb.bbbb/...b..../......w./wwwww.ww/wwwwwwww/........",
+  "side": "black",
+  "moves": [
+   "a6-a5",
+   "b6-b5",
+   "c6-c5",
+   "c6-d6",
+   "d5-c5",
+   "d5-d4",
+   "d5-e5",
+   "d7-d6",
+   "e6-d6",
+   "e6-e5",
+   "f6-f5",
+   "g6-g5",
+   "h6-h5"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../w...b..b/.......b/.b....../..w.w.ww/w.w...../.wwwwwww/........",
+  "side": "black",
+  "moves": [
+   "b5-a5",
+   "b5-b4",
+   "b5-c5",
+   "e7-d7",
+   "e7-e6",
+   "e7-f7",
+   "h6-g6",
+   "h6-h5",
+   "h7-g7"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../w......./....b.bb/......../w....www/wwww.w.w/..w.w.w./........",
+  "side": "black",
+  "moves": [
+   "e6-d6",
+   "e6-e5",
+   "e6-f6",
+   "g6-f6",
+   "g6-g5",
+   "h6-h5"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../bbbbbbbb/b.bbbbb./.b.....b/....w.w./wwww..ww/wwwwwwww/........",
+  "side": "black",
+  "moves": [
+   "a6-a5",
+   "a6-b6",
+   "b5-a5",
+   "b5-b4",
+   "b5-c5",
+   "b7-b6",
+   "c6-b6",
+   "c6-c5",
+   "d6-d5",
+   "e6-e5",
+   "f6-f5",
+   "g6-g5",
+   "g6-h6",
+   "h5-g5",
+   "h5-h4",
+   "h7-h6"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../bbbbbbb./b.bbbbbb/.b.....b/....w.w./wwww..ww/wwwwwwww/........",
+  "side": "white",
+  "moves": [
+   "a3-a4",
+   "b3-b4",
+   "c3-c4",
+   "d3-d4",
+   "d3-e3",
+   "e2-e3",
+   "e4-d4",
+   "e4-e5",
+   "e4-f4",
+   "f2-f3",
+   "g3-f3",
+   "g4-f4",
+   "g4-g5",
+   "g4-h4",
+   "h3-h4"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../b.bb.b../bb.b.bbb/..w.b..b/.w....../..w...w./...ww..b/........",
+  "side": "white",
+  "moves": [
+   "b4-a4",
+   "b4-b5",
+   "b4-c4",
+   "c3-b3",
+   "c3-c4",
+   "c3-d3",
+   "c5-b5",
+   "c5-c6",
+   "c5-d5",
+   "d2-c2",
+   "d2-d3",
+   "e2-e3",
+   "e2-f2",
+   "g3-f3",
+   "g3-g4",
+   "g3-h3"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../bbb..bbb/.b.b..b./....w.../..b...../ww.w..../wwwwwwww/........",
+  "side": "white",
+  "moves": [
+   "a3-a4",
+   "b3-b4",
+   "b3-c3",
+   "c2-c3",
+   "d3-c3",
+   "d3-d4",
+   "d3-e3",
+   "e2-e3",
+   "e5-d5",
+   "e5-e6",
+   "e5-f5",
+   "f2-f3",
+   "g2-g3",
+   "h2-h3"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../bb....bb/..b..b.b/.b.w..../.w....../ww.....w/w.www.w./........",
+  "side": "black",
+  "moves": [
+   "a7-a6",
+   "b5-a5",
+   "b5-c5",
+   "b7-b6",
+   "b7-c7",
+   "c6-b6",
+   "c6-c5",
+   "c6-d6",
+   "f6-e6",
+   "f6-f5",
+   "f6-g6",
+   "g7-f7",
+   "g7-g6",
+   "h6-g6",
+   "h6-h5"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../bb....bb/...w.bb./...w..../......../ww.....w/w.www.w./........",
+  "side": "black",
+  "moves": [
+   "a7-a6",
+   "b7-b6",
+   "b7-c7",
+   "f6-e6",
+   "f6-f5",
+   "g6-g5",
+   "g6-h6",
+   "g7-f7",
+   "h7-h6"
+  ]
+ },
+ {
+  "kind": "quiet",
+  "board": "......../bbbbbb.b/b.bbb.../....b..b/......../.w..w.../..w.w.../........",
+  "side": "black",
+  "moves": [
+   "a6-a5",
+   "a6-b6",
+   "b7-b6",
+   "c6-b6",
+   "c6-c5",
+   "d6-d5",
+   "e5-d5",
+   "e5-e4",
+   "e5-f5",
+   "e6-f6",
+   "f7-f6",
+   "f7-g7",
+   "h5-g5",
+   "h5-h4",
+   "h7-g7",
+   "h7-h6"
+  ]
+ }
+]

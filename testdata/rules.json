@@ -1,0 +1,142 @@
+[
+ {
+  "name": "king_lands_anywhere_beyond",
+  "rule": "A king may land on any empty square beyond the captured piece.",
+  "board": "......../......../......../......../W..b..../......../......../........",
+  "side": "white",
+  "moves": [
+   "a4xe4",
+   "a4xf4",
+   "a4xg4",
+   "a4xh4"
+  ]
+ },
+ {
+  "name": "king_no_180_up_down",
+  "rule": "No 180-degree turn between two captures (vertical).",
+  "board": "......../...b..../......../...W..../......../...b..../......../........",
+  "side": "white",
+  "moves": [
+   "d5xd1",
+   "d5xd2",
+   "d5xd8"
+  ]
+ },
+ {
+  "name": "king_no_180_left_right",
+  "rule": "No 180-degree turn between two captures (horizontal).",
+  "board": "......../......../......../......../.b.W.b../......../......../........",
+  "side": "white",
+  "moves": [
+   "d4xa4",
+   "d4xg4",
+   "d4xh4"
+  ]
+ },
+ {
+  "name": "man_continues_as_man",
+  "rule": "A man that reaches the last row during a capture continues as a man and is crowned at the end.",
+  "board": "..b...../...b..../...w..../......../......../......../......../........",
+  "side": "white",
+  "moves": [
+   "d6xd8xb8=K"
+  ]
+ },
+ {
+  "name": "sideways_capture_on_last_row",
+  "rule": "A man may capture sideways along the last row.",
+  "board": "....b.../...b..../...w..../......../......../......../......../........",
+  "side": "white",
+  "moves": [
+   "d6xd8xf8=K"
+  ]
+ },
+ {
+  "name": "black_man_promotes",
+  "rule": "Black promotes on rank 1.",
+  "board": "......../......../......../......../......../...b..../...w..../........",
+  "side": "black",
+  "moves": [
+   "d3xd1=K"
+  ]
+ },
+ {
+  "name": "king_moves_from_centre",
+  "rule": "A king flies orthogonally: 14 moves from d4 on an empty board.",
+  "board": ".......b/......../......../......../...W..../......../......../........",
+  "side": "white",
+  "moves": [
+   "d4-a4",
+   "d4-b4",
+   "d4-c4",
+   "d4-d1",
+   "d4-d2",
+   "d4-d3",
+   "d4-d5",
+   "d4-d6",
+   "d4-d7",
+   "d4-d8",
+   "d4-e4",
+   "d4-f4",
+   "d4-g4",
+   "d4-h4"
+  ]
+ },
+ {
+  "name": "man_moves",
+  "rule": "A man moves one square forward or sideways, never backward.",
+  "board": ".......b/......../......../......../...w..../......../......../........",
+  "side": "white",
+  "moves": [
+   "d4-c4",
+   "d4-d5",
+   "d4-e4"
+  ]
+ },
+ {
+  "name": "capture_is_mandatory",
+  "rule": "If a capture exists, only captures are legal.",
+  "board": "......../......../......../...b..../...w..../......../......../........",
+  "side": "white",
+  "moves": [
+   "d4xd6"
+  ]
+ },
+ {
+  "name": "man_never_captures_backward",
+  "rule": "A man never captures backward.",
+  "board": ".......b/......../......../......../...w..../...b..../......../........",
+  "side": "white",
+  "moves": [
+   "d4-c4",
+   "d4-d5",
+   "d4-e4"
+  ]
+ },
+ {
+  "name": "longest_capture_only",
+  "rule": "Only the sequence that captures the most pieces is legal.",
+  "board": "......../...b..../......../...b..../...wb.../......../......../........",
+  "side": "white",
+  "moves": [
+   "d4xd6xd8=K"
+  ]
+ },
+ {
+  "name": "captured_pieces_removed_at_once",
+  "rule": "Captured pieces leave the board during the sequence, so a later jump may cross their squares.",
+  "board": "......../..b..b../.....bb./Wb....../.b...ww./w......./w.ww.w../...B....",
+  "side": "white",
+  "moves": [
+   "a5xg5xg7xd7xb7xb1xe1",
+   "a5xg5xg7xd7xb7xb1xf1",
+   "a5xg5xg7xd7xb7xb1xg1",
+   "a5xg5xg7xd7xb7xb1xh1",
+   "a5xg5xg7xe7xb7xb1xe1",
+   "a5xg5xg7xe7xb7xb1xf1",
+   "a5xg5xg7xe7xb7xb1xg1",
+   "a5xg5xg7xe7xb7xb1xh1"
+  ],
+  "example": "a5xg5xg7xe7xb7xb1xe1"
+ }
+]

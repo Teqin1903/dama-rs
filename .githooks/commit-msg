@@ -1,0 +1,6 @@
+#!/bin/sh
+# Removes AI attribution lines from commit messages: Co-Authored-By trailers that point to
+# noreply@anthropic.com and "Generated with [Claude Code]" lines.
+# Enable once per clone:  git config core.hooksPath .githooks
+sed -i -e '/^[Cc]o-[Aa]uthored-[Bb]y:.*noreply@anthropic\.com/d' \
+       -e '/Generated with \[Claude Code\]/d' "$1"
