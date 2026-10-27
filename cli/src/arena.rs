@@ -24,6 +24,7 @@ agents:
   first             the baseline agent with weights 1/3/0.1
   tuned             the baseline agent with weights 1/2.5/-0.05
   u:MAN/KING/MOB    the baseline agent with any weights, for example u:1/2/0.2
+  mmN               minimax N plies deep (1 to 9) with the tuned weights, for example mm3
 
 options:
   --games N         the number of games (default 200)
@@ -34,7 +35,8 @@ options:
 
 /// The columns of the CSV file, one row per run.
 const CSV_HEADER: &str = "date,version,build,a,b,games,seed,wins,draws,losses,score_pct,se_pct,\
-mean_plies,a_us_per_move,b_us_per_move,repetition,no_move,one_piece_each,fifty_quiet,cap";
+mean_plies,a_us_per_move,b_us_per_move,repetition,no_move,one_piece_each,fifty_quiet,cap,\
+a_nodes_per_move,b_nodes_per_move";
 
 /// Debug builds are many times slower: the times per move of a debug build are not measurements.
 const BUILD: &str = if cfg!(debug_assertions) {
@@ -155,6 +157,12 @@ fn run(args: &Args) -> Result<(), Box<dyn Error>> {
 fn describe(spec: &AgentSpec) -> String {
     match (spec, spec.preset()) {
         (AgentSpec::U(weights), Some(name)) => format!("{name} ({weights})"),
+        (AgentSpec::Minimax(depth), _) => {
+            format!(
+                "{spec} (minimax, {depth} plies, {})",
+                engine::Weights::TUNED
+            )
+        }
         _ => spec.to_string(),
     }
 }
@@ -167,6 +175,10 @@ fn report(args: &Args, record: &MatchRecord, version: &str, elapsed: Duration) -
         Some(d) => format!("{} ({} moves)", duration(d), t.moves),
         None => "- (no moves)".to_string(),
     };
+    let nodes = |t: &Thinking| {
+        t.nodes_per_move()
+            .map_or("-".to_string(), |n| format!("{n:.1}"))
+    };
     let endings: Vec<String> = record
         .endings()
         .iter()
@@ -178,6 +190,7 @@ fn report(args: &Args, record: &MatchRecord, version: &str, elapsed: Duration) -
          \x20 A: +{wins} ={draws} -{losses}, score {}% (SE {})\n\
          \x20 plies per game: {}\n\
          \x20 time per move: A {}, B {}\n\
+         \x20 nodes per move: A {}, B {}\n\
          \x20 endings: {}\n\
          \x20 version {version} ({BUILD} build), {} in all\n",
         describe(&args.a),
@@ -192,6 +205,8 @@ fn report(args: &Args, record: &MatchRecord, version: &str, elapsed: Duration) -
             .map_or("-".to_string(), |p| format!("{p:.1}")),
         per_move(&record.a),
         per_move(&record.b),
+        nodes(&record.a),
+        nodes(&record.b),
         endings.join(", "),
         duration(elapsed),
     )
@@ -245,6 +260,7 @@ fn csv_row(date: &str, version: &str, build: &str, args: &Args, record: &MatchRe
         x.map_or(String::new(), |x| format!("{:.decimals$}", x * scale))
     };
     let micros = |t: &Thinking| number(t.per_move().map(|d| d.as_secs_f64()), 1e6, 2);
+    let nodes = |t: &Thinking| number(t.nodes_per_move(), 1.0, 1);
     let endings: Vec<String> = record
         .endings()
         .iter()
@@ -267,6 +283,8 @@ fn csv_row(date: &str, version: &str, build: &str, args: &Args, record: &MatchRe
         micros(&record.a),
         micros(&record.b),
         endings.join(","),
+        nodes(&record.a),
+        nodes(&record.b),
     ];
     fields.join(",")
 }
@@ -440,6 +458,7 @@ mod tests {
             a: Thinking {
                 moves: 4,
                 time: Duration::from_micros(10),
+                nodes: 90,
             },
             b: Thinking::default(),
         };
@@ -456,7 +475,7 @@ mod tests {
         assert_eq!(
             row,
             "2026-10-25T00:00:00Z,baseline-1-gabc,release,tuned,u:1/2/0.2,2,1,1,1,0,75.00,25.00,\
-             40.0,2.50,,1,1,0,0,0"
+             40.0,2.50,,1,1,0,0,0,22.5,"
         );
         assert_eq!(row.split(',').count(), CSV_HEADER.split(',').count());
     }

@@ -174,6 +174,8 @@ pub struct Thinking {
     pub moves: u64,
     /// The time spent choosing them.
     pub time: Duration,
+    /// The positions its search produced while choosing them (`Agent::nodes`).
+    pub nodes: u64,
 }
 
 impl Thinking {
@@ -181,9 +183,14 @@ impl Thinking {
     pub fn per_move(&self) -> Option<Duration> {
         (self.moves > 0).then(|| self.time.div_f64(self.moves as f64))
     }
+
+    /// The mean number of nodes per move, or `None` if the agent never moved.
+    pub fn nodes_per_move(&self) -> Option<f64> {
+        (self.moves > 0).then(|| self.nodes as f64 / self.moves as f64)
+    }
 }
 
-/// An agent with a stopwatch around `choose`.
+/// An agent with a stopwatch and a node counter around `choose`.
 struct Timed<'a> {
     agent: &'a mut dyn Agent,
     thinking: Thinking,
@@ -200,11 +207,16 @@ impl Agent for Timed<'_> {
         side: Color,
         legal: &'m [Move],
     ) -> Result<&'m Move, AgentError> {
-        let start = Instant::now();
+        let (start, nodes) = (Instant::now(), self.agent.nodes());
         let chosen = self.agent.choose(board, side, legal);
         self.thinking.time += start.elapsed();
+        self.thinking.nodes += self.agent.nodes() - nodes;
         self.thinking.moves += 1;
         chosen
+    }
+
+    fn nodes(&self) -> u64 {
+        self.agent.nodes()
     }
 }
 
@@ -415,8 +427,11 @@ mod tests {
         let thinking = Thinking {
             moves: 4,
             time: Duration::from_micros(10),
+            nodes: 90,
         };
         assert_eq!(thinking.per_move(), Some(Duration::from_nanos(2500)));
+        assert_eq!(thinking.nodes_per_move(), Some(22.5));
         assert_eq!(Thinking::default().per_move(), None);
+        assert_eq!(Thinking::default().nodes_per_move(), None);
     }
 }

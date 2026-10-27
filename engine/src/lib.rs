@@ -1,5 +1,5 @@
-//! Turkish draughts (TÜDAF rules): board, move generation, perft, the baseline agent and the
-//! arena that plays agents against each other.
+//! Turkish draughts (TÜDAF rules): board, move generation, perft, the baseline agent, the
+//! minimax agent and the arena that plays agents against each other.
 //!
 //! `reference/js/` is the reference: the same square numbers, the same text formats
 //! (docs/reference.md), the same order of legal moves, the same U, the same random numbers and the
@@ -16,7 +16,7 @@ mod rng;
 mod search;
 mod square;
 
-pub use agent::{Agent, AgentError, AgentSpec, ParseAgentError, RandomAgent, UAgent};
+pub use agent::{Agent, AgentError, AgentSpec, MinimaxAgent, ParseAgentError, RandomAgent, UAgent};
 pub use arena::{
     EndReason, GameRecord, MatchGame, MatchRecord, MatchSettings, Thinking, play_game, play_match,
 };
@@ -26,5 +26,5 @@ pub use eval::{Features, U_EPSILON, WIN, Weights};
 pub use movegen::Move;
 pub use perft::perft;
 pub use rng::Mulberry32;
-pub use search::{Candidate, Decision, decide};
+pub use search::{Candidate, Decision, decide, minimax};
 pub use square::Square;

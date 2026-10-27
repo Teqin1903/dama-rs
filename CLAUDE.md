@@ -51,7 +51,8 @@ Never change an expected value to make a test pass: find the bug and explain whi
 - One module per session: plan first, then implement, run the tests, then commit (ask me first).
 - Ask before adding a crate. `kish` may be used only as a dev-dependency, in tests.
 - Keep the binaries thin; logic lives in `engine/`.
-- Search is one ply for now, like the baseline. Keep it behind its own module so minimax can come later.
+- Search lives in its own module: one ply for the baseline (`tuned`), depth-limited minimax for `mmN` (no
+  alpha-beta yet). Keep new search ideas there, behind the `Agent` trait.
 - Do not add Co-Authored-By trailers or "Generated with" lines to commits or pull requests.
 
 ## Talking to me

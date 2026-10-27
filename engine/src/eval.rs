@@ -83,6 +83,20 @@ impl Features {
         }
     }
 
+    /// The features of `board` from `side`'s view at a leaf of the minimax search, where either
+    /// side may be to move: never a win (a side without moves is caught before the leaf), and the
+    /// move counts come from the caller, which has already generated one of them.
+    pub fn leaf(board: &Board, side: Color, our_moves: usize, their_moves: usize) -> Features {
+        let opponent = side.opponent();
+        let difference = |kind| board.count(side, kind) as i32 - board.count(opponent, kind) as i32;
+        Features {
+            men: difference(Kind::Man),
+            kings: difference(Kind::King),
+            mob: our_moves as i32 - their_moves as i32,
+            win: false,
+        }
+    }
+
     /// U with the weights `w`: `WIN` for a win, otherwise man·men + king·kings + mob·mob.
     /// Computed in this order in f64 it is the same double as in agent.js: Rust neither reorders
     /// these operations nor fuses a multiplication and an addition into one FMA.
