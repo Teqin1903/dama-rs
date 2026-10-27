@@ -1,5 +1,6 @@
-//! The agents' search: the baseline's one ply (`decide` in reference/js/agent.js) and
-//! depth-limited minimax (`minimax`).
+//! The agents' search: the baseline's one ply (`decide` in reference/js/agent.js),
+//! depth-limited minimax (`minimax`) and alpha-beta (`alpha_beta`), which makes the same decisions
+//! as minimax at the same depth from fewer nodes.
 //!
 //! Minimax values every position from the root side's view:
 //!
@@ -10,6 +11,11 @@
 //!   moves there, and when it is the root side the opponent's lack of moves is not yet a win.
 //!
 //! Depth 1 therefore gives every move the same U as `decide`.
+//!
+//! Alpha-beta searches the same tree in the same move order with the same scores, but skips the
+//! subtrees that cannot change a value it needs. It only selects among leaf values (no arithmetic),
+//! so every value it finds exactly is bit for bit the minimax value. At the root it needs exact
+//! values only for the moves that can be within `U_EPSILON` of the best (see `alpha_beta`).
 
 use crate::board::{Board, Color};
 use crate::eval::{Features, U_EPSILON, WIN, Weights};
@@ -21,7 +27,12 @@ use crate::rng::Mulberry32;
 pub struct Candidate {
     pub mv: Move,
     pub features: Features,
+    /// The move's value. When `exact` is false it is only an upper bound, lower than the best
+    /// value by more than `U_EPSILON`, so the move is not among the best.
     pub u: f64,
+    /// Whether `u` is the exact value: always for `decide` and `minimax`, and for `alpha_beta`
+    /// at least for every move within `U_EPSILON` of the best.
+    pub exact: bool,
 }
 
 /// Every legal move evaluated one ply deep, and the ones with the highest U.
@@ -48,6 +59,7 @@ pub fn decide(board: &Board, side: Color, weights: Weights) -> Decision {
                 u: features.u(weights),
                 features,
                 mv,
+                exact: true,
             }
         })
         .collect();
@@ -78,9 +90,47 @@ pub fn minimax(board: &Board, side: Color, weights: Weights, depth: u32) -> Deci
                     &mut nodes,
                 ),
                 mv,
+                exact: true,
             }
         })
         .collect();
+    Decision::new(candidates, nodes)
+}
+
+/// The same decision as `minimax(board, side, weights, depth)` from at most as many nodes: the
+/// same `top`, and the same `u` for every move in it, bit for bit.
+///
+/// Root moves are searched in legal-move order, each with the window (best − 2·`U_EPSILON`, +∞),
+/// where best is the highest value found so far. A value above the window's lower end is exact. A
+/// value at or below it is an upper bound (fail-soft) and the true value is at most best − 2ε, so
+/// that move cannot end up within `U_EPSILON` of the best: best only grows. The margin of 2ε,
+/// instead of ε, keeps rounding in `best - ε` from deciding whether a tied move is searched exactly.
+pub fn alpha_beta(board: &Board, side: Color, weights: Weights, depth: u32) -> Decision {
+    assert!(depth >= 1, "alpha-beta needs a depth of at least 1");
+    let mut nodes = 0;
+    let mut best = f64::NEG_INFINITY;
+    let mut candidates = Vec::new();
+    for mv in board.legal_moves(side) {
+        let after = board.apply(&mv);
+        let alpha = best - 2.0 * U_EPSILON;
+        let u = bounded_value(
+            &after,
+            side.opponent(),
+            side,
+            weights,
+            depth - 1,
+            1,
+            (alpha, f64::INFINITY),
+            &mut nodes,
+        );
+        best = best.max(u);
+        candidates.push(Candidate {
+            features: Features::of(&after, side),
+            u,
+            exact: u > alpha,
+            mv,
+        });
+    }
     Decision::new(candidates, nodes)
 }
 
@@ -126,6 +176,66 @@ fn value(
     } else {
         children.fold(f64::INFINITY, f64::min)
     }
+}
+
+/// `value` searched with alpha-beta in the window `(alpha, beta)`, fail-soft: a result strictly
+/// inside the window is the exact minimax value; a result `<= alpha` is an upper bound of it and a
+/// result `>= beta` a lower bound. Counts every board it visits in `nodes`, as `value` does.
+#[allow(clippy::too_many_arguments)]
+fn bounded_value(
+    board: &Board,
+    to_move: Color,
+    root: Color,
+    weights: Weights,
+    depth: u32,
+    ply: u32,
+    (mut alpha, mut beta): (f64, f64),
+    nodes: &mut u64,
+) -> f64 {
+    *nodes += 1;
+    let moves = board.legal_moves(to_move);
+    if moves.is_empty() {
+        let win = WIN - f64::from(ply - 1);
+        return if to_move == root { -win } else { win };
+    }
+    if depth == 0 {
+        let others = board.legal_moves(to_move.opponent()).len();
+        let (ours, theirs) = if to_move == root {
+            (moves.len(), others)
+        } else {
+            (others, moves.len())
+        };
+        return Features::leaf(board, root, ours, theirs).u(weights);
+    }
+    let maximising = to_move == root;
+    let mut best = if maximising {
+        f64::NEG_INFINITY
+    } else {
+        f64::INFINITY
+    };
+    for mv in &moves {
+        let v = bounded_value(
+            &board.apply(mv),
+            to_move.opponent(),
+            root,
+            weights,
+            depth - 1,
+            ply + 1,
+            (alpha, beta),
+            nodes,
+        );
+        if maximising {
+            best = best.max(v);
+            alpha = alpha.max(v);
+        } else {
+            best = best.min(v);
+            beta = beta.min(v);
+        }
+        if alpha >= beta {
+            break;
+        }
+    }
+    best
 }
 
 impl Decision {
@@ -187,6 +297,7 @@ mod tests {
                 mv,
                 features,
                 u: 0.0,
+                exact: true,
             })
             .collect();
         Decision {

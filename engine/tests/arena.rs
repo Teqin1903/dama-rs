@@ -290,3 +290,24 @@ fn every_pairing_gets_the_same_openings() {
     assert_eq!(openings("tuned", "first"), random);
     assert_eq!(openings("material", "u:1/2/0.2"), random);
 }
+
+#[test]
+fn alpha_beta_plays_the_games_of_minimax_at_depth_2() {
+    assert_eq!(
+        match_games("ab2", "tuned", 10, 1),
+        match_games("mm2", "tuned", 10, 1)
+    );
+}
+
+#[test]
+#[ignore = "slow in a debug build; run with --release -- --ignored"]
+fn alpha_beta_plays_the_games_of_minimax_at_depth_3() {
+    assert_eq!(
+        match_games("ab3", "tuned", 50, 1),
+        match_games("mm3", "tuned", 50, 1)
+    );
+    assert_eq!(
+        match_games("ab3", "mm2", 50, 1),
+        match_games("mm3", "mm2", 50, 1)
+    );
+}

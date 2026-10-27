@@ -25,6 +25,7 @@ agents:
   tuned             the baseline agent with weights 1/2.5/-0.05
   u:MAN/KING/MOB    the baseline agent with any weights, for example u:1/2/0.2
   mmN               minimax N plies deep (1 to 9) with the tuned weights, for example mm3
+  abN               alpha-beta N plies deep (1 to 9): the same moves as mmN, faster
 
 options:
   --games N         the number of games (default 200)
@@ -160,6 +161,12 @@ fn describe(spec: &AgentSpec) -> String {
         (AgentSpec::Minimax(depth), _) => {
             format!(
                 "{spec} (minimax, {depth} plies, {})",
+                engine::Weights::TUNED
+            )
+        }
+        (AgentSpec::AlphaBeta(depth), _) => {
+            format!(
+                "{spec} (alpha-beta, {depth} plies, {})",
                 engine::Weights::TUNED
             )
         }

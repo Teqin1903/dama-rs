@@ -1,5 +1,5 @@
 //! The agents that play in the arena: the random player, the baseline agent (`randomPolicy` and
-//! `agentPolicy` in reference/js/agent.js) and the minimax agent.
+//! `agentPolicy` in reference/js/agent.js), the minimax agent and the alpha-beta agent.
 //!
 //! The arena talks to an agent only through the `Agent` trait: a game starts, and a move is
 //! chosen from the legal moves of a position. That is also all the text protocol (position / go /
@@ -13,7 +13,7 @@ use crate::board::{Board, Color};
 use crate::eval::Weights;
 use crate::movegen::Move;
 use crate::rng::Mulberry32;
-use crate::search::{Decision, decide, minimax};
+use crate::search::{Decision, alpha_beta, decide, minimax};
 
 /// A player in the arena.
 ///
@@ -177,9 +177,52 @@ impl Agent for MinimaxAgent {
     }
 }
 
+/// Alpha-beta `depth` plies deep (`search::alpha_beta`): the same moves as `MinimaxAgent` with
+/// the same depth and seed, from fewer nodes.
+#[derive(Clone, Debug)]
+pub struct AlphaBetaAgent {
+    weights: Weights,
+    depth: u32,
+    rng: Mulberry32,
+    nodes: u64,
+}
+
+impl AlphaBetaAgent {
+    pub fn new(weights: Weights, depth: u32, seed: u32) -> AlphaBetaAgent {
+        AlphaBetaAgent {
+            weights,
+            depth,
+            rng: Mulberry32::new(seed),
+            nodes: 0,
+        }
+    }
+}
+
+impl Agent for AlphaBetaAgent {
+    fn new_game(&mut self, seed: u32) -> Result<(), AgentError> {
+        self.rng = Mulberry32::new(seed);
+        Ok(())
+    }
+
+    fn choose<'m>(
+        &mut self,
+        board: &Board,
+        side: Color,
+        legal: &'m [Move],
+    ) -> Result<&'m Move, AgentError> {
+        let decision = alpha_beta(board, side, self.weights, self.depth);
+        self.nodes += decision.nodes;
+        Ok(play(&decision, &mut self.rng, legal))
+    }
+
+    fn nodes(&self) -> u64 {
+        self.nodes
+    }
+}
+
 /// An agent as the command line names it: `random`, a preset name (`material`, `first`,
-/// `tuned`), `u:MAN/KING/MOB` for the baseline agent with any weights, or `mmN` for minimax N
-/// plies deep with the tuned weights.
+/// `tuned`), `u:MAN/KING/MOB` for the baseline agent with any weights, `mmN` for minimax N
+/// plies deep with the tuned weights, or `abN` for alpha-beta N plies deep with the tuned weights.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum AgentSpec {
     Random,
@@ -187,6 +230,8 @@ pub enum AgentSpec {
     U(Weights),
     /// Minimax this many plies deep, 1 to `MAX_DEPTH`, with the tuned weights.
     Minimax(u32),
+    /// Alpha-beta this many plies deep, 1 to `MAX_DEPTH`, with the tuned weights.
+    AlphaBeta(u32),
 }
 
 impl AgentSpec {
@@ -197,13 +242,14 @@ impl AgentSpec {
         ("tuned", Weights::TUNED),
     ];
 
-    /// The deepest minimax the command line accepts: plain minimax grows about tenfold per ply.
+    /// The deepest search (`mmN`, `abN`) the command line accepts: plain minimax grows about
+    /// tenfold per ply.
     pub const MAX_DEPTH: u32 = 9;
 
     /// The name of the preset with these weights, if there is one.
     pub fn preset(&self) -> Option<&'static str> {
         match self {
-            AgentSpec::Random | AgentSpec::Minimax(_) => None,
+            AgentSpec::Random | AgentSpec::Minimax(_) | AgentSpec::AlphaBeta(_) => None,
             AgentSpec::U(weights) => AgentSpec::PRESETS
                 .iter()
                 .find(|(_, w)| w == weights)
@@ -217,12 +263,13 @@ impl AgentSpec {
             AgentSpec::Random => Box::new(RandomAgent::new(0)),
             AgentSpec::U(weights) => Box::new(UAgent::new(weights, 0)),
             AgentSpec::Minimax(depth) => Box::new(MinimaxAgent::new(Weights::TUNED, depth, 0)),
+            AgentSpec::AlphaBeta(depth) => Box::new(AlphaBetaAgent::new(Weights::TUNED, depth, 0)),
         }
     }
 }
 
 impl fmt::Display for AgentSpec {
-    /// The canonical name: `random`, `mmN`, the preset's name, or else `u:MAN/KING/MOB`.
+    /// The canonical name: `random`, `mmN`, `abN`, the preset's name, or else `u:MAN/KING/MOB`.
     /// `"u:1/3/0".parse()` therefore prints as `material`.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match (self, self.preset()) {
@@ -230,6 +277,7 @@ impl fmt::Display for AgentSpec {
             (AgentSpec::U(_), Some(name)) => f.write_str(name),
             (AgentSpec::U(weights), None) => write!(f, "u:{weights}"),
             (AgentSpec::Minimax(depth), _) => write!(f, "mm{depth}"),
+            (AgentSpec::AlphaBeta(depth), _) => write!(f, "ab{depth}"),
         }
     }
 }
@@ -237,9 +285,9 @@ impl fmt::Display for AgentSpec {
 /// Why a name is not an agent.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ParseAgentError {
-    /// Neither `random`, a preset name, `u:...` nor `mmN`.
+    /// Neither `random`, a preset name, `u:...`, `mmN` nor `abN`.
     Unknown(String),
-    /// `mm` is not followed by a depth from 1 to `AgentSpec::MAX_DEPTH`.
+    /// `mm` or `ab` is not followed by a depth from 1 to `AgentSpec::MAX_DEPTH`.
     Depth(String),
     /// `u:` is not followed by three finite numbers separated by `/`.
     Weights(String),
@@ -250,12 +298,12 @@ impl fmt::Display for ParseAgentError {
         match self {
             ParseAgentError::Unknown(name) => write!(
                 f,
-                "unknown agent {name:?}: expected random, material, first, tuned, u:MAN/KING/MOB \
-                 or mmN"
+                "unknown agent {name:?}: expected random, material, first, tuned, u:MAN/KING/MOB, \
+                 mmN or abN"
             ),
             ParseAgentError::Depth(name) => write!(
                 f,
-                "agent {name:?}: expected a depth from 1 to {} after mm, for example mm3",
+                "agent {name:?}: expected a depth from 1 to {} after mm or ab, for example mm3",
                 AgentSpec::MAX_DEPTH
             ),
             ParseAgentError::Weights(name) => write!(
@@ -279,13 +327,17 @@ impl FromStr for AgentSpec {
         if let Some((_, weights)) = AgentSpec::PRESETS.iter().find(|(name, _)| *name == s) {
             return Ok(AgentSpec::U(*weights));
         }
-        if let Some(depth) = s.strip_prefix("mm") {
-            return depth
-                .parse()
-                .ok()
-                .filter(|d| (1..=AgentSpec::MAX_DEPTH).contains(d))
-                .map(AgentSpec::Minimax)
-                .ok_or_else(|| ParseAgentError::Depth(s.to_string()));
+        // An enum variant with data is also a function that builds it: `AgentSpec::Minimax(3)`.
+        let search = AgentSpec::Minimax as fn(u32) -> AgentSpec;
+        for (prefix, spec) in [("mm", search), ("ab", AgentSpec::AlphaBeta)] {
+            if let Some(depth) = s.strip_prefix(prefix) {
+                return depth
+                    .parse()
+                    .ok()
+                    .filter(|d| (1..=AgentSpec::MAX_DEPTH).contains(d))
+                    .map(spec)
+                    .ok_or_else(|| ParseAgentError::Depth(s.to_string()));
+            }
         }
         let Some(numbers) = s.strip_prefix("u:") else {
             return Err(ParseAgentError::Unknown(s.to_string()));
@@ -317,6 +369,7 @@ mod tests {
         assert_eq!(spec("first"), AgentSpec::U(Weights::FIRST_GUESS));
         assert_eq!(spec("tuned"), AgentSpec::U(Weights::TUNED));
         assert_eq!(spec("mm3"), AgentSpec::Minimax(3));
+        assert_eq!(spec("ab5"), AgentSpec::AlphaBeta(5));
         assert_eq!(
             spec("u:1/2/0.2"),
             AgentSpec::U(Weights {
@@ -341,6 +394,8 @@ mod tests {
             "u:0.5/4/-1",
             "mm1",
             "mm9",
+            "ab1",
+            "ab9",
         ] {
             assert_eq!(spec(name).to_string(), name);
         }
@@ -354,7 +409,9 @@ mod tests {
         for s in ["", "Tuned", "minimax", "1/2/3", "u"] {
             assert_eq!(s.parse::<AgentSpec>(), unknown(s));
         }
-        for s in ["mm", "mm0", "mm10", "mm-1", "mm3x", "mm 3"] {
+        for s in [
+            "mm", "mm0", "mm10", "mm-1", "mm3x", "mm 3", "ab", "ab0", "ab10", "ab3x",
+        ] {
             assert_eq!(s.parse::<AgentSpec>(), depth(s));
         }
         for s in [
@@ -412,5 +469,21 @@ mod tests {
             assert_eq!(agent.choose(&board, Color::White, &legal).ok(), expected);
         }
         assert_eq!(agent.nodes(), 4 * decision.nodes);
+    }
+
+    #[test]
+    fn alpha_beta_agent_plays_the_move_minimax_picks_from_fewer_nodes() {
+        let board = Board::start();
+        let legal = board.legal_moves(Color::White);
+        let mm = minimax(&board, Color::White, Weights::TUNED, 3);
+        let ab = alpha_beta(&board, Color::White, Weights::TUNED, 3);
+        assert!(ab.nodes < mm.nodes);
+        let mut agent = AlphaBetaAgent::new(Weights::TUNED, 3, 0);
+        for seed in [1, 2, 3, 2026] {
+            agent.new_game(seed).unwrap();
+            let expected = mm.choose(Some(&mut Mulberry32::new(seed)));
+            assert_eq!(agent.choose(&board, Color::White, &legal).ok(), expected);
+        }
+        assert_eq!(agent.nodes(), 4 * ab.nodes);
     }
 }
