@@ -14,7 +14,9 @@ match kish 1.1.2, and every number in our Assignment 3 talk came from it.
 - `docs/benchmarks.md`: measured speed against the JS prototype (perft), with the machine and the method
 - `bench/`: timing scripts for the JS prototype (the Rust timer is `engine/examples/perft.rs`), and
   `playgame_log.js`, which checks that the arena plays the same games as `playGame`
-- `results/arena.csv`: one row per `dama arena` run; its version column ignores changes under `results/`
+- `results/arena.csv`: one row per `dama arena` run; its version column ignores changes under `results/`; the
+  `schedule`, `opening_plies`, `threads` and `wall_s` columns say how the match was played (rows before them are
+  `legacy,2,1`), and the time per move is empty when more than one thread played
 
 ## Commands
 - Build: `cargo build --release`
@@ -22,7 +24,10 @@ match kish 1.1.2, and every number in our Assignment 3 talk came from it.
 - Slow tests (perft 7-8 and others marked `#[ignore]`): `cargo test --release -- --ignored`
 - Lint: `cargo clippy --all-targets -- -D warnings`
 - Format: `cargo fmt`
-- Arena: `cargo run --release -p cli -- arena tuned random --games 200 --seed 1` (`--help` lists the agents)
+- Arena: `cargo run --release -p cli -- arena tuned random --games 200 --seed 1 --threads 6` (`--help` lists the
+  agents). The default `paired` schedule gives every game its own seeds, 4 random opening plies, each opening twice
+  with the colours swapped; `--schedule legacy` repeats the old rows and `bench/playgame_log.js`. The games are the
+  same with any `--threads`; measure time per move with `--threads 1` (pinned with `taskset`)
 - Regenerate testdata (only when I ask): `node reference/js/make_testdata.js`
 
 ## Rules (TÜDAF): the parts that are easy to get wrong
@@ -58,7 +63,9 @@ Never change an expected value to make a test pass: find the bug and explain whi
   depth, nodes and/or milliseconds; the deepest completed iteration decides, so `id:dN` plays as `abN`;
   official comparisons use node budgets), and quiescence for `abNq` and `idq:...` (past the depth limit,
   captures only until the position is quiet; no stand pat, since capturing is mandatory; its nodes count
-  against the budget). Keep new search ideas there, behind the `Agent` trait.
+  against the budget), and repetitions for `abNr`, `abNqr`, `idr:...` and `idqr:...` (a position of the game or of
+the search path that occurs again is a draw, 0; agents learn the game through `Agent::observe`). Keep new search
+ideas there, behind the `Agent` trait.
 - Do not add Co-Authored-By trailers or "Generated with" lines to commits or pull requests.
 
 ## Talking to me
