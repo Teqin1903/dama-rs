@@ -5,7 +5,8 @@ in this repository. The executable reference here is the JavaScript prototype in
 match kish 1.1.2, and every number in our Assignment 3 talk came from it.
 
 ## Layout
-- `engine/`: library crate with the board, move generation, evaluation (U) and search
+- `engine/`: library crate with the board, move generation, evaluation (U and its positional features, `eval.rs`),
+  search, the arena and its SPRT (`sprt.rs`)
 - `cli/`: binary crate that speaks the text protocol (position / go / bestmove)
 - `reference/js/`: the JS prototype. Read it; never edit it.
 - `testdata/`: perft counts, rule cases, move lists of sampled positions, decisions of the baseline agent
@@ -16,7 +17,9 @@ match kish 1.1.2, and every number in our Assignment 3 talk came from it.
   `playgame_log.js`, which checks that the arena plays the same games as `playGame`
 - `results/arena.csv`: one row per `dama arena` run; its version column ignores changes under `results/`; the
   `schedule`, `opening_plies`, `threads` and `wall_s` columns say how the match was played (rows before them are
-  `legacy,2,1`), and the time per move is empty when more than one thread played
+  `legacy,2,1`), and the time per move is empty when more than one thread played; `sprt` (H0, H1 or none), `llr`,
+  `elo0`, `elo1`, `alpha`, `beta`, `max_games`, `min_games` are empty unless the match ran with `--sprt`, and `games`
+  is the number of games played
 
 ## Commands
 - Build: `cargo build --release`
@@ -28,6 +31,9 @@ match kish 1.1.2, and every number in our Assignment 3 talk came from it.
   agents). The default `paired` schedule gives every game its own seeds, 4 random opening plies, each opening twice
   with the colours swapped; `--schedule legacy` repeats the old rows and `bench/playgame_log.js`. The games are the
   same with any `--threads`; measure time per move with `--threads 1` (pinned with `taskset`)
+- SPRT arena: `cargo run --release -p cli -- arena idqr:n2000:adv=0.1 idqr:n2000 --sprt --threads 6` stops when the
+  test decides (defaults `--elo0 0 --elo1 20 --alpha 0.05 --beta 0.05`, at most `--games 2000`, no verdict before
+  `--min-games 100`; paired schedule only). Use it for comparisons; fixed `--games N` stays for measurements
 - Regenerate testdata (only when I ask): `node reference/js/make_testdata.js`
 
 ## Rules (TÜDAF): the parts that are easy to get wrong
@@ -66,6 +72,10 @@ Never change an expected value to make a test pass: find the bug and explain whi
   against the budget), and repetitions for `abNr`, `abNqr`, `idr:...` and `idqr:...` (a position of the game or of
 the search path that occurs again is a draw, 0; agents learn the game through `Agent::observe`). Keep new search
 ideas there, behind the `Agent` trait.
+- Evaluation lives in `eval.rs`: U (`man`, `king`, `mob`) plus the positional features `adv`, `back`, `cen`, `edge`,
+  `qmob` (defined there), whose weights are 0 unless set. Any agent name but `random` may end in `:KEY=VALUE` parts
+  (`idqr:n2000:adv=0.1:king=3`, `tuned:cen=0.05`) on top of the tuned or named weights. With every positional weight
+  0, `evaluate` is U bit for bit: keep it so, and check new features for colour symmetry (`tests/eval_features.rs`).
 - Do not add Co-Authored-By trailers or "Generated with" lines to commits or pull requests.
 
 ## Talking to me
