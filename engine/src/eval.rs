@@ -85,6 +85,22 @@ impl Weights {
         ..Weights::ZERO
     };
 
+    /// The weight sets with a name, which `w=NAME` in an agent name starts from
+    /// (`idqr:n2000:w=material`).
+    pub const NAMED: [(&'static str, Weights); 3] = [
+        ("material", Weights::MATERIAL),
+        ("first", Weights::FIRST_GUESS),
+        ("tuned", Weights::TUNED),
+    ];
+
+    /// The weight set called `name` (one of `NAMED`).
+    pub fn named(name: &str) -> Option<Weights> {
+        Weights::NAMED
+            .iter()
+            .find(|(n, _)| *n == name)
+            .map(|(_, w)| *w)
+    }
+
     /// The names of the weights in agent names (`idqr:n2000:adv=0.1`), in the order they are written.
     pub const KEYS: [&'static str; 8] =
         ["man", "king", "mob", "adv", "back", "cen", "edge", "qmob"];
@@ -121,12 +137,24 @@ impl Weights {
 
     /// These weights with `overrides`, one or more `KEY=VALUE` separated by `:` (for example
     /// `adv=0.1:king=3`): each KEY one of `KEYS`, at most once, and each VALUE a finite number.
+    /// The first part may instead be `w=NAME`: the weights then start from the set `NAME` of
+    /// `NAMED` (`w=material:mob=0.1`).
     pub fn with_overrides(mut self, overrides: &str) -> Result<Weights, String> {
         let mut seen = Vec::new();
-        for part in overrides.split(':') {
+        for (i, part) in overrides.split(':').enumerate() {
             let (key, value) = part
                 .split_once('=')
                 .ok_or_else(|| format!("{part:?} is not KEY=VALUE"))?;
+            if key == "w" {
+                if i > 0 {
+                    return Err("w=NAME must come before the other weights".to_string());
+                }
+                self = Weights::named(value).ok_or_else(|| {
+                    let names: Vec<&str> = Weights::NAMED.iter().map(|(n, _)| *n).collect();
+                    format!("w={value}: expected one of {}", names.join(", "))
+                })?;
+                continue;
+            }
             if seen.contains(&key) {
                 return Err(format!("{key} is set twice"));
             }
@@ -154,6 +182,25 @@ impl Weights {
             }
         }
         parts
+    }
+
+    /// The suffix that names these weights in a search agent's name: `overrides_from` the named
+    /// set it needs the fewest parts from, written `:w=NAME` first unless that set is the tuned
+    /// one (on a tie the tuned set, so a name without `w=` keeps its old spelling).
+    pub fn suffix(&self) -> String {
+        let tuned = self.overrides_from(&Weights::TUNED);
+        let count = |s: &str| s.matches(':').count();
+        let mut best = tuned;
+        for (name, base) in Weights::NAMED {
+            if base == Weights::TUNED {
+                continue;
+            }
+            let candidate = format!(":w={name}{}", self.overrides_from(&base));
+            if count(&candidate) < count(&best) {
+                best = candidate;
+            }
+        }
+        best
     }
 
     /// Whether any positional weight is not 0: only then does `evaluate` compute the features.

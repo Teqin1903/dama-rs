@@ -1,6 +1,6 @@
 //! Turkish draughts (TÜDAF rules): board, move generation, perft, the baseline agent, the
 //! minimax, alpha-beta and iterative-deepening agents, and the arena that plays agents against each other
-//! (with an SPRT that stops a match once its result is clear).
+//! (with an SPRT that stops a match once its result is clear), and Texel tuning of the weights.
 //!
 //! `reference/js/` is the reference: the same square numbers, the same text formats
 //! (docs/reference.md), the same order of legal moves, the same U, the same random numbers and the
@@ -17,6 +17,7 @@ mod rng;
 mod search;
 mod sprt;
 mod square;
+mod texel;
 
 pub use agent::{
     Agent, AgentError, AgentSpec, AlphaBetaAgent, DeepeningAgent, MinimaxAgent, ParseAgentError,
@@ -38,3 +39,7 @@ pub use search::{
 };
 pub use sprt::{Pentanomial, Sprt, SprtResult, Verdict, elo_of, expected_score};
 pub use square::Square;
+pub use texel::{
+    N_WEIGHTS, STEPS, Sample, Tuning, features_of, fit_k, from_array, is_validation, mse,
+    samples_of, to_array, tune, value,
+};

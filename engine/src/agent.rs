@@ -372,7 +372,8 @@ impl Agent for DeepeningAgent {
 ///
 /// Any name but `random` may end in `:KEY=VALUE` parts that set weights (`Weights::KEYS`), on top
 /// of the tuned weights for a search and of the named weights for the baseline agent:
-/// `idqr:n2000:adv=0.1:qmob=0.02`, `ab3q:king=3`, `tuned:cen=0.05`.
+/// `idqr:n2000:adv=0.1:qmob=0.02`, `ab3q:king=3`, `tuned:cen=0.05`. The first part may be
+/// `w=NAME` to start from the named set `NAME` (`Weights::NAMED`) instead: `idqr:n2000:w=material`.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum AgentSpec {
     Random,
@@ -401,11 +402,7 @@ pub enum AgentSpec {
 
 impl AgentSpec {
     /// The weights that have a name.
-    pub const PRESETS: [(&'static str, Weights); 3] = [
-        ("material", Weights::MATERIAL),
-        ("first", Weights::FIRST_GUESS),
-        ("tuned", Weights::TUNED),
-    ];
+    pub const PRESETS: [(&'static str, Weights); Weights::NAMED.len()] = Weights::NAMED;
 
     /// The deepest search (`mmN`, `abN`) the command line accepts: plain minimax grows about
     /// tenfold per ply.
@@ -477,9 +474,11 @@ impl fmt::Display for AgentSpec {
     /// The canonical name: `random`, `mmN`, `abN` (`abNq`, `abNr`, `abNqr`), `id:` (`idq:`, `idr:`,
     /// `idqr:`) with the limits in the order d, n, t, the preset's name, or else `u:MAN/KING/MOB`.
     /// `"u:1/3/0".parse()` therefore prints as `material`. Then the weights as `:KEY=VALUE` in the
-    /// order of `Weights::KEYS`: for a search those that differ from the tuned weights, for the
-    /// baseline agent (unless it is a preset) the positional weights that are not 0. A weight set
-    /// to its default is left out: `idqr:n2000:adv=0` prints as `idqr:n2000`.
+    /// order of `Weights::KEYS`: for a search those that differ from the tuned weights or, when
+    /// that takes fewer parts, `:w=NAME` and those that differ from that named set
+    /// (`Weights::suffix`), for the baseline agent (unless it is a preset) the positional weights
+    /// that are not 0. A weight set to its default is left out: `idqr:n2000:adv=0` prints as
+    /// `idqr:n2000`.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match (self, self.preset()) {
             (AgentSpec::Random, _) => f.write_str("random"),
@@ -494,7 +493,7 @@ impl fmt::Display for AgentSpec {
                 write!(f, "u:{weights}{}", weights.overrides_from(&u_only))
             }
             (AgentSpec::Minimax { depth, weights }, _) => {
-                write!(f, "mm{depth}{}", weights.overrides_from(&Weights::TUNED))
+                write!(f, "mm{depth}{}", weights.suffix())
             }
             (
                 AgentSpec::AlphaBeta {
@@ -508,7 +507,7 @@ impl fmt::Display for AgentSpec {
                 f,
                 "ab{depth}{}{}",
                 suffix(*quiescence, *repetition),
-                weights.overrides_from(&Weights::TUNED)
+                weights.suffix()
             ),
             (
                 AgentSpec::Deepening {
@@ -529,7 +528,7 @@ impl fmt::Display for AgentSpec {
                 if let Some(time) = limits.time {
                     write!(f, ":t{}", time.as_millis())?;
                 }
-                f.write_str(&weights.overrides_from(&Weights::TUNED))
+                f.write_str(&weights.suffix())
             }
         }
     }
@@ -593,7 +592,7 @@ impl fmt::Display for ParseAgentError {
                 f,
                 "agent {name:?}: {why}; weights are set with :KEY=VALUE at the end of the name, \
                  KEY one of {} (each once) and VALUE a finite number, for example \
-                 idqr:n2000:adv=0.1",
+                 idqr:n2000:adv=0.1; a first part w=NAME starts from a named weight set",
                 Weights::KEYS.join(", ")
             ),
         }
@@ -860,6 +859,34 @@ mod tests {
     }
 
     #[test]
+    fn named_weight_sets_in_a_name() {
+        let weights = |s: &str| spec(s).weights().unwrap();
+        assert_eq!(weights("idqr:n2000:w=material"), Weights::MATERIAL);
+        assert_eq!(
+            weights("ab3q:w=first:cen=0.5"),
+            Weights {
+                cen: 0.5,
+                ..Weights::FIRST_GUESS
+            }
+        );
+        // For the baseline agent too, replacing its named weights.
+        assert_eq!(weights("tuned:w=material"), Weights::MATERIAL);
+        assert_eq!(spec("idqr:n2000:w=tuned"), spec("idqr:n2000"));
+        // The canonical name starts from the named set that needs the fewest parts.
+        for name in [
+            "idqr:n2000:w=material",
+            "ab3q:w=first:cen=0.5",
+            "idqr:n2000:w=first:adv=0.1:cen=0.2",
+        ] {
+            assert_eq!(spec(name).to_string(), name);
+        }
+        assert_eq!(spec("idqr:n2000:w=tuned").to_string(), "idqr:n2000");
+        assert_eq!(spec("ab3:king=3:mob=0").to_string(), "ab3:w=material");
+        // One part from tuned beats two from material.
+        assert_eq!(spec("ab3:w=material:mob=-0.05").to_string(), "ab3:king=3");
+    }
+
+    #[test]
     fn names_with_weights_are_canonical_and_parse_back() {
         for name in [
             "mm3:adv=0.1",
@@ -900,6 +927,9 @@ mod tests {
             "ab3:adv=1=2",
             "random:adv=1",
             "idqr:n2000:ADV=1",
+            "ab3:w=foo",
+            "ab3:adv=0:w=tuned",
+            "ab3:w=tuned:w=material",
         ] {
             assert!(weight(s), "{s} should be a weight error");
         }
