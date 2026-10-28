@@ -363,7 +363,7 @@ impl Agent for DeepeningAgent {
 }
 
 /// An agent as the command line names it: `random`, a preset name (`material`, `first`,
-/// `tuned`, `texel1`), `u:MAN/KING/MOB` for the baseline agent with any weights, `mmN` for minimax N
+/// `tuned`, `texel1`, `texel2`, `texel2s`), `u:MAN/KING/MOB` for the baseline agent with any weights, `mmN` for minimax N
 /// plies deep, `abN` for alpha-beta N plies deep, or `id:LIMITS` for iterative deepening, the
 /// searches with the tuned weights. LIMITS are one or more of `dN`
 /// (at most N plies), `nK` (at most K nodes per move) and `tMS` (at most MS milliseconds per move),
@@ -568,7 +568,8 @@ impl fmt::Display for ParseAgentError {
         match self {
             ParseAgentError::Unknown(name) => write!(
                 f,
-                "unknown agent {name:?}: expected random, material, first, tuned, texel1, u:MAN/KING/MOB, \
+                "unknown agent {name:?}: expected random, material, first, tuned, texel1, texel2, texel2s, \
+                 u:MAN/KING/MOB, \
                  mmN, abN, abNq, abNr, abNqr, id:LIMITS, idq:LIMITS, idr:LIMITS or idqr:LIMITS"
             ),
             ParseAgentError::Depth(name) => write!(
@@ -888,6 +889,12 @@ mod tests {
         }
         assert_eq!(spec("texel1"), AgentSpec::U(Weights::TEXEL1));
         assert_eq!(spec("texel1").to_string(), "texel1");
+        // The second Texel tuning, full and simplified.
+        assert_eq!(weights("idqr:n2000:w=texel2"), Weights::TEXEL2);
+        assert_eq!(weights("idqr:n20000:w=texel2s"), Weights::TEXEL2S);
+        for name in ["idqr:n2000:w=texel2", "idqr:n20000:w=texel2s", "texel2s"] {
+            assert_eq!(spec(name).to_string(), name);
+        }
         assert_eq!(spec("ab3:king=3:mob=0").to_string(), "ab3:w=material");
         // One part from tuned beats two from material.
         assert_eq!(spec("ab3:w=material:mob=-0.05").to_string(), "ab3:king=3");

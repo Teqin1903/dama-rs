@@ -38,7 +38,10 @@ match kish 1.1.2, and every number in our Assignment 3 talk came from it.
   idqr:n2000, idq:n2000, ab3q, tuned, 500 games each), fits K and then the weights with man = 1 on the quiet
   positions, and prints the errors on training and validation (every fifth pair) and the weights. The data set
   is not stored; the command and seed make it again. `texel1` in `eval.rs` came from this run; it beats the tuned
-  weights clearly (SPRT H1 at n2000 and n20000, docs/decisions.md, with an ablation of each weight)
+  weights clearly (SPRT H1 at n2000 and n20000, docs/decisions.md, with an ablation of each weight).
+  `--agents`, `--games`, `--start W` (as in an agent name, `w=texel1:qmob=0`), `--fixed KEYS` (left at the start
+  value besides man) and `--compare NAMES` set up other runs; the split is by whole games and is reported.
+  `texel2` and `texel2s` came from the second run (seed 2, 6000 games; the commands are in docs/decisions.md)
 - Regenerate testdata (only when I ask): `node reference/js/make_testdata.js`
 
 ## Rules (TÜDAF): the parts that are easy to get wrong
@@ -80,7 +83,8 @@ ideas there, behind the `Agent` trait.
 - Evaluation lives in `eval.rs`: U (`man`, `king`, `mob`) plus the positional features `adv`, `back`, `cen`, `edge`,
   `qmob` (defined there), whose weights are 0 unless set. Any agent name but `random` may end in `:KEY=VALUE` parts
   (`idqr:n2000:adv=0.1:king=3`, `tuned:cen=0.05`) on top of the tuned or named weights; a first part `w=NAME`
-  starts from a named set of `Weights::NAMED` (material, first, tuned, texel1): `idqr:n2000:w=texel1:adv=0`.
+  starts from a named set of `Weights::NAMED` (material, first, tuned, texel1, texel2,
+  texel2s): `idqr:n2000:w=texel1:adv=0`.
   With every positional weight 0, `evaluate` is U bit for bit: keep it so, and check new features for colour symmetry (`tests/eval_features.rs`).
 - Do not add Co-Authored-By trailers or "Generated with" lines to commits or pull requests.
 

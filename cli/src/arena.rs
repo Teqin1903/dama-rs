@@ -35,6 +35,8 @@ agents:
   first             the baseline agent with weights 1/3/0.1
   tuned             the baseline agent with weights 1/2.5/-0.05
   texel1            the baseline agent with the weights of the first Texel tuning (dama texel)
+  texel2, texel2s   the baseline agent with the weights of the second Texel tuning, full and
+                    simplified (king, adv and cen only)
   u:MAN/KING/MOB    the baseline agent with any weights, for example u:1/2/0.2
   mmN               minimax N plies deep (1 to 9) with the tuned weights, for example mm3
   abN               alpha-beta N plies deep (1 to 9): the same moves as mmN, faster
@@ -59,7 +61,8 @@ idqr:n2000:adv=0.1:qmob=0.02, ab3q:king=3 or tuned:cen=0.05. All features count 
   edge              men and kings on files a and h
   qmob              quiet moves, counted as if capturing were not mandatory
 The positional weights (adv to qmob) are 0 unless set. The first part may be w=NAME instead, to
-start from a named weight set (material, first, tuned, texel1): idqr:n2000:w=texel1:adv=0.
+start from a named weight set (material, first, tuned, texel1, texel2, texel2s):
+idqr:n2000:w=texel1:adv=0.
 
 options:
   --games N         the number of games, even for the paired schedule (default 200); with --sprt

@@ -98,13 +98,41 @@ impl Weights {
         qmob: 0.0813,
     };
 
+    /// The second Texel tuning (`dama texel --agents idqr:n2000:w=texel1,idqr:n2000,idq:n2000,ab3q
+    /// --games 1000 --seed 2 --threads 6 --start w=texel1:qmob=0 --fixed qmob`, docs/decisions.md):
+    /// from texel1 with `qmob` fixed at 0, fitted to the quiet positions of 6000 games, with
+    /// K = 0.3689 and `man` fixed at 1.
+    pub const TEXEL2: Weights = Weights {
+        man: 1.0,
+        king: 2.6953,
+        mob: 0.0635,
+        adv: 0.0889,
+        back: -0.427,
+        cen: -0.6287,
+        edge: -0.1893,
+        qmob: 0.0,
+    };
+
+    /// The simplified second Texel tuning: the data of `TEXEL2`, only `king`, `adv` and `cen`
+    /// tuned (`--start w=texel1:mob=0:back=0:edge=0:qmob=0 --fixed mob,back,edge,qmob`), with
+    /// K = 0.3268 and `man` fixed at 1.
+    pub const TEXEL2S: Weights = Weights {
+        man: 1.0,
+        king: 3.8018,
+        adv: 0.324,
+        cen: -0.7147,
+        ..Weights::ZERO
+    };
+
     /// The weight sets with a name, which `w=NAME` in an agent name starts from
     /// (`idqr:n2000:w=texel1`).
-    pub const NAMED: [(&'static str, Weights); 4] = [
+    pub const NAMED: [(&'static str, Weights); 6] = [
         ("material", Weights::MATERIAL),
         ("first", Weights::FIRST_GUESS),
         ("tuned", Weights::TUNED),
         ("texel1", Weights::TEXEL1),
+        ("texel2", Weights::TEXEL2),
+        ("texel2s", Weights::TEXEL2S),
     ];
 
     /// The weight set called `name` (one of `NAMED`).
