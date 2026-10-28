@@ -2,9 +2,10 @@
 //! weights) and the 400 of testdata/movegen.json (with the tuned weights).
 //!
 //!     cargo build --release --example search
-//!     taskset -c 2 target/release/examples/search mm3 ab3 ab4 ab5 ab6
+//!     taskset -c 2 target/release/examples/search mm3 ab3 ab4 ab5 ab6 id5
 //!
-//! Each argument is a search: `mmN` (minimax) or `abN` (alpha-beta), N plies deep. One pass over
+//! Each argument is a search: `mmN` (minimax), `abN` (alpha-beta) or `idN` (iterative deepening
+//! up to N plies, no node or time limit), N plies deep. One pass over
 //! all positions is a sample; 3 samples per search, after one warm-up pass, and the time per move
 //! is the median sample / the number of positions.
 //!
@@ -15,7 +16,7 @@ use std::hint::black_box;
 use std::path::Path;
 use std::time::{Duration, Instant};
 
-use engine::{Board, Color, Decision, Weights, alpha_beta, minimax};
+use engine::{Board, Color, Decision, Limits, Weights, alpha_beta, iterative_deepening, minimax};
 use serde::Deserialize;
 
 #[derive(Deserialize)]
@@ -57,6 +58,15 @@ fn positions() -> Vec<(Board, Color, Weights)> {
 
 type Search = fn(&Board, Color, Weights, u32) -> Decision;
 
+/// Iterative deepening up to `depth` plies, with no other limit.
+fn deepening(board: &Board, side: Color, weights: Weights, depth: u32) -> Decision {
+    let limits = Limits {
+        depth: Some(depth),
+        ..Limits::default()
+    };
+    iterative_deepening(board, side, weights, limits).decision
+}
+
 /// One pass over `positions`: the total time, the slowest position's time and the total nodes.
 fn sample(
     positions: &[(Board, Color, Weights)],
@@ -83,10 +93,12 @@ fn main() {
             (minimax, d)
         } else if let Some(d) = name.strip_prefix("ab") {
             (alpha_beta, d)
+        } else if let Some(d) = name.strip_prefix("id") {
+            (deepening, d)
         } else {
-            panic!("{name}: expected mmN or abN");
+            panic!("{name}: expected mmN, abN or idN");
         };
-        let depth: u32 = depth.parse().expect("expected a depth after mm or ab");
+        let depth: u32 = depth.parse().expect("expected a depth after mm, ab or id");
         sample(&positions, search, depth); // warm-up
         let mut samples: Vec<_> = (0..3).map(|_| sample(&positions, search, depth)).collect();
         samples.sort();

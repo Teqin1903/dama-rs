@@ -311,3 +311,24 @@ fn alpha_beta_plays_the_games_of_minimax_at_depth_3() {
         match_games("mm3", "mm2", 50, 1)
     );
 }
+
+#[test]
+fn iterative_deepening_plays_the_games_of_alpha_beta_at_depth_3() {
+    assert_eq!(
+        match_games("id:d3", "tuned", 10, 1),
+        match_games("ab3", "tuned", 10, 1)
+    );
+}
+
+#[test]
+#[ignore = "slow in a debug build; run with --release -- --ignored"]
+fn iterative_deepening_plays_the_games_of_alpha_beta_at_depths_3_and_4() {
+    assert_eq!(
+        match_games("id:d3", "tuned", 50, 1),
+        match_games("ab3", "tuned", 50, 1)
+    );
+    assert_eq!(
+        match_games("id:d4", "tuned", 20, 1),
+        match_games("ab4", "tuned", 20, 1)
+    );
+}

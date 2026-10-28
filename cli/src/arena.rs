@@ -26,6 +26,11 @@ agents:
   u:MAN/KING/MOB    the baseline agent with any weights, for example u:1/2/0.2
   mmN               minimax N plies deep (1 to 9) with the tuned weights, for example mm3
   abN               alpha-beta N plies deep (1 to 9): the same moves as mmN, faster
+  id:LIMITS         iterative deepening: alpha-beta 1, 2, 3, ... plies deep, the move of the
+                    deepest completed iteration; LIMITS are one or more of dN (at most N plies),
+                    nK (at most K nodes per move), tMS (at most MS milliseconds per move),
+                    separated by ':', for example id:n20000 or id:d5:t50. Matches with a time
+                    limit cannot be repeated exactly
 
 options:
   --games N         the number of games (default 200)
@@ -170,6 +175,10 @@ fn describe(spec: &AgentSpec) -> String {
                 engine::Weights::TUNED
             )
         }
+        (AgentSpec::Deepening(_), _) => format!(
+            "{spec} (iterative deepening alpha-beta, {})",
+            engine::Weights::TUNED
+        ),
         _ => spec.to_string(),
     }
 }

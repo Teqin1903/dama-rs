@@ -1,6 +1,7 @@
 //! The agents' search: the baseline's one ply (`decide` in reference/js/agent.js),
-//! depth-limited minimax (`minimax`) and alpha-beta (`alpha_beta`), which makes the same decisions
-//! as minimax at the same depth from fewer nodes.
+//! depth-limited minimax (`minimax`), alpha-beta (`alpha_beta`), which makes the same decisions
+//! as minimax at the same depth from fewer nodes, and iterative deepening (`iterative_deepening`),
+//! which runs alpha-beta 1, 2, 3, ... plies deep until a node or time budget runs out.
 //!
 //! Minimax values every position from the root side's view:
 //!
@@ -16,6 +17,11 @@
 //! subtrees that cannot change a value it needs. It only selects among leaf values (no arithmetic),
 //! so every value it finds exactly is bit for bit the minimax value. At the root it needs exact
 //! values only for the moves that can be within `U_EPSILON` of the best (see `alpha_beta`).
+//!
+//! Iterative deepening has no move ordering yet, so its iterations do not depend on each other: a
+//! completed iteration at depth d is exactly `alpha_beta` at depth d.
+
+use std::time::{Duration, Instant};
 
 use crate::board::{Board, Color};
 use crate::eval::{Features, U_EPSILON, WIN, Weights};
@@ -107,7 +113,124 @@ pub fn minimax(board: &Board, side: Color, weights: Weights, depth: u32) -> Deci
 /// instead of ε, keeps rounding in `best - ε` from deciding whether a tied move is searched exactly.
 pub fn alpha_beta(board: &Board, side: Color, weights: Weights, depth: u32) -> Decision {
     assert!(depth >= 1, "alpha-beta needs a depth of at least 1");
-    let mut nodes = 0;
+    root_alpha_beta(board, side, weights, depth, &mut Counter::unlimited())
+        .expect("a search without a budget is never interrupted")
+}
+
+/// The deepest iteration `iterative_deepening` runs, whatever its limits.
+pub const MAX_ID_DEPTH: u32 = 64;
+
+/// When iterative deepening stops. Every limit that is `Some` applies; at least one must be.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Limits {
+    /// The deepest iteration, 1 to `MAX_ID_DEPTH`.
+    pub depth: Option<u32>,
+    /// The most nodes per move, all iterations together.
+    pub nodes: Option<u64>,
+    /// The most time per move, all iterations together.
+    pub time: Option<Duration>,
+}
+
+/// The result of `iterative_deepening`.
+#[derive(Clone, Debug)]
+pub struct Deepening {
+    /// The decision of the deepest completed iteration; its `nodes` are those of every iteration,
+    /// the interrupted one included.
+    pub decision: Decision,
+    /// The depth of that iteration.
+    pub depth: u32,
+}
+
+/// Alpha-beta 1, 2, 3, ... plies deep until `limits` stop it, and the decision of the deepest
+/// iteration that was completed. An iteration that runs out of nodes or time is thrown away.
+///
+/// Depth 1 always completes (it costs one node per legal move), so there is always a decision.
+/// The search also stops when an iteration reached no leaf at the depth limit: every line ended
+/// in a position without a legal move first, so a deeper iteration would visit the same nodes and
+/// make the same decision.
+pub fn iterative_deepening(
+    board: &Board,
+    side: Color,
+    weights: Weights,
+    limits: Limits,
+) -> Deepening {
+    assert!(
+        limits != Limits::default(),
+        "iterative deepening needs a depth, node or time limit"
+    );
+    let max_depth = limits.depth.unwrap_or(MAX_ID_DEPTH);
+    assert!(
+        (1..=MAX_ID_DEPTH).contains(&max_depth),
+        "iterative deepening needs a depth from 1 to {MAX_ID_DEPTH}"
+    );
+    let deadline = limits.time.map(|time| Instant::now() + time);
+    let mut counter = Counter::unlimited();
+    let mut decision = root_alpha_beta(board, side, weights, 1, &mut counter)
+        .expect("a search without a budget is never interrupted");
+    let mut depth = 1;
+    counter.max_nodes = limits.nodes;
+    counter.deadline = deadline;
+    while depth < max_depth && counter.horizon {
+        counter.horizon = false;
+        // `?` cannot help here: an interrupted iteration is not an error of this function, so the
+        // `Option` is matched and `None` ends the loop.
+        match root_alpha_beta(board, side, weights, depth + 1, &mut counter) {
+            Some(deeper) => {
+                decision = deeper;
+                depth += 1;
+            }
+            None => break,
+        }
+    }
+    decision.nodes = counter.nodes;
+    Deepening { decision, depth }
+}
+
+/// The nodes a search has produced, and its budget.
+#[derive(Clone, Debug)]
+struct Counter {
+    /// The positions produced with `apply`, the root not included.
+    nodes: u64,
+    /// No more nodes than this.
+    max_nodes: Option<u64>,
+    /// No new node from this moment on.
+    deadline: Option<Instant>,
+    /// Whether a leaf at the depth limit was scored (set, never cleared, by the search).
+    horizon: bool,
+}
+
+impl Counter {
+    fn unlimited() -> Counter {
+        Counter {
+            nodes: 0,
+            max_nodes: None,
+            deadline: None,
+            horizon: false,
+        }
+    }
+
+    /// Counts one more node, or `None` if the budget is spent. The clock is read only when there
+    /// is a deadline.
+    fn visit(&mut self) -> Option<()> {
+        let out_of_nodes = self.max_nodes.is_some_and(|max| self.nodes >= max);
+        let out_of_time = self.deadline.is_some_and(|d| Instant::now() >= d);
+        if out_of_nodes || out_of_time {
+            return None;
+        }
+        self.nodes += 1;
+        Some(())
+    }
+}
+
+/// Alpha-beta at the root, as `alpha_beta` describes, counting in `counter`: `None` if the budget
+/// ran out. The decision's `nodes` are `counter.nodes` at the end.
+fn root_alpha_beta(
+    board: &Board,
+    side: Color,
+    weights: Weights,
+    depth: u32,
+    counter: &mut Counter,
+) -> Option<Decision> {
     let mut best = f64::NEG_INFINITY;
     let mut candidates = Vec::new();
     for mv in board.legal_moves(side) {
@@ -121,8 +244,8 @@ pub fn alpha_beta(board: &Board, side: Color, weights: Weights, depth: u32) -> D
             depth - 1,
             1,
             (alpha, f64::INFINITY),
-            &mut nodes,
-        );
+            counter,
+        )?;
         best = best.max(u);
         candidates.push(Candidate {
             features: Features::of(&after, side),
@@ -131,7 +254,7 @@ pub fn alpha_beta(board: &Board, side: Color, weights: Weights, depth: u32) -> D
             mv,
         });
     }
-    Decision::new(candidates, nodes)
+    Some(Decision::new(candidates, counter.nodes))
 }
 
 /// The minimax value for `root` of `board` at ply `ply`, with `to_move` to move and `depth` plies
@@ -180,7 +303,8 @@ fn value(
 
 /// `value` searched with alpha-beta in the window `(alpha, beta)`, fail-soft: a result strictly
 /// inside the window is the exact minimax value; a result `<= alpha` is an upper bound of it and a
-/// result `>= beta` a lower bound. Counts every board it visits in `nodes`, as `value` does.
+/// result `>= beta` a lower bound. Counts every board it visits in `counter`, as `value` does, and
+/// gives `None` as soon as the counter's budget runs out.
 #[allow(clippy::too_many_arguments)]
 fn bounded_value(
     board: &Board,
@@ -190,22 +314,23 @@ fn bounded_value(
     depth: u32,
     ply: u32,
     (mut alpha, mut beta): (f64, f64),
-    nodes: &mut u64,
-) -> f64 {
-    *nodes += 1;
+    counter: &mut Counter,
+) -> Option<f64> {
+    counter.visit()?;
     let moves = board.legal_moves(to_move);
     if moves.is_empty() {
         let win = WIN - f64::from(ply - 1);
-        return if to_move == root { -win } else { win };
+        return Some(if to_move == root { -win } else { win });
     }
     if depth == 0 {
+        counter.horizon = true;
         let others = board.legal_moves(to_move.opponent()).len();
         let (ours, theirs) = if to_move == root {
             (moves.len(), others)
         } else {
             (others, moves.len())
         };
-        return Features::leaf(board, root, ours, theirs).u(weights);
+        return Some(Features::leaf(board, root, ours, theirs).u(weights));
     }
     let maximising = to_move == root;
     let mut best = if maximising {
@@ -222,8 +347,8 @@ fn bounded_value(
             depth - 1,
             ply + 1,
             (alpha, beta),
-            nodes,
-        );
+            counter,
+        )?;
         if maximising {
             best = best.max(v);
             alpha = alpha.max(v);
@@ -235,7 +360,7 @@ fn bounded_value(
             break;
         }
     }
-    best
+    Some(best)
 }
 
 impl Decision {
