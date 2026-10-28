@@ -69,6 +69,9 @@ Never change an expected value to make a test pass: find the bug and explain whi
 
 ## How we work
 - One module per session: plan first, then implement, run the tests, then commit (ask me first).
+- Before starting a measurement (arena, SPRT, texel), estimate its worst-case time: the most games it can play
+  (`--games`, the SPRT maximum) times the time per game from earlier `wall_s` rows of `results/arena.csv`. If that is
+  more than 15 minutes, ask me first.
 - Ask before adding a crate. `kish` may be used only as a dev-dependency, in tests.
 - Keep the binaries thin; logic lives in `engine/`.
 - Search lives in its own module: one ply for the baseline (`tuned`), depth-limited minimax for `mmN`,
