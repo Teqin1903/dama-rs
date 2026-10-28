@@ -6,7 +6,7 @@ match kish 1.1.2, and every number in our Assignment 3 talk came from it.
 
 ## Layout
 - `engine/`: library crate with the board, move generation, evaluation (U and its positional features, `eval.rs`),
-  search, the arena and its SPRT (`sprt.rs`)
+  search, the arena and its SPRT (`sprt.rs`), and Texel tuning of the weights (`texel.rs`)
 - `cli/`: binary crate that speaks the text protocol (position / go / bestmove)
 - `reference/js/`: the JS prototype. Read it; never edit it.
 - `testdata/`: perft counts, rule cases, move lists of sampled positions, decisions of the baseline agent
@@ -34,6 +34,10 @@ match kish 1.1.2, and every number in our Assignment 3 talk came from it.
 - SPRT arena: `cargo run --release -p cli -- arena idqr:n2000:adv=0.1 idqr:n2000 --sprt --threads 6` stops when the
   test decides (defaults `--elo0 0 --elo1 20 --alpha 0.05 --beta 0.05`, at most `--games 2000`, no verdict before
   `--min-games 100`; paired schedule only). Use it for comparisons; fixed `--games N` stays for measurements
+- Texel tuning: `cargo run --release -p cli -- texel --seed 1 --threads 6` plays a paired round robin (default
+  idqr:n2000, idq:n2000, ab3q, tuned, 500 games each), fits K and then the weights with man = 1 on the quiet
+  positions, and prints the errors on training and validation (every fifth pair) and the weights. The data set
+  is not stored; the command and seed make it again. `texel1` in `eval.rs` came from this run
 - Regenerate testdata (only when I ask): `node reference/js/make_testdata.js`
 
 ## Rules (TÜDAF): the parts that are easy to get wrong
@@ -74,8 +78,9 @@ the search path that occurs again is a draw, 0; agents learn the game through `A
 ideas there, behind the `Agent` trait.
 - Evaluation lives in `eval.rs`: U (`man`, `king`, `mob`) plus the positional features `adv`, `back`, `cen`, `edge`,
   `qmob` (defined there), whose weights are 0 unless set. Any agent name but `random` may end in `:KEY=VALUE` parts
-  (`idqr:n2000:adv=0.1:king=3`, `tuned:cen=0.05`) on top of the tuned or named weights. With every positional weight
-  0, `evaluate` is U bit for bit: keep it so, and check new features for colour symmetry (`tests/eval_features.rs`).
+  (`idqr:n2000:adv=0.1:king=3`, `tuned:cen=0.05`) on top of the tuned or named weights; a first part `w=NAME`
+  starts from a named set of `Weights::NAMED` (material, first, tuned, texel1): `idqr:n2000:w=texel1:adv=0`.
+  With every positional weight 0, `evaluate` is U bit for bit: keep it so, and check new features for colour symmetry (`tests/eval_features.rs`).
 - Do not add Co-Authored-By trailers or "Generated with" lines to commits or pull requests.
 
 ## Talking to me

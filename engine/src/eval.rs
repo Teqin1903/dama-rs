@@ -85,12 +85,26 @@ impl Weights {
         ..Weights::ZERO
     };
 
+    /// The first Texel tuning (`dama texel --seed 1 --threads 6`, docs/decisions.md): fitted to
+    /// the quiet positions of 3000 games, with K = 0.2353 and `man` fixed at 1.
+    pub const TEXEL1: Weights = Weights {
+        man: 1.0,
+        king: 2.5134,
+        mob: 0.0148,
+        adv: 0.0831,
+        back: -0.3041,
+        cen: -0.3085,
+        edge: -0.0226,
+        qmob: 0.0813,
+    };
+
     /// The weight sets with a name, which `w=NAME` in an agent name starts from
-    /// (`idqr:n2000:w=material`).
-    pub const NAMED: [(&'static str, Weights); 3] = [
+    /// (`idqr:n2000:w=texel1`).
+    pub const NAMED: [(&'static str, Weights); 4] = [
         ("material", Weights::MATERIAL),
         ("first", Weights::FIRST_GUESS),
         ("tuned", Weights::TUNED),
+        ("texel1", Weights::TEXEL1),
     ];
 
     /// The weight set called `name` (one of `NAMED`).
