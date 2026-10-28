@@ -37,6 +37,9 @@ agents:
                     limit cannot be repeated exactly
   abNq, idq:LIMITS  abN and id:LIMITS with quiescence: past the depth limit, a position whose
                     side to move must capture is searched on, captures only, until it is quiet
+  abNr, abNqr,      abN, abNq, id:LIMITS and idq:LIMITS that recognise repetitions: a position
+  idr:LIMITS,       of the game or of the search path that occurs again is a draw (0), so the
+  idqr:LIMITS       agent avoids repeating when ahead and seeks it when behind
 
 options:
   --games N         the number of games, even for the paired schedule (default 200)
@@ -205,20 +208,46 @@ fn describe(spec: &AgentSpec) -> String {
                 engine::Weights::TUNED
             )
         }
-        (AgentSpec::AlphaBeta { depth, quiescence }, _) => {
+        (
+            AgentSpec::AlphaBeta {
+                depth,
+                quiescence,
+                repetition,
+            },
+            _,
+        ) => {
             format!(
                 "{spec} (alpha-beta, {depth} plies{}, {})",
-                if *quiescence { ", quiescence" } else { "" },
+                extras(*quiescence, *repetition),
                 engine::Weights::TUNED
             )
         }
-        (AgentSpec::Deepening { quiescence, .. }, _) => format!(
+        (
+            AgentSpec::Deepening {
+                quiescence,
+                repetition,
+                ..
+            },
+            _,
+        ) => format!(
             "{spec} (iterative deepening alpha-beta{}, {})",
-            if *quiescence { ", quiescence" } else { "" },
+            extras(*quiescence, *repetition),
             engine::Weights::TUNED
         ),
         _ => spec.to_string(),
     }
+}
+
+/// `, quiescence` and `, repetitions` for the searches that have them.
+fn extras(quiescence: bool, repetition: bool) -> String {
+    let mut extras = String::new();
+    if quiescence {
+        extras.push_str(", quiescence");
+    }
+    if repetition {
+        extras.push_str(", repetitions");
+    }
+    extras
 }
 
 /// The report printed after the match, from A's point of view.

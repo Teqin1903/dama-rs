@@ -26,12 +26,12 @@ pub use arena::{
 };
 pub use bitboard::Bitboard;
 pub use board::{Board, Color, Kind, ParseBoardError, Piece};
-pub use eval::{Features, U_EPSILON, WIN, Weights};
+pub use eval::{DRAW, Features, U_EPSILON, WIN, Weights};
 pub use movegen::Move;
 pub use perft::perft;
 pub use rng::{Mulberry32, derive_seed};
 pub use search::{
-    Candidate, Decision, Deepening, Limits, MAX_ID_DEPTH, alpha_beta, alpha_beta_q, decide,
-    iterative_deepening, minimax, minimax_q,
+    Candidate, Decision, Deepening, Limits, MAX_ID_DEPTH, alpha_beta, alpha_beta_q, alpha_beta_rep,
+    decide, iterative_deepening, iterative_deepening_rep, minimax, minimax_q,
 };
 pub use square::Square;

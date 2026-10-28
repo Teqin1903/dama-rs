@@ -7,6 +7,10 @@ use crate::board::{Board, Color, Kind};
 /// U of a move after which the opponent has no legal move: a win.
 pub const WIN: f64 = 1000.0;
 
+/// The value of a position the search has seen before (a repetition): a draw, worth neither side
+/// anything.
+pub const DRAW: f64 = 0.0;
+
 /// Two U values closer than this are equal (docs/reference.md).
 pub const U_EPSILON: f64 = 1e-9;
 

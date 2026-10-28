@@ -213,7 +213,8 @@ impl GameRecord {
 
 /// Plays a game from `start` with `side` to move: the port of `playGame`.
 ///
-/// Before every ply, in the order of agent.js: the third occurrence of a position is a draw; a
+/// Both agents observe every position (`Agent::observe`) as it is reached. Then, before every
+/// ply, in the order of agent.js: the third occurrence of a position is a draw; a
 /// side without a legal move loses; one piece each is a draw; 50 quiet plies are a draw; reaching
 /// `max_plies` is a draw. The first `opening_plies` plies are random legal moves drawn from
 /// `opening`, without asking the agents; after that each agent chooses its own moves.
@@ -232,6 +233,8 @@ pub fn play_game(
     let mut moves = Vec::new();
     // `loop` is an expression: `break` carries the end of the game out of it.
     let (winner, reason) = loop {
+        white.observe(&board, side);
+        black.observe(&board, side);
         let occurrences = seen.entry((board, side)).or_insert(0);
         *occurrences += 1;
         if *occurrences >= REPETITIONS {
@@ -312,6 +315,10 @@ struct Timed<'a> {
 impl Agent for Timed<'_> {
     fn new_game(&mut self, seed: u32) -> Result<(), AgentError> {
         self.agent.new_game(seed)
+    }
+
+    fn observe(&mut self, board: &Board, side: Color) {
+        self.agent.observe(board, side);
     }
 
     fn choose<'m>(

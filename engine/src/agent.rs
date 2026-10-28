@@ -1,6 +1,6 @@
 //! The agents that play in the arena: the random player, the baseline agent (`randomPolicy` and
 //! `agentPolicy` in reference/js/agent.js), the minimax agent, the alpha-beta agent and the
-//! iterative-deepening agent.
+//! iterative-deepening agent, each of the last two also with repetitions recognised.
 //!
 //! The arena talks to an agent only through the `Agent` trait: a game starts, and a move is
 //! chosen from the legal moves of a position. That is also all the text protocol (position / go /
@@ -16,7 +16,8 @@ use crate::eval::Weights;
 use crate::movegen::Move;
 use crate::rng::Mulberry32;
 use crate::search::{
-    Decision, Limits, MAX_ID_DEPTH, alpha_beta, alpha_beta_q, decide, iterative_deepening, minimax,
+    Decision, Limits, MAX_ID_DEPTH, alpha_beta, alpha_beta_q, alpha_beta_rep, decide,
+    iterative_deepening, iterative_deepening_rep, minimax,
 };
 
 /// A player in the arena.
@@ -29,6 +30,11 @@ pub trait Agent {
     fn new_game(&mut self, _seed: u32) -> Result<(), AgentError> {
         Ok(())
     }
+
+    /// The game has reached `board` with `side` to move. The arena calls this for every position
+    /// of a game, the start and the random opening plies included, before it asks for a move, so
+    /// an agent that remembers the game can recognise a repetition. Most agents ignore it.
+    fn observe(&mut self, _board: &Board, _side: Color) {}
 
     /// The move to play on `board` with `side` to move. `legal` is `board.legal_moves(side)` and
     /// is never empty; the move returned is one of its elements.
@@ -57,6 +63,30 @@ impl fmt::Display for AgentError {
 }
 
 impl std::error::Error for AgentError {}
+
+/// The positions of the current game since its last capture, for an agent that recognises
+/// repetitions. A position from before a capture cannot occur again (it has more pieces), so
+/// those are dropped: the search compares against fewer positions.
+#[derive(Clone, Debug, Default)]
+struct GameHistory {
+    positions: Vec<(Board, Color)>,
+}
+
+impl GameHistory {
+    fn clear(&mut self) {
+        self.positions.clear();
+    }
+
+    fn push(&mut self, board: &Board, side: Color) {
+        let pieces = |b: &Board| b.pieces(Color::White).len() + b.pieces(Color::Black).len();
+        if let Some((last, _)) = self.positions.last()
+            && pieces(board) < pieces(last)
+        {
+            self.positions.clear();
+        }
+        self.positions.push((*board, side));
+    }
+}
 
 /// Plays a random legal move: `randomPolicy` in agent.js.
 #[derive(Clone, Debug)]
@@ -183,12 +213,15 @@ impl Agent for MinimaxAgent {
 
 /// Alpha-beta `depth` plies deep (`search::alpha_beta`): the same moves as `MinimaxAgent` with
 /// the same depth and seed, from fewer nodes. With `quiescence`, captures are searched past the
-/// depth limit (`search::alpha_beta_q`).
+/// depth limit (`search::alpha_beta_q`). With `with_repetitions`, a repetition of a position of the
+/// game or of the search path is a draw (`search::alpha_beta_rep`).
 #[derive(Clone, Debug)]
 pub struct AlphaBetaAgent {
     weights: Weights,
     depth: u32,
     quiescence: bool,
+    /// `Some` when repetitions are recognised: the game so far.
+    history: Option<GameHistory>,
     rng: Mulberry32,
     nodes: u64,
 }
@@ -199,15 +232,25 @@ impl AlphaBetaAgent {
             weights,
             depth,
             quiescence,
+            history: None,
             rng: Mulberry32::new(seed),
             nodes: 0,
         }
+    }
+
+    /// The same agent, recognising repetitions if `on`.
+    pub fn with_repetitions(mut self, on: bool) -> AlphaBetaAgent {
+        self.history = on.then(GameHistory::default);
+        self
     }
 }
 
 impl Agent for AlphaBetaAgent {
     fn new_game(&mut self, seed: u32) -> Result<(), AgentError> {
         self.rng = Mulberry32::new(seed);
+        if let Some(history) = &mut self.history {
+            history.clear();
+        }
         Ok(())
     }
 
@@ -217,14 +260,26 @@ impl Agent for AlphaBetaAgent {
         side: Color,
         legal: &'m [Move],
     ) -> Result<&'m Move, AgentError> {
-        let search = if self.quiescence {
-            alpha_beta_q
-        } else {
-            alpha_beta
+        let decision = match &self.history {
+            Some(history) => alpha_beta_rep(
+                board,
+                side,
+                self.weights,
+                self.depth,
+                self.quiescence,
+                &history.positions,
+            ),
+            None if self.quiescence => alpha_beta_q(board, side, self.weights, self.depth),
+            None => alpha_beta(board, side, self.weights, self.depth),
         };
-        let decision = search(board, side, self.weights, self.depth);
         self.nodes += decision.nodes;
         Ok(play(&decision, &mut self.rng, legal))
+    }
+
+    fn observe(&mut self, board: &Board, side: Color) {
+        if let Some(history) = &mut self.history {
+            history.push(board, side);
+        }
     }
 
     fn nodes(&self) -> u64 {
@@ -234,12 +289,15 @@ impl Agent for AlphaBetaAgent {
 
 /// Iterative deepening (`search::iterative_deepening`): alpha-beta 1, 2, 3, ... plies deep within
 /// `limits`, the move of the deepest completed iteration, with or without quiescence. With only a
-/// depth limit N it plays the moves of `AlphaBetaAgent` at depth N.
+/// depth limit N it plays the moves of `AlphaBetaAgent` at depth N. With `with_repetitions`, a
+/// repetition is a draw (`search::iterative_deepening_rep`).
 #[derive(Clone, Debug)]
 pub struct DeepeningAgent {
     weights: Weights,
     limits: Limits,
     quiescence: bool,
+    /// `Some` when repetitions are recognised: the game so far.
+    history: Option<GameHistory>,
     rng: Mulberry32,
     nodes: u64,
 }
@@ -250,15 +308,25 @@ impl DeepeningAgent {
             weights,
             limits,
             quiescence,
+            history: None,
             rng: Mulberry32::new(seed),
             nodes: 0,
         }
+    }
+
+    /// The same agent, recognising repetitions if `on`.
+    pub fn with_repetitions(mut self, on: bool) -> DeepeningAgent {
+        self.history = on.then(GameHistory::default);
+        self
     }
 }
 
 impl Agent for DeepeningAgent {
     fn new_game(&mut self, seed: u32) -> Result<(), AgentError> {
         self.rng = Mulberry32::new(seed);
+        if let Some(history) = &mut self.history {
+            history.clear();
+        }
         Ok(())
     }
 
@@ -268,10 +336,25 @@ impl Agent for DeepeningAgent {
         side: Color,
         legal: &'m [Move],
     ) -> Result<&'m Move, AgentError> {
-        let deepening =
-            iterative_deepening(board, side, self.weights, self.limits, self.quiescence);
+        let deepening = match &self.history {
+            Some(history) => iterative_deepening_rep(
+                board,
+                side,
+                self.weights,
+                self.limits,
+                self.quiescence,
+                &history.positions,
+            ),
+            None => iterative_deepening(board, side, self.weights, self.limits, self.quiescence),
+        };
         self.nodes += deepening.decision.nodes;
         Ok(play(&deepening.decision, &mut self.rng, legal))
+    }
+
+    fn observe(&mut self, board: &Board, side: Color) {
+        if let Some(history) = &mut self.history {
+            history.push(board, side);
+        }
     }
 
     fn nodes(&self) -> u64 {
@@ -285,7 +368,7 @@ impl Agent for DeepeningAgent {
 /// or `id:LIMITS` for iterative deepening with the tuned weights. LIMITS are one or more of `dN`
 /// (at most N plies), `nK` (at most K nodes per move) and `tMS` (at most MS milliseconds per move),
 /// separated by `:`, for example `id:n20000` or `id:d5:t50`. `abNq` and `idq:LIMITS` add
-/// quiescence.
+/// quiescence; a final `r` (`abNr`, `abNqr`, `idr:LIMITS`, `idqr:LIMITS`) adds repetitions.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum AgentSpec {
     Random,
@@ -297,11 +380,13 @@ pub enum AgentSpec {
     AlphaBeta {
         depth: u32,
         quiescence: bool,
+        repetition: bool,
     },
     /// Iterative deepening within `limits`, with the tuned weights.
     Deepening {
         limits: Limits,
         quiescence: bool,
+        repetition: bool,
     },
 }
 
@@ -337,19 +422,29 @@ impl AgentSpec {
             AgentSpec::Random => Box::new(RandomAgent::new(0)),
             AgentSpec::U(weights) => Box::new(UAgent::new(weights, 0)),
             AgentSpec::Minimax(depth) => Box::new(MinimaxAgent::new(Weights::TUNED, depth, 0)),
-            AgentSpec::AlphaBeta { depth, quiescence } => {
-                Box::new(AlphaBetaAgent::new(Weights::TUNED, depth, quiescence, 0))
-            }
-            AgentSpec::Deepening { limits, quiescence } => {
-                Box::new(DeepeningAgent::new(Weights::TUNED, limits, quiescence, 0))
-            }
+            AgentSpec::AlphaBeta {
+                depth,
+                quiescence,
+                repetition,
+            } => Box::new(
+                AlphaBetaAgent::new(Weights::TUNED, depth, quiescence, 0)
+                    .with_repetitions(repetition),
+            ),
+            AgentSpec::Deepening {
+                limits,
+                quiescence,
+                repetition,
+            } => Box::new(
+                DeepeningAgent::new(Weights::TUNED, limits, quiescence, 0)
+                    .with_repetitions(repetition),
+            ),
         }
     }
 }
 
 impl fmt::Display for AgentSpec {
-    /// The canonical name: `random`, `mmN`, `abN` or `abNq`, `id:` or `idq:` with the limits in the
-    /// order d, n, t, the preset's name, or else `u:MAN/KING/MOB`.
+    /// The canonical name: `random`, `mmN`, `abN` (`abNq`, `abNr`, `abNqr`), `id:` (`idq:`, `idr:`,
+    /// `idqr:`) with the limits in the order d, n, t, the preset's name, or else `u:MAN/KING/MOB`.
     /// `"u:1/3/0".parse()` therefore prints as `material`.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match (self, self.preset()) {
@@ -357,11 +452,23 @@ impl fmt::Display for AgentSpec {
             (AgentSpec::U(_), Some(name)) => f.write_str(name),
             (AgentSpec::U(weights), None) => write!(f, "u:{weights}"),
             (AgentSpec::Minimax(depth), _) => write!(f, "mm{depth}"),
-            (AgentSpec::AlphaBeta { depth, quiescence }, _) => {
-                write!(f, "ab{depth}{}", if *quiescence { "q" } else { "" })
-            }
-            (AgentSpec::Deepening { limits, quiescence }, _) => {
-                f.write_str(if *quiescence { "idq" } else { "id" })?;
+            (
+                AgentSpec::AlphaBeta {
+                    depth,
+                    quiescence,
+                    repetition,
+                },
+                _,
+            ) => write!(f, "ab{depth}{}", suffix(*quiescence, *repetition)),
+            (
+                AgentSpec::Deepening {
+                    limits,
+                    quiescence,
+                    repetition,
+                },
+                _,
+            ) => {
+                write!(f, "id{}", suffix(*quiescence, *repetition))?;
                 if let Some(depth) = limits.depth {
                     write!(f, ":d{depth}")?;
                 }
@@ -377,17 +484,28 @@ impl fmt::Display for AgentSpec {
     }
 }
 
+/// The suffix of `ab` and `id` names: `q` for quiescence, then `r` for repetitions.
+fn suffix(quiescence: bool, repetition: bool) -> &'static str {
+    match (quiescence, repetition) {
+        (false, false) => "",
+        (true, false) => "q",
+        (false, true) => "r",
+        (true, true) => "qr",
+    }
+}
+
 /// Why a name is not an agent.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ParseAgentError {
-    /// Neither `random`, a preset name, `u:...`, `mmN`, `abN`, `abNq`, `id:...` nor `idq:...`.
+    /// Neither `random`, a preset name, `u:...`, `mmN`, `abN` (with `q`, `r`, `qr`), nor `id:...`
+    /// (`idq:`, `idr:`, `idqr:`).
     Unknown(String),
     /// `mm` or `ab` is not followed by a depth from 1 to `AgentSpec::MAX_DEPTH` (and for `ab`, an
-    /// optional `q`).
+    /// optional `q`, `r` or `qr`).
     Depth(String),
     /// `u:` is not followed by three finite numbers separated by `/`.
     Weights(String),
-    /// `id` or `idq` is not followed by one to three different limits `:dN`, `:nK`, `:tMS`, each a
+    /// `id`, `idq`, `idr` or `idqr` is not followed by one to three different limits `:dN`, `:nK`, `:tMS`, each a
     /// positive whole number (N at most `MAX_ID_DEPTH`).
     Limits(String),
 }
@@ -398,12 +516,12 @@ impl fmt::Display for ParseAgentError {
             ParseAgentError::Unknown(name) => write!(
                 f,
                 "unknown agent {name:?}: expected random, material, first, tuned, u:MAN/KING/MOB, \
-                 mmN, abN, abNq, id:LIMITS or idq:LIMITS"
+                 mmN, abN, abNq, abNr, abNqr, id:LIMITS, idq:LIMITS, idr:LIMITS or idqr:LIMITS"
             ),
             ParseAgentError::Depth(name) => write!(
                 f,
-                "agent {name:?}: expected a depth from 1 to {} after mm or ab, for example mm3, ab5 \
-                 or ab3q",
+                "agent {name:?}: expected a depth from 1 to {} after mm or ab, for example mm3, ab5, \
+                 ab3q or ab3qr",
                 AgentSpec::MAX_DEPTH
             ),
             ParseAgentError::Weights(name) => write!(
@@ -413,7 +531,7 @@ impl fmt::Display for ParseAgentError {
             ),
             ParseAgentError::Limits(name) => write!(
                 f,
-                "agent {name:?}: expected limits after id or idq, separated by ':': dN (plies, 1 to \
+                "agent {name:?}: expected limits after id, idq, idr or idqr, separated by ':': dN (plies, 1 to \
                  {MAX_ID_DEPTH}), nK (nodes per move), tMS (milliseconds per move), \
                  for example id:n20000 or id:d5:t50"
             ),
@@ -433,15 +551,27 @@ impl FromStr for AgentSpec {
         if let Some((_, weights)) = AgentSpec::PRESETS.iter().find(|(name, _)| *name == s) {
             return Ok(AgentSpec::U(*weights));
         }
-        // `idq` before `id`, since "idq:..." also starts with "id".
-        let deepening = [("idq", true), ("id", false)]
-            .into_iter()
-            .find_map(|(prefix, quiescence)| Some((s.strip_prefix(prefix)?, quiescence)));
-        if let Some((limits, quiescence)) = deepening
-            && (limits.is_empty() || limits.starts_with(':'))
-        {
+        // The longest prefixes first, since "idqr:..." also starts with "idq" and "id".
+        let deepening = [
+            ("idqr", true, true),
+            ("idq", true, false),
+            ("idr", false, true),
+            ("id", false, false),
+        ]
+        .into_iter()
+        .find_map(|(prefix, quiescence, repetition)| {
+            let limits = s.strip_prefix(prefix)?;
+            // "idq" must not be read as "id" followed by limits "q".
+            (limits.is_empty() || limits.starts_with(':'))
+                .then_some((limits, quiescence, repetition))
+        });
+        if let Some((limits, quiescence, repetition)) = deepening {
             return parse_limits(limits)
-                .map(|limits| AgentSpec::Deepening { limits, quiescence })
+                .map(|limits| AgentSpec::Deepening {
+                    limits,
+                    quiescence,
+                    repetition,
+                })
                 .ok_or_else(|| ParseAgentError::Limits(s.to_string()));
         }
         let depth = |digits: &str| -> Result<u32, ParseAgentError> {
@@ -455,11 +585,20 @@ impl FromStr for AgentSpec {
             return depth(digits).map(AgentSpec::Minimax);
         }
         if let Some(rest) = s.strip_prefix("ab") {
+            // `q` comes before `r`, so they are taken off from the end in the other order.
+            let (rest, repetition) = match rest.strip_suffix('r') {
+                Some(rest) => (rest, true),
+                None => (rest, false),
+            };
             let (digits, quiescence) = match rest.strip_suffix('q') {
                 Some(digits) => (digits, true),
                 None => (rest, false),
             };
-            return depth(digits).map(|depth| AgentSpec::AlphaBeta { depth, quiescence });
+            return depth(digits).map(|depth| AgentSpec::AlphaBeta {
+                depth,
+                quiescence,
+                repetition,
+            });
         }
         let Some(numbers) = s.strip_prefix("u:") else {
             return Err(ParseAgentError::Unknown(s.to_string()));
@@ -519,49 +658,34 @@ mod tests {
         assert_eq!(spec("first"), AgentSpec::U(Weights::FIRST_GUESS));
         assert_eq!(spec("tuned"), AgentSpec::U(Weights::TUNED));
         assert_eq!(spec("mm3"), AgentSpec::Minimax(3));
-        assert_eq!(
-            spec("ab5"),
-            AgentSpec::AlphaBeta {
-                depth: 5,
-                quiescence: false
-            }
-        );
-        assert_eq!(
-            spec("ab3q"),
-            AgentSpec::AlphaBeta {
-                depth: 3,
-                quiescence: true
-            }
-        );
+        let ab = |depth, quiescence, repetition| AgentSpec::AlphaBeta {
+            depth,
+            quiescence,
+            repetition,
+        };
+        assert_eq!(spec("ab5"), ab(5, false, false));
+        assert_eq!(spec("ab3q"), ab(3, true, false));
+        assert_eq!(spec("ab3r"), ab(3, false, true));
+        assert_eq!(spec("ab3qr"), ab(3, true, true));
         let nodes = Limits {
             nodes: Some(20000),
             ..Limits::default()
         };
-        assert_eq!(
-            spec("id:n20000"),
-            AgentSpec::Deepening {
-                limits: nodes,
-                quiescence: false
-            }
-        );
-        assert_eq!(
-            spec("idq:n20000"),
-            AgentSpec::Deepening {
-                limits: nodes,
-                quiescence: true
-            }
-        );
-        assert_eq!(
-            spec("id:t50:d5"),
-            AgentSpec::Deepening {
-                limits: Limits {
-                    depth: Some(5),
-                    nodes: None,
-                    time: Some(Duration::from_millis(50)),
-                },
-                quiescence: false
-            }
-        );
+        let id = |limits, quiescence, repetition| AgentSpec::Deepening {
+            limits,
+            quiescence,
+            repetition,
+        };
+        assert_eq!(spec("id:n20000"), id(nodes, false, false));
+        assert_eq!(spec("idq:n20000"), id(nodes, true, false));
+        assert_eq!(spec("idr:n20000"), id(nodes, false, true));
+        assert_eq!(spec("idqr:n20000"), id(nodes, true, true));
+        let limits = Limits {
+            depth: Some(5),
+            nodes: None,
+            time: Some(Duration::from_millis(50)),
+        };
+        assert_eq!(spec("id:t50:d5"), id(limits, false, false));
         assert_eq!(
             spec("u:1/2/0.2"),
             AgentSpec::U(Weights {
@@ -597,6 +721,10 @@ mod tests {
             "ab9q",
             "idq:n20000",
             "idq:d3:t10",
+            "ab1r",
+            "ab9qr",
+            "idr:d3",
+            "idqr:n20000",
         ] {
             assert_eq!(spec(name).to_string(), name);
         }
@@ -609,13 +737,13 @@ mod tests {
         let weights = |s: &str| Err(ParseAgentError::Weights(s.to_string()));
         let depth = |s: &str| Err(ParseAgentError::Depth(s.to_string()));
         for s in [
-            "", "Tuned", "minimax", "1/2/3", "u", "idd3", "idqd3", "idx:d3",
+            "", "Tuned", "minimax", "1/2/3", "u", "idd3", "idqd3", "idx:d3", "idrq:d3", "idqrr:d3",
         ] {
             assert_eq!(s.parse::<AgentSpec>(), unknown(s));
         }
         for s in [
             "mm", "mm0", "mm10", "mm-1", "mm3x", "mm 3", "mm3q", "ab", "ab0", "ab10", "ab3x",
-            "abq", "ab0q", "ab3qq", "ab10q",
+            "abq", "ab0q", "ab3qq", "ab10q", "ab3rq", "ab3rr", "abr", "ab0qr", "ab3qrq",
         ] {
             assert_eq!(s.parse::<AgentSpec>(), depth(s));
         }
@@ -623,6 +751,7 @@ mod tests {
         for s in [
             "id", "id:", "id:d", "id:d0", "id:d65", "id:n0", "id:x5", "id:d3:d4", "id:d3:",
             "id::d3", "id:n+5", "id:t-1", "id:t5ms", "id:n 5", "idq", "idq:", "idq:d0", "idq::n5",
+            "idr", "idqr", "idqr:", "idr:d0",
         ] {
             assert_eq!(s.parse::<AgentSpec>(), limits(s));
         }

@@ -27,11 +27,18 @@
 //! move) is reached. Capturing is mandatory, so the side to move cannot decline ("stand pat") as in
 //! chess, and since every capture removes a piece, the captures run out by themselves. The nodes
 //! beyond the depth limit are counted in `nodes` and, separately, in `q_nodes`.
+//!
+//! Repetitions (`alpha_beta_rep`, `iterative_deepening_rep`): a position below the root that
+//! occurred before, in the game (`history`) or on the path from the root, is a draw worth `DRAW`
+//! (0), and is not searched further. The game is drawn only at the third occurrence, but a side
+//! that can repeat once can repeat again, so the first repetition already decides. With U from
+//! the root side's view, a side ahead (U > 0) avoids the repetition and a side behind (U < 0)
+//! welcomes it. Without repetitions, the search is the one above, node for node.
 
 use std::time::{Duration, Instant};
 
 use crate::board::{Board, Color};
-use crate::eval::{Features, U_EPSILON, WIN, Weights};
+use crate::eval::{DRAW, Features, U_EPSILON, WIN, Weights};
 use crate::movegen::Move;
 use crate::rng::Mulberry32;
 
@@ -134,12 +141,34 @@ fn root_minimax(
 /// that move cannot end up within `U_EPSILON` of the best: best only grows. The margin of 2ε,
 /// instead of ε, keeps rounding in `best - ε` from deciding whether a tied move is searched exactly.
 pub fn alpha_beta(board: &Board, side: Color, weights: Weights, depth: u32) -> Decision {
-    unlimited_alpha_beta(board, side, weights, depth, false)
+    unlimited_alpha_beta(board, side, weights, depth, false, None)
 }
 
 /// `alpha_beta` with quiescence at the depth limit: the decision of `minimax_q`.
 pub fn alpha_beta_q(board: &Board, side: Color, weights: Weights, depth: u32) -> Decision {
-    unlimited_alpha_beta(board, side, weights, depth, true)
+    unlimited_alpha_beta(board, side, weights, depth, true, None)
+}
+
+/// `alpha_beta` (or `alpha_beta_q` with `quiescence`) that scores a repetition as a draw: a
+/// position below the root that is in `history` (the positions of the game so far, with their
+/// side to move) or on the path from the root is worth `DRAW`.
+pub fn alpha_beta_rep(
+    board: &Board,
+    side: Color,
+    weights: Weights,
+    depth: u32,
+    quiescence: bool,
+    history: &[(Board, Color)],
+) -> Decision {
+    let mut repetitions = Repetitions::new(history);
+    unlimited_alpha_beta(
+        board,
+        side,
+        weights,
+        depth,
+        quiescence,
+        Some(&mut repetitions),
+    )
 }
 
 fn unlimited_alpha_beta(
@@ -148,6 +177,7 @@ fn unlimited_alpha_beta(
     weights: Weights,
     depth: u32,
     quiescence: bool,
+    repetitions: Option<&mut Repetitions>,
 ) -> Decision {
     assert!(depth >= 1, "alpha-beta needs a depth of at least 1");
     let context = Context {
@@ -156,7 +186,7 @@ fn unlimited_alpha_beta(
         depth,
         quiescence,
     };
-    root_alpha_beta(board, &context, &mut Counter::unlimited())
+    root_alpha_beta(board, &context, &mut Counter::unlimited(), repetitions)
         .expect("a search without a budget is never interrupted")
 }
 
@@ -201,6 +231,38 @@ pub fn iterative_deepening(
     limits: Limits,
     quiescence: bool,
 ) -> Deepening {
+    deepening(board, side, weights, limits, quiescence, None)
+}
+
+/// `iterative_deepening` whose iterations score a repetition as a draw, as `alpha_beta_rep` does.
+pub fn iterative_deepening_rep(
+    board: &Board,
+    side: Color,
+    weights: Weights,
+    limits: Limits,
+    quiescence: bool,
+    history: &[(Board, Color)],
+) -> Deepening {
+    let mut repetitions = Repetitions::new(history);
+    deepening(
+        board,
+        side,
+        weights,
+        limits,
+        quiescence,
+        Some(&mut repetitions),
+    )
+}
+
+fn deepening(
+    board: &Board,
+    side: Color,
+    weights: Weights,
+    limits: Limits,
+    quiescence: bool,
+    // `mut` on the binding: `as_deref_mut` below lends the `&mut` out once per iteration.
+    mut repetitions: Option<&mut Repetitions>,
+) -> Deepening {
     assert!(
         limits != Limits::default(),
         "iterative deepening needs a depth, node or time limit"
@@ -218,7 +280,7 @@ pub fn iterative_deepening(
         quiescence,
     };
     let mut counter = Counter::unlimited();
-    let mut decision = root_alpha_beta(board, &context, &mut counter)
+    let mut decision = root_alpha_beta(board, &context, &mut counter, repetitions.as_deref_mut())
         .expect("a search without a budget is never interrupted");
     counter.max_nodes = limits.nodes;
     counter.deadline = deadline;
@@ -227,7 +289,7 @@ pub fn iterative_deepening(
         context.depth += 1;
         // `?` cannot help here: an interrupted iteration is not an error of this function, so the
         // `Option` is matched and `None` ends the loop.
-        match root_alpha_beta(board, &context, &mut counter) {
+        match root_alpha_beta(board, &context, &mut counter, repetitions.as_deref_mut()) {
             Some(deeper) => decision = deeper,
             None => {
                 context.depth -= 1;
@@ -320,10 +382,44 @@ impl Counter {
     }
 }
 
+/// The positions a search with repetitions compares against: those of the game, and those on the
+/// path from the root to the current node (the root included).
+#[derive(Clone, Debug)]
+struct Repetitions<'h> {
+    history: &'h [(Board, Color)],
+    path: Vec<(Board, Color)>,
+}
+
+impl<'h> Repetitions<'h> {
+    fn new(history: &'h [(Board, Color)]) -> Repetitions<'h> {
+        Repetitions {
+            history,
+            path: Vec::new(),
+        }
+    }
+
+    /// Whether `board` with `to_move` to move occurred before, in the game or on the path.
+    fn seen(&self, board: &Board, to_move: Color) -> bool {
+        let position = (*board, to_move);
+        self.path.contains(&position) || self.history.contains(&position)
+    }
+}
+
 /// Alpha-beta at the root, as `alpha_beta` describes, counting in `counter`: `None` if the budget
-/// ran out. The decision's `nodes` and `q_nodes` are the counter's at the end.
-fn root_alpha_beta(board: &Board, context: &Context, counter: &mut Counter) -> Option<Decision> {
+/// ran out. The decision's `nodes` and `q_nodes` are the counter's at the end. With
+/// `repetitions`, a repetition below the root is a draw.
+fn root_alpha_beta(
+    board: &Board,
+    context: &Context,
+    counter: &mut Counter,
+    mut repetitions: Option<&mut Repetitions>,
+) -> Option<Decision> {
     let side = context.root;
+    if let Some(repetitions) = repetitions.as_deref_mut() {
+        // An interrupted search leaves its path behind; every search starts from the root.
+        repetitions.path.clear();
+        repetitions.path.push((*board, side));
+    }
     let mut best = f64::NEG_INFINITY;
     let mut candidates = Vec::new();
     for mv in board.legal_moves(side) {
@@ -336,6 +432,7 @@ fn root_alpha_beta(board: &Board, context: &Context, counter: &mut Counter) -> O
             (alpha, f64::INFINITY),
             context,
             counter,
+            repetitions.as_deref_mut(),
         )?;
         best = best.max(u);
         candidates.push(Candidate {
@@ -378,7 +475,8 @@ fn value(board: &Board, to_move: Color, ply: u32, context: &Context, counter: &m
 /// `value` searched with alpha-beta in the window `(alpha, beta)`, fail-soft: a result strictly
 /// inside the window is the exact minimax value; a result `<= alpha` is an upper bound of it and a
 /// result `>= beta` a lower bound. Counts every board it visits in `counter`, as `value` does, and
-/// gives `None` as soon as the counter's budget runs out.
+/// gives `None` as soon as the counter's budget runs out. With `repetitions`, a position seen
+/// before is worth `DRAW`.
 fn bounded_value(
     board: &Board,
     to_move: Color,
@@ -386,8 +484,12 @@ fn bounded_value(
     (mut alpha, mut beta): (f64, f64),
     context: &Context,
     counter: &mut Counter,
+    mut repetitions: Option<&mut Repetitions>,
 ) -> Option<f64> {
     counter.visit(ply, context)?;
+    if repetitions.as_ref().is_some_and(|r| r.seen(board, to_move)) {
+        return Some(DRAW);
+    }
     let moves = board.legal_moves(to_move);
     if moves.is_empty() {
         return Some(context.no_move_value(to_move, ply));
@@ -402,6 +504,9 @@ fn bounded_value(
     } else {
         f64::INFINITY
     };
+    if let Some(repetitions) = repetitions.as_deref_mut() {
+        repetitions.path.push((*board, to_move));
+    }
     for mv in &moves {
         let v = bounded_value(
             &board.apply(mv),
@@ -410,6 +515,7 @@ fn bounded_value(
             (alpha, beta),
             context,
             counter,
+            repetitions.as_deref_mut(),
         )?;
         if maximising {
             best = best.max(v);
@@ -421,6 +527,9 @@ fn bounded_value(
         if alpha >= beta {
             break;
         }
+    }
+    if let Some(repetitions) = repetitions {
+        repetitions.path.pop();
     }
     Some(best)
 }
@@ -554,6 +663,51 @@ mod tests {
         assert_eq!(capture.u, WIN);
         assert_eq!(mm3.top.len(), 1);
         assert!(mm3.candidates[mm3.top[0]].mv.is_capture());
+    }
+
+    /// White: king a2, man a1. Black: king h8, man h7 (`KINGS` in tests/arena.rs).
+    const KINGS: &str = ".......B/.......b/......../......../......../......../W......./w.......";
+
+    #[test]
+    fn a_position_on_the_path_is_a_draw_and_the_path_is_restored() {
+        let board: Board = KINGS.parse().unwrap();
+        let context = Context {
+            root: Color::White,
+            weights: Weights::TUNED,
+            depth: 3,
+            quiescence: false,
+        };
+        let mut repetitions = Repetitions::new(&[]);
+        repetitions.path.push((board, Color::Black));
+        let mut counter = Counter::unlimited();
+        let window = (f64::NEG_INFINITY, f64::INFINITY);
+        let draw = bounded_value(
+            &board,
+            Color::Black,
+            1,
+            window,
+            &context,
+            &mut counter,
+            Some(&mut repetitions),
+        );
+        // A repetition is a node, but nothing below it is searched.
+        assert_eq!((draw, counter.nodes), (Some(DRAW), 1));
+        // The same side to move is part of the position.
+        let searched = bounded_value(
+            &board,
+            Color::White,
+            1,
+            window,
+            &context,
+            &mut counter,
+            Some(&mut repetitions),
+        );
+        assert_ne!(searched, Some(DRAW));
+        assert!(counter.nodes > 2);
+        assert_eq!(repetitions.path, [(board, Color::Black)]);
+        // A root search leaves only the root on the path.
+        root_alpha_beta(&board, &context, &mut counter, Some(&mut repetitions)).unwrap();
+        assert_eq!(repetitions.path, [(board, Color::White)]);
     }
 
     #[test]
