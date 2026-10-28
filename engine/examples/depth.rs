@@ -74,7 +74,7 @@ fn main() {
         let (mut nodes, mut total, mut longest) = (0, Duration::ZERO, Duration::ZERO);
         for (board, side, weights) in &positions {
             let start = Instant::now();
-            let id = iterative_deepening(board, *side, *weights, limits);
+            let id = iterative_deepening(board, *side, *weights, limits, false);
             let took = start.elapsed();
             *depths.entry(id.depth).or_insert(0) += 1;
             nodes += id.decision.nodes;

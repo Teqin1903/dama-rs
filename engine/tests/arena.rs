@@ -332,3 +332,12 @@ fn iterative_deepening_plays_the_games_of_alpha_beta_at_depths_3_and_4() {
         match_games("ab4", "tuned", 20, 1)
     );
 }
+
+#[test]
+#[ignore = "slow in a debug build; run with --release -- --ignored"]
+fn iterative_deepening_with_quiescence_plays_the_games_of_ab3q() {
+    assert_eq!(
+        match_games("idq:d3", "tuned", 20, 1),
+        match_games("ab3q", "tuned", 20, 1)
+    );
+}

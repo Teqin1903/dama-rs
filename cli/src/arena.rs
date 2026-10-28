@@ -31,6 +31,8 @@ agents:
                     nK (at most K nodes per move), tMS (at most MS milliseconds per move),
                     separated by ':', for example id:n20000 or id:d5:t50. Matches with a time
                     limit cannot be repeated exactly
+  abNq, idq:LIMITS  abN and id:LIMITS with quiescence: past the depth limit, a position whose
+                    side to move must capture is searched on, captures only, until it is quiet
 
 options:
   --games N         the number of games (default 200)
@@ -169,14 +171,16 @@ fn describe(spec: &AgentSpec) -> String {
                 engine::Weights::TUNED
             )
         }
-        (AgentSpec::AlphaBeta(depth), _) => {
+        (AgentSpec::AlphaBeta { depth, quiescence }, _) => {
             format!(
-                "{spec} (alpha-beta, {depth} plies, {})",
+                "{spec} (alpha-beta, {depth} plies{}, {})",
+                if *quiescence { ", quiescence" } else { "" },
                 engine::Weights::TUNED
             )
         }
-        (AgentSpec::Deepening(_), _) => format!(
-            "{spec} (iterative deepening alpha-beta, {})",
+        (AgentSpec::Deepening { quiescence, .. }, _) => format!(
+            "{spec} (iterative deepening alpha-beta{}, {})",
+            if *quiescence { ", quiescence" } else { "" },
             engine::Weights::TUNED
         ),
         _ => spec.to_string(),

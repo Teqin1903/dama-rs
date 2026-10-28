@@ -20,6 +20,13 @@
 //!
 //! Iterative deepening has no move ordering yet, so its iterations do not depend on each other: a
 //! completed iteration at depth d is exactly `alpha_beta` at depth d.
+//!
+//! Quiescence (`minimax_q`, `alpha_beta_q`, and iterative deepening with `quiescence`) changes only
+//! the depth limit: a position there whose side to move must capture is not scored, and every
+//! capture is searched instead, ply after ply, until a position without a capture (or without a
+//! move) is reached. Capturing is mandatory, so the side to move cannot decline ("stand pat") as in
+//! chess, and since every capture removes a piece, the captures run out by themselves. The nodes
+//! beyond the depth limit are counted in `nodes` and, separately, in `q_nodes`.
 
 use std::time::{Duration, Instant};
 
@@ -52,6 +59,8 @@ pub struct Decision {
     /// The positions the search produced with `apply`, the root not included: one per legal move
     /// for `decide`.
     pub nodes: u64,
+    /// The part of `nodes` beyond the depth limit, produced by quiescence: 0 without it.
+    pub q_nodes: u64,
 }
 
 /// Evaluates every legal move of `side` on `board` with U.
@@ -70,15 +79,36 @@ pub fn decide(board: &Board, side: Color, weights: Weights) -> Decision {
         })
         .collect();
     let nodes = candidates.len() as u64;
-    Decision::new(candidates, nodes)
+    Decision::new(candidates, nodes, 0)
 }
 
 /// Values every legal move of `side` on `board` with minimax `depth` plies deep (at least 1), the
 /// leaves scored with U and `weights`. A candidate's `features` are those one ply deep, as in
 /// `decide`; its `u` is the minimax value.
 pub fn minimax(board: &Board, side: Color, weights: Weights, depth: u32) -> Decision {
+    root_minimax(board, side, weights, depth, false)
+}
+
+/// `minimax` with quiescence at the depth limit.
+pub fn minimax_q(board: &Board, side: Color, weights: Weights, depth: u32) -> Decision {
+    root_minimax(board, side, weights, depth, true)
+}
+
+fn root_minimax(
+    board: &Board,
+    side: Color,
+    weights: Weights,
+    depth: u32,
+    quiescence: bool,
+) -> Decision {
     assert!(depth >= 1, "minimax needs a depth of at least 1");
-    let mut nodes = 0;
+    let context = Context {
+        root: side,
+        weights,
+        depth,
+        quiescence,
+    };
+    let mut counter = Counter::unlimited();
     let candidates: Vec<Candidate> = board
         .legal_moves(side)
         .into_iter()
@@ -86,21 +116,13 @@ pub fn minimax(board: &Board, side: Color, weights: Weights, depth: u32) -> Deci
             let after = board.apply(&mv);
             Candidate {
                 features: Features::of(&after, side),
-                u: value(
-                    &after,
-                    side.opponent(),
-                    side,
-                    weights,
-                    depth - 1,
-                    1,
-                    &mut nodes,
-                ),
+                u: value(&after, side.opponent(), 1, &context, &mut counter),
                 mv,
                 exact: true,
             }
         })
         .collect();
-    Decision::new(candidates, nodes)
+    Decision::new(candidates, counter.nodes, counter.q_nodes)
 }
 
 /// The same decision as `minimax(board, side, weights, depth)` from at most as many nodes: the
@@ -112,8 +134,29 @@ pub fn minimax(board: &Board, side: Color, weights: Weights, depth: u32) -> Deci
 /// that move cannot end up within `U_EPSILON` of the best: best only grows. The margin of 2ε,
 /// instead of ε, keeps rounding in `best - ε` from deciding whether a tied move is searched exactly.
 pub fn alpha_beta(board: &Board, side: Color, weights: Weights, depth: u32) -> Decision {
+    unlimited_alpha_beta(board, side, weights, depth, false)
+}
+
+/// `alpha_beta` with quiescence at the depth limit: the decision of `minimax_q`.
+pub fn alpha_beta_q(board: &Board, side: Color, weights: Weights, depth: u32) -> Decision {
+    unlimited_alpha_beta(board, side, weights, depth, true)
+}
+
+fn unlimited_alpha_beta(
+    board: &Board,
+    side: Color,
+    weights: Weights,
+    depth: u32,
+    quiescence: bool,
+) -> Decision {
     assert!(depth >= 1, "alpha-beta needs a depth of at least 1");
-    root_alpha_beta(board, side, weights, depth, &mut Counter::unlimited())
+    let context = Context {
+        root: side,
+        weights,
+        depth,
+        quiescence,
+    };
+    root_alpha_beta(board, &context, &mut Counter::unlimited())
         .expect("a search without a budget is never interrupted")
 }
 
@@ -148,11 +191,15 @@ pub struct Deepening {
 /// The search also stops when an iteration reached no leaf at the depth limit: every line ended
 /// in a position without a legal move first, so a deeper iteration would visit the same nodes and
 /// make the same decision.
+///
+/// With `quiescence`, every iteration searches captures past its depth limit (`alpha_beta_q`), and
+/// the quiescence nodes count against the node budget.
 pub fn iterative_deepening(
     board: &Board,
     side: Color,
     weights: Weights,
     limits: Limits,
+    quiescence: bool,
 ) -> Deepening {
     assert!(
         limits != Limits::default(),
@@ -164,26 +211,71 @@ pub fn iterative_deepening(
         "iterative deepening needs a depth from 1 to {MAX_ID_DEPTH}"
     );
     let deadline = limits.time.map(|time| Instant::now() + time);
+    let mut context = Context {
+        root: side,
+        weights,
+        depth: 1,
+        quiescence,
+    };
     let mut counter = Counter::unlimited();
-    let mut decision = root_alpha_beta(board, side, weights, 1, &mut counter)
+    let mut decision = root_alpha_beta(board, &context, &mut counter)
         .expect("a search without a budget is never interrupted");
-    let mut depth = 1;
     counter.max_nodes = limits.nodes;
     counter.deadline = deadline;
-    while depth < max_depth && counter.horizon {
+    while context.depth < max_depth && counter.horizon {
         counter.horizon = false;
+        context.depth += 1;
         // `?` cannot help here: an interrupted iteration is not an error of this function, so the
         // `Option` is matched and `None` ends the loop.
-        match root_alpha_beta(board, side, weights, depth + 1, &mut counter) {
-            Some(deeper) => {
-                decision = deeper;
-                depth += 1;
+        match root_alpha_beta(board, &context, &mut counter) {
+            Some(deeper) => decision = deeper,
+            None => {
+                context.depth -= 1;
+                break;
             }
-            None => break,
         }
     }
     decision.nodes = counter.nodes;
-    Deepening { decision, depth }
+    decision.q_nodes = counter.q_nodes;
+    Deepening {
+        decision,
+        depth: context.depth,
+    }
+}
+
+/// What a search is for: the root side, the weights of U, the depth limit (in plies from the
+/// root) and whether to search captures past it.
+#[derive(Clone, Copy, Debug)]
+struct Context {
+    root: Color,
+    weights: Weights,
+    depth: u32,
+    quiescence: bool,
+}
+
+impl Context {
+    /// Whether a position at `ply` with `moves` to play (not empty) is scored with U, rather than
+    /// searched further.
+    fn is_leaf(&self, ply: u32, moves: &[Move]) -> bool {
+        ply >= self.depth && !(self.quiescence && moves[0].is_capture())
+    }
+
+    /// U at a leaf where `to_move` has `moves`, from the root side's view.
+    fn leaf_value(&self, board: &Board, to_move: Color, moves: &[Move]) -> f64 {
+        let others = board.legal_moves(to_move.opponent()).len();
+        let (ours, theirs) = if to_move == self.root {
+            (moves.len(), others)
+        } else {
+            (others, moves.len())
+        };
+        Features::leaf(board, self.root, ours, theirs).u(self.weights)
+    }
+
+    /// The value of a position at `ply` where `to_move` has no legal move: a loss for `to_move`.
+    fn no_move_value(&self, to_move: Color, ply: u32) -> f64 {
+        let win = WIN - f64::from(ply - 1);
+        if to_move == self.root { -win } else { win }
+    }
 }
 
 /// The nodes a search has produced, and its budget.
@@ -191,6 +283,8 @@ pub fn iterative_deepening(
 struct Counter {
     /// The positions produced with `apply`, the root not included.
     nodes: u64,
+    /// The part of `nodes` beyond the depth limit.
+    q_nodes: u64,
     /// No more nodes than this.
     max_nodes: Option<u64>,
     /// No new node from this moment on.
@@ -203,34 +297,33 @@ impl Counter {
     fn unlimited() -> Counter {
         Counter {
             nodes: 0,
+            q_nodes: 0,
             max_nodes: None,
             deadline: None,
             horizon: false,
         }
     }
 
-    /// Counts one more node, or `None` if the budget is spent. The clock is read only when there
-    /// is a deadline.
-    fn visit(&mut self) -> Option<()> {
+    /// Counts one more node at `ply`, or `None` if the budget is spent. The clock is read only
+    /// when there is a deadline.
+    fn visit(&mut self, ply: u32, context: &Context) -> Option<()> {
         let out_of_nodes = self.max_nodes.is_some_and(|max| self.nodes >= max);
         let out_of_time = self.deadline.is_some_and(|d| Instant::now() >= d);
         if out_of_nodes || out_of_time {
             return None;
         }
         self.nodes += 1;
+        if ply > context.depth {
+            self.q_nodes += 1;
+        }
         Some(())
     }
 }
 
 /// Alpha-beta at the root, as `alpha_beta` describes, counting in `counter`: `None` if the budget
-/// ran out. The decision's `nodes` are `counter.nodes` at the end.
-fn root_alpha_beta(
-    board: &Board,
-    side: Color,
-    weights: Weights,
-    depth: u32,
-    counter: &mut Counter,
-) -> Option<Decision> {
+/// ran out. The decision's `nodes` and `q_nodes` are the counter's at the end.
+fn root_alpha_beta(board: &Board, context: &Context, counter: &mut Counter) -> Option<Decision> {
+    let side = context.root;
     let mut best = f64::NEG_INFINITY;
     let mut candidates = Vec::new();
     for mv in board.legal_moves(side) {
@@ -239,11 +332,9 @@ fn root_alpha_beta(
         let u = bounded_value(
             &after,
             side.opponent(),
-            side,
-            weights,
-            depth - 1,
             1,
             (alpha, f64::INFINITY),
+            context,
             counter,
         )?;
         best = best.max(u);
@@ -254,47 +345,30 @@ fn root_alpha_beta(
             mv,
         });
     }
-    Some(Decision::new(candidates, counter.nodes))
+    Some(Decision::new(candidates, counter.nodes, counter.q_nodes))
 }
 
-/// The minimax value for `root` of `board` at ply `ply`, with `to_move` to move and `depth` plies
-/// left to search. Counts `board` in `nodes`.
-fn value(
-    board: &Board,
-    to_move: Color,
-    root: Color,
-    weights: Weights,
-    depth: u32,
-    ply: u32,
-    nodes: &mut u64,
-) -> f64 {
-    *nodes += 1;
+/// The minimax value for the root side of `board` at ply `ply` (the root is ply 0), with `to_move`
+/// to move. Counts `board` in `counter`.
+fn value(board: &Board, to_move: Color, ply: u32, context: &Context, counter: &mut Counter) -> f64 {
+    counter.visit(ply, context).expect("minimax has no budget");
     let moves = board.legal_moves(to_move);
     if moves.is_empty() {
-        let win = WIN - f64::from(ply - 1);
-        return if to_move == root { -win } else { win };
+        return context.no_move_value(to_move, ply);
     }
-    if depth == 0 {
-        let others = board.legal_moves(to_move.opponent()).len();
-        let (ours, theirs) = if to_move == root {
-            (moves.len(), others)
-        } else {
-            (others, moves.len())
-        };
-        return Features::leaf(board, root, ours, theirs).u(weights);
+    if context.is_leaf(ply, &moves) {
+        return context.leaf_value(board, to_move, &moves);
     }
     let children = moves.iter().map(|mv| {
         value(
             &board.apply(mv),
             to_move.opponent(),
-            root,
-            weights,
-            depth - 1,
             ply + 1,
-            nodes,
+            context,
+            counter,
         )
     });
-    if to_move == root {
+    if to_move == context.root {
         children.fold(f64::NEG_INFINITY, f64::max)
     } else {
         children.fold(f64::INFINITY, f64::min)
@@ -305,34 +379,24 @@ fn value(
 /// inside the window is the exact minimax value; a result `<= alpha` is an upper bound of it and a
 /// result `>= beta` a lower bound. Counts every board it visits in `counter`, as `value` does, and
 /// gives `None` as soon as the counter's budget runs out.
-#[allow(clippy::too_many_arguments)]
 fn bounded_value(
     board: &Board,
     to_move: Color,
-    root: Color,
-    weights: Weights,
-    depth: u32,
     ply: u32,
     (mut alpha, mut beta): (f64, f64),
+    context: &Context,
     counter: &mut Counter,
 ) -> Option<f64> {
-    counter.visit()?;
+    counter.visit(ply, context)?;
     let moves = board.legal_moves(to_move);
     if moves.is_empty() {
-        let win = WIN - f64::from(ply - 1);
-        return Some(if to_move == root { -win } else { win });
+        return Some(context.no_move_value(to_move, ply));
     }
-    if depth == 0 {
+    if context.is_leaf(ply, &moves) {
         counter.horizon = true;
-        let others = board.legal_moves(to_move.opponent()).len();
-        let (ours, theirs) = if to_move == root {
-            (moves.len(), others)
-        } else {
-            (others, moves.len())
-        };
-        return Some(Features::leaf(board, root, ours, theirs).u(weights));
+        return Some(context.leaf_value(board, to_move, &moves));
     }
-    let maximising = to_move == root;
+    let maximising = to_move == context.root;
     let mut best = if maximising {
         f64::NEG_INFINITY
     } else {
@@ -342,11 +406,9 @@ fn bounded_value(
         let v = bounded_value(
             &board.apply(mv),
             to_move.opponent(),
-            root,
-            weights,
-            depth - 1,
             ply + 1,
             (alpha, beta),
+            context,
             counter,
         )?;
         if maximising {
@@ -365,7 +427,7 @@ fn bounded_value(
 
 impl Decision {
     /// A decision over `candidates`: `top` holds the ones within `U_EPSILON` of the highest U.
-    fn new(candidates: Vec<Candidate>, nodes: u64) -> Decision {
+    fn new(candidates: Vec<Candidate>, nodes: u64, q_nodes: u64) -> Decision {
         // f64 has no total order (NaN), so the highest U is a fold rather than `max()`.
         let best = candidates
             .iter()
@@ -378,6 +440,7 @@ impl Decision {
             candidates,
             top,
             nodes,
+            q_nodes,
         }
     }
 
@@ -428,6 +491,7 @@ mod tests {
         Decision {
             top: (0..candidates.len()).collect(),
             nodes: candidates.len() as u64,
+            q_nodes: 0,
             candidates,
         }
     }

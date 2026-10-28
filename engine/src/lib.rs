@@ -30,7 +30,7 @@ pub use movegen::Move;
 pub use perft::perft;
 pub use rng::Mulberry32;
 pub use search::{
-    Candidate, Decision, Deepening, Limits, MAX_ID_DEPTH, alpha_beta, decide, iterative_deepening,
-    minimax,
+    Candidate, Decision, Deepening, Limits, MAX_ID_DEPTH, alpha_beta, alpha_beta_q, decide,
+    iterative_deepening, minimax, minimax_q,
 };
 pub use square::Square;

@@ -79,7 +79,7 @@ fn same_choice(a: &Decision, b: &Decision) -> bool {
 fn same_decisions_as_alpha_beta_at(max: u32) {
     let mut errors = Vec::new();
     for (label, board, side, weights) in positions() {
-        let id = iterative_deepening(&board, side, weights, depth(max));
+        let id = iterative_deepening(&board, side, weights, depth(max), false);
         let ab = alpha_beta(&board, side, weights, max);
         if !same_choice(&id.decision, &ab) {
             errors.push(format!(
@@ -128,8 +128,8 @@ fn a_node_budget_is_kept_and_buys_depth() {
         let first = alpha_beta(&board, side, weights, 1).nodes;
         let mut deepest = 0;
         for budget in [50, 300, 2000, 8000] {
-            let id = iterative_deepening(&board, side, weights, nodes(budget));
-            let again = iterative_deepening(&board, side, weights, nodes(budget));
+            let id = iterative_deepening(&board, side, weights, nodes(budget), false);
+            let again = iterative_deepening(&board, side, weights, nodes(budget), false);
             let what = format!("{label}, budget {budget}");
             if id.decision.nodes > budget.max(first) {
                 errors.push(format!("{what}: spent {} nodes", id.decision.nodes));
@@ -156,7 +156,7 @@ fn a_time_limit_always_gives_a_decision() {
         time: Some(Duration::from_millis(1)),
         ..Limits::default()
     };
-    let id = iterative_deepening(&board, Color::White, Weights::TUNED, limits);
+    let id = iterative_deepening(&board, Color::White, Weights::TUNED, limits, false);
     assert!(id.depth >= 1);
     assert!(!id.decision.top.is_empty());
     // A time limit that is never reached changes nothing.
@@ -165,7 +165,7 @@ fn a_time_limit_always_gives_a_decision() {
         time: Some(Duration::from_secs(3600)),
         ..Limits::default()
     };
-    let id = iterative_deepening(&board, Color::White, Weights::TUNED, limits);
+    let id = iterative_deepening(&board, Color::White, Weights::TUNED, limits, false);
     assert_eq!(id.depth, 3);
     assert!(same_choice(
         &id.decision,
@@ -180,8 +180,14 @@ fn deepening_stops_when_every_line_has_ended() {
     let board: Board = "......../......../......../...b..../...w..../......../......../W......."
         .parse()
         .unwrap();
-    let id = iterative_deepening(&board, Color::White, Weights::TUNED, depth(10));
+    let id = iterative_deepening(&board, Color::White, Weights::TUNED, depth(10), false);
     assert_eq!((id.depth, id.decision.nodes), (1, 1));
-    let id = iterative_deepening(&board, Color::White, Weights::TUNED, nodes(1_000_000));
+    let id = iterative_deepening(
+        &board,
+        Color::White,
+        Weights::TUNED,
+        nodes(1_000_000),
+        false,
+    );
     assert_eq!((id.depth, id.decision.nodes), (1, 1));
 }
