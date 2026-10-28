@@ -37,7 +37,8 @@ match kish 1.1.2, and every number in our Assignment 3 talk came from it.
 - Texel tuning: `cargo run --release -p cli -- texel --seed 1 --threads 6` plays a paired round robin (default
   idqr:n2000, idq:n2000, ab3q, tuned, 500 games each), fits K and then the weights with man = 1 on the quiet
   positions, and prints the errors on training and validation (every fifth pair) and the weights. The data set
-  is not stored; the command and seed make it again. `texel1` in `eval.rs` came from this run
+  is not stored; the command and seed make it again. `texel1` in `eval.rs` came from this run; it beats the tuned
+  weights clearly (SPRT H1 at n2000 and n20000, docs/decisions.md, with an ablation of each weight)
 - Regenerate testdata (only when I ask): `node reference/js/make_testdata.js`
 
 ## Rules (TÜDAF): the parts that are easy to get wrong
