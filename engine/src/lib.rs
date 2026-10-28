@@ -40,6 +40,6 @@ pub use search::{
 pub use sprt::{Pentanomial, Sprt, SprtResult, Verdict, elo_of, expected_score};
 pub use square::Square;
 pub use texel::{
-    N_WEIGHTS, STEPS, Sample, Tuning, features_of, fit_k, from_array, is_validation, mse,
-    samples_of, to_array, tune, value,
+    DataSet, N_WEIGHTS, STEPS, Sample, Tuning, features_of, fit_k, from_array, is_validation, mse,
+    quiet_positions, samples_of, to_array, tune, value,
 };

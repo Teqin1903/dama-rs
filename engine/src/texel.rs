@@ -71,29 +71,22 @@ pub fn value(features: &[f64; N_WEIGHTS], w: &[f64; N_WEIGHTS]) -> f64 {
     features.iter().zip(w).map(|(f, w)| f * w).sum()
 }
 
-/// The positions of a game worth learning from, each once: from ply `skip_plies` on (the random
-/// opening plies are not the agents' choice), only quiet ones (the side to move has no capture;
-/// with one, the value would change before the position settles, which the search's quiescence
-/// never scores either), and only while both sides have a legal move.
-pub fn samples_of(game: &GameRecord, skip_plies: usize) -> Vec<Sample> {
-    let result = match game.winner {
-        Some(Color::White) => 1.0,
-        Some(Color::Black) => 0.0,
-        None => 0.5,
-    };
+/// The positions of a game worth learning from, each once, with the side to move: from ply
+/// `skip_plies` on (the random opening plies are not the agents' choice), only quiet ones (the
+/// side to move has no capture; with one, the value would change before the position settles,
+/// which the search's quiescence never scores either), and only while both sides have a legal
+/// move.
+pub fn quiet_positions(game: &GameRecord, skip_plies: usize) -> Vec<(Board, Color)> {
     let (mut board, mut side) = (Board::start(), Color::White);
     let mut seen = HashSet::new();
-    let mut samples = Vec::new();
+    let mut positions = Vec::new();
     // The position before every move, and the last one.
     for ply in 0..=game.moves.len() {
         if ply >= skip_plies && seen.insert((board, side)) {
             let ours = board.legal_moves(side);
             let quiet = !ours.is_empty() && !ours.iter().any(|mv| mv.is_capture());
             if quiet && !board.legal_moves(side.opponent()).is_empty() {
-                samples.push(Sample {
-                    features: features_of(&board),
-                    result,
-                });
+                positions.push((board, side));
             }
         }
         if let Some(mv) = game.moves.get(ply) {
@@ -101,13 +94,73 @@ pub fn samples_of(game: &GameRecord, skip_plies: usize) -> Vec<Sample> {
             side = side.opponent();
         }
     }
-    samples
+    positions
+}
+
+/// The `quiet_positions` of a game as samples, labelled with the game's result for White.
+pub fn samples_of(game: &GameRecord, skip_plies: usize) -> Vec<Sample> {
+    let result = match game.winner {
+        Some(Color::White) => 1.0,
+        Some(Color::Black) => 0.0,
+        None => 0.5,
+    };
+    quiet_positions(game, skip_plies)
+        .iter()
+        .map(|(board, _)| Sample {
+            features: features_of(board),
+            result,
+        })
+        .collect()
 }
 
 /// Whether game `game` of a paired match (counted from 0) belongs to the validation set: every
 /// fifth pair. The two games of a pair share their opening, so they go to the same set.
 pub fn is_validation(game: usize) -> bool {
     (game / 2) % 5 == 4
+}
+
+/// The samples of whole games, split into a training and a validation set game by game: every
+/// game goes with all its positions to the set `is_validation` names for it, so no game is in
+/// both. The same position can still come up in games of both sets; `shared` counts those.
+#[derive(Debug, Default)]
+pub struct DataSet {
+    pub train: Vec<Sample>,
+    pub validation: Vec<Sample>,
+    /// The games in each set: training, validation.
+    pub games: [usize; 2],
+    /// The distinct positions (board, side to move) of each set's games.
+    positions: [HashSet<(Board, Color)>; 2],
+}
+
+impl DataSet {
+    /// Adds the games of a paired match, in the order of its schedule, from ply `skip_plies` on.
+    pub fn add_match<'a>(
+        &mut self,
+        games: impl IntoIterator<Item = &'a GameRecord>,
+        skip_plies: usize,
+    ) {
+        for (g, game) in games.into_iter().enumerate() {
+            let set = usize::from(is_validation(g));
+            let samples = samples_of(game, skip_plies);
+            self.positions[set].extend(quiet_positions(game, skip_plies));
+            self.games[set] += 1;
+            if set == 1 {
+                self.validation.extend(samples);
+            } else {
+                self.train.extend(samples);
+            }
+        }
+    }
+
+    /// The distinct validation positions that come up in a training game too.
+    pub fn shared(&self) -> usize {
+        self.positions[1].intersection(&self.positions[0]).count()
+    }
+
+    /// The distinct positions of the validation games.
+    pub fn validation_positions(&self) -> usize {
+        self.positions[1].len()
+    }
 }
 
 /// 1 / (1 + e^−x).

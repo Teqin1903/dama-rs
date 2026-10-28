@@ -7,8 +7,8 @@
 mod common;
 
 use engine::{
-    Board, Color, EndReason, Features, GameRecord, Sample, Weights, evaluate, features_of, fit_k,
-    mse, samples_of, to_array, tune, value,
+    Board, Color, DataSet, EndReason, Features, GameRecord, Sample, Weights, evaluate, features_of,
+    fit_k, is_validation, mse, quiet_positions, samples_of, to_array, tune, value,
 };
 
 /// The 541 fixed positions of decisions.json and movegen.json in which both sides have a legal
@@ -152,4 +152,82 @@ fn the_fit_finds_known_weights_and_k_again() {
         ..Weights::TUNED
     };
     assert_eq!(tune(&samples, &half_man, k, &["man"]).weights.man, 0.5);
+}
+
+#[test]
+fn the_fixed_weights_stay_where_they_start() {
+    let k = 0.8;
+    let truth = to_array(&SOME);
+    let samples: Vec<Sample> = positions()
+        .iter()
+        .map(|board| {
+            let features = features_of(board);
+            let result = 1.0 / (1.0 + (-k * value(&features, &truth)).exp());
+            Sample { features, result }
+        })
+        .collect();
+    // Every weight but these would move towards SOME.
+    let start = Weights {
+        qmob: 0.0,
+        back: 0.0,
+        ..Weights::TUNED
+    };
+    let fixed = ["man", "qmob", "back"];
+    let found = tune(&samples, &start, k, &fixed).weights;
+    for key in Weights::KEYS {
+        if fixed.contains(&key) {
+            assert_eq!(found.get(key), start.get(key), "{key}");
+        }
+    }
+    assert_ne!(found.king, start.king);
+    assert_ne!(found.cen, start.cen);
+}
+
+#[test]
+fn the_samples_are_the_quiet_positions() {
+    let game = first_move_game(60);
+    let positions = quiet_positions(&game, 8);
+    let samples = samples_of(&game, 8);
+    assert_eq!(positions.len(), samples.len());
+    for ((board, side), sample) in positions.iter().zip(&samples) {
+        assert_eq!(sample.features, features_of(board));
+        assert!(board.legal_moves(*side).iter().all(|mv| !mv.is_capture()));
+    }
+}
+
+#[test]
+fn the_split_takes_whole_games() {
+    // Games of different lengths and results, each with its own number of samples.
+    let games: Vec<GameRecord> = (0..40)
+        .map(|g| GameRecord {
+            winner: [Some(Color::White), None, Some(Color::Black)][g % 3],
+            ..first_move_game(20 + g)
+        })
+        .collect();
+    let mut data = DataSet::default();
+    data.add_match(&games, 8);
+    data.add_match(&games[..12], 8);
+    let (mut train, mut validation) = (Vec::new(), Vec::new());
+    for (g, game) in games
+        .iter()
+        .enumerate()
+        .chain(games[..12].iter().enumerate())
+    {
+        let samples = samples_of(game, 8);
+        // A pair's two games go to the same set.
+        assert_eq!(is_validation(g), is_validation(g ^ 1));
+        if is_validation(g) {
+            validation.extend(samples);
+        } else {
+            train.extend(samples);
+        }
+    }
+    // Each game's samples are in exactly one set, in the order of the games.
+    assert_eq!(data.train, train);
+    assert_eq!(data.validation, validation);
+    // Validation: games 8, 9, 18, 19, 28, 29, 38, 39 of the first match, 8 and 9 of the second.
+    assert_eq!(data.games, [42, 10]);
+    // The first-move games share their first plies, so validation positions recur in training.
+    assert!(data.shared() > 0);
+    assert!(data.shared() <= data.validation_positions());
 }
