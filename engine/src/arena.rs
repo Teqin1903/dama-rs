@@ -6,26 +6,43 @@
 //! move.
 //!
 //! The seeds of a match are ours (docs/reference.md only asks for "the same seeds for every
-//! pairing"):
+//! pairing"). There are two schedules:
 //!
 //! ```text
-//! seeds = Mulberry32::new(seed)                          one generator per match
-//! game g:  opening = Mulberry32::new(seeds.next_u32())   the random opening plies
-//!          a.new_game(seeds.next_u32())                  agent A's own random numbers
-//!          b.new_game(seeds.next_u32())                  agent B's own random numbers
-//!          A plays White in even games and Black in odd games
+//! Legacy (2 random opening plies), the schedule of every match before the paired one:
+//!   seeds = Mulberry32::new(seed)                          one generator per match
+//!   game g:  opening = Mulberry32::new(seeds.next_u32())   the random opening plies
+//!            a.new_game(seeds.next_u32())                  agent A's own random numbers
+//!            b.new_game(seeds.next_u32())                  agent B's own random numbers
+//!            A plays White in even games and Black in odd games
+//!
+//! Paired (4 random opening plies): game g's seeds come from (seed, g) alone
+//!   game g:  opening = Mulberry32::new(derive_seed(seed, OPENING, g / 2))
+//!            a.new_game(derive_seed(seed, AGENT_A, g))
+//!            b.new_game(derive_seed(seed, AGENT_B, g))
+//!            A plays White in even games and Black in odd games
 //! ```
 //!
-//! Game g thus gets the same seeds in every pairing and in a match of any length.
+//! In both, game g gets the same seeds in every pairing and in a match of any length. The paired
+//! schedule plays each opening twice, games 2p and 2p + 1, with the colours swapped: the opening
+//! plies are drawn by the arena, not the agents, so the same seed gives the same opening.
+//!
+//! The seeds of every game are fixed before the first game starts, and every agent is reseeded at
+//! the start of a game, so a game does not depend on the games played before it: the games of a
+//! match can be played by several threads, in any order, with the same result.
 
 use std::collections::HashMap;
 use std::fmt;
+use std::ops::AddAssign;
+use std::str::FromStr;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::thread;
 use std::time::{Duration, Instant};
 
 use crate::agent::{Agent, AgentError};
 use crate::board::{Board, Color};
 use crate::movegen::Move;
-use crate::rng::Mulberry32;
+use crate::rng::{Mulberry32, derive_seed};
 
 /// A game is drawn when a position occurs for this many times, with the same side to move.
 const REPETITIONS: u32 = 3;
@@ -49,6 +66,93 @@ impl MatchSettings {
         opening_plies: 2,
         max_plies: 400,
     };
+
+    /// The settings of the paired schedule: 4 random opening plies, a draw at ply 400.
+    pub const PAIRED: MatchSettings = MatchSettings {
+        opening_plies: 4,
+        max_plies: 400,
+    };
+}
+
+/// How the games of a match get their seeds, openings and colours (see the module documentation).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Schedule {
+    /// One generator for the whole match, 2 random opening plies: the matches of
+    /// results/arena.csv before the paired schedule, and of `bench/playgame_log.js`.
+    Legacy,
+    /// Seeds from (seed, game), 4 random opening plies, every opening played twice with the
+    /// colours swapped.
+    Paired,
+}
+
+/// The streams of `derive_seed` in the paired schedule.
+const OPENING: u32 = 1;
+const AGENT_A: u32 = 2;
+const AGENT_B: u32 = 3;
+
+impl Schedule {
+    /// The match settings that go with the schedule.
+    pub fn settings(self) -> MatchSettings {
+        match self {
+            Schedule::Legacy => MatchSettings::REFERENCE,
+            Schedule::Paired => MatchSettings::PAIRED,
+        }
+    }
+
+    /// The seeds of games 0 to `games - 1`.
+    fn game_seeds(self, seed: u32, games: u32) -> Vec<GameSeeds> {
+        match self {
+            Schedule::Legacy => {
+                let mut seeds = Mulberry32::new(seed);
+                (0..games)
+                    .map(|g| GameSeeds {
+                        opening: seeds.next_u32(),
+                        a: seeds.next_u32(),
+                        b: seeds.next_u32(),
+                        a_white: g % 2 == 0,
+                    })
+                    .collect()
+            }
+            Schedule::Paired => (0..games)
+                .map(|g| GameSeeds {
+                    opening: derive_seed(seed, OPENING, g / 2),
+                    a: derive_seed(seed, AGENT_A, g),
+                    b: derive_seed(seed, AGENT_B, g),
+                    a_white: g % 2 == 0,
+                })
+                .collect(),
+        }
+    }
+}
+
+impl fmt::Display for Schedule {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            Schedule::Legacy => "legacy",
+            Schedule::Paired => "paired",
+        })
+    }
+}
+
+impl FromStr for Schedule {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Schedule, String> {
+        match s {
+            "legacy" => Ok(Schedule::Legacy),
+            "paired" => Ok(Schedule::Paired),
+            _ => Err(format!("unknown schedule {s:?}: expected legacy or paired")),
+        }
+    }
+}
+
+/// The seeds and colours of one game of a match.
+#[derive(Clone, Copy, Debug)]
+struct GameSeeds {
+    opening: u32,
+    a: u32,
+    b: u32,
+    a_white: bool,
 }
 
 /// Why a game ended.
@@ -190,6 +294,15 @@ impl Thinking {
     }
 }
 
+/// `+=` adds up the thinking of an agent in several threads.
+impl AddAssign for Thinking {
+    fn add_assign(&mut self, other: Thinking) {
+        self.moves += other.moves;
+        self.time += other.time;
+        self.nodes += other.nodes;
+    }
+}
+
 /// An agent with a stopwatch and a node counter around `choose`.
 struct Timed<'a> {
     agent: &'a mut dyn Agent,
@@ -309,49 +422,149 @@ impl MatchRecord {
     }
 }
 
-/// Plays `games` games between agents A and B from the start position, with the seeds that the
-/// module documentation describes: A plays White in even games.
+/// Builds a fresh agent. Every thread of a match builds its own agents with it, so the factory is
+/// shared between threads (`Sync`) while the agents are not.
+pub type AgentFactory<'f> = dyn Fn() -> Box<dyn Agent> + Sync + 'f;
+
+/// What a match is: how many games, the seed, the schedule, and how many threads play them.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct MatchPlan {
+    /// The number of games; even for the paired schedule.
+    pub games: u32,
+    pub seed: u32,
+    pub schedule: Schedule,
+    /// The threads that play the games at the same time (at least 1). The games, and so the
+    /// result, are the same with any number of threads; the time per move is not.
+    pub threads: usize,
+}
+
+/// The games one thread played, with its agents' thinking, or the first error it met.
+#[derive(Default)]
+struct Played {
+    games: Vec<(usize, MatchGame)>,
+    error: Option<(usize, AgentError)>,
+    a: Thinking,
+    b: Thinking,
+}
+
+/// Plays the games of `plan` between agents A and B from the start position, with the seeds and
+/// colours of its schedule (see the module documentation). If an agent fails, the other threads
+/// stop after their current game, and the error of the earliest failed game is returned.
+///
+/// # Panics
+/// If the paired schedule is asked for an odd number of games, or for 0 threads.
 pub fn play_match(
-    a: &mut dyn Agent,
-    b: &mut dyn Agent,
-    games: u32,
-    seed: u32,
-    settings: &MatchSettings,
+    a: &AgentFactory,
+    b: &AgentFactory,
+    plan: &MatchPlan,
 ) -> Result<MatchRecord, AgentError> {
+    assert!(
+        plan.schedule != Schedule::Paired || plan.games.is_multiple_of(2),
+        "the paired schedule plays every opening twice: an even number of games"
+    );
+    assert!(plan.threads >= 1, "a match needs at least one thread");
+    let seeds = plan.schedule.game_seeds(plan.seed, plan.games);
+    let settings = plan.schedule.settings();
+    let next = AtomicUsize::new(0);
+    let failed = AtomicBool::new(false);
+    let threads = plan.threads.min(seeds.len()).max(1);
+    // `thread::scope` waits for every thread it spawned before it returns, so the threads may
+    // borrow `seeds`, `next` and `failed` from this function.
+    let parts: Vec<Played> = thread::scope(|scope| {
+        let workers: Vec<_> = (0..threads)
+            .map(|_| scope.spawn(|| play_games(a, b, &seeds, &next, &failed, &settings)))
+            .collect();
+        workers
+            .into_iter()
+            .map(|worker| worker.join().expect("an arena thread panicked"))
+            .collect()
+    });
+    let mut games = Vec::with_capacity(seeds.len());
+    let (mut a_thinking, mut b_thinking) = (Thinking::default(), Thinking::default());
+    let mut error: Option<(usize, AgentError)> = None;
+    for part in parts {
+        games.extend(part.games);
+        a_thinking += part.a;
+        b_thinking += part.b;
+        if let Some((g, e)) = part.error
+            && error.as_ref().is_none_or(|(first, _)| g < *first)
+        {
+            error = Some((g, e));
+        }
+    }
+    if let Some((_, e)) = error {
+        return Err(e);
+    }
+    games.sort_by_key(|(g, _)| *g);
+    Ok(MatchRecord {
+        games: games.into_iter().map(|(_, game)| game).collect(),
+        a: a_thinking,
+        b: b_thinking,
+    })
+}
+
+/// One thread of `play_match`: takes the next unplayed game until there is none, or until a game
+/// anywhere has failed.
+fn play_games(
+    a: &AgentFactory,
+    b: &AgentFactory,
+    seeds: &[GameSeeds],
+    next: &AtomicUsize,
+    failed: &AtomicBool,
+    settings: &MatchSettings,
+) -> Played {
+    let (mut a_agent, mut b_agent) = (a(), b());
     let mut a = Timed {
-        agent: a,
+        agent: a_agent.as_mut(),
         thinking: Thinking::default(),
     };
     let mut b = Timed {
-        agent: b,
+        agent: b_agent.as_mut(),
         thinking: Thinking::default(),
     };
-    let mut seeds = Mulberry32::new(seed);
-    let mut played = Vec::new();
-    for g in 0..games {
-        let mut opening = Mulberry32::new(seeds.next_u32());
-        a.new_game(seeds.next_u32())?;
-        b.new_game(seeds.next_u32())?;
-        let a_white = g % 2 == 0;
-        let (white, black): (&mut dyn Agent, &mut dyn Agent) = if a_white {
-            (&mut a, &mut b)
-        } else {
-            (&mut b, &mut a)
+    let mut played = Played::default();
+    while !failed.load(Ordering::Relaxed) {
+        // `fetch_add` hands every game index to exactly one thread.
+        let g = next.fetch_add(1, Ordering::Relaxed);
+        let Some(game_seeds) = seeds.get(g) else {
+            break;
         };
-        let record = play_game(
-            Board::start(),
-            Color::White,
-            white,
-            black,
-            &mut opening,
-            settings,
-        )?;
-        played.push(MatchGame { a_white, record });
+        match play_one(&mut a, &mut b, game_seeds, settings) {
+            Ok(game) => played.games.push((g, game)),
+            Err(e) => {
+                failed.store(true, Ordering::Relaxed);
+                played.error = Some((g, e));
+            }
+        }
     }
-    Ok(MatchRecord {
-        games: played,
-        a: a.thinking,
-        b: b.thinking,
+    played.a = a.thinking;
+    played.b = b.thinking;
+    played
+}
+
+/// One game of a match from the start position, with these seeds and colours.
+fn play_one(
+    a: &mut dyn Agent,
+    b: &mut dyn Agent,
+    seeds: &GameSeeds,
+    settings: &MatchSettings,
+) -> Result<MatchGame, AgentError> {
+    let mut opening = Mulberry32::new(seeds.opening);
+    a.new_game(seeds.a)?;
+    b.new_game(seeds.b)?;
+    let (white, black): (&mut dyn Agent, &mut dyn Agent) =
+        if seeds.a_white { (a, b) } else { (b, a) };
+    let record = play_game(
+        Board::start(),
+        Color::White,
+        white,
+        black,
+        &mut opening,
+        settings,
+    )?;
+    Ok(MatchGame {
+        a_white: seeds.a_white,
+        record,
     })
 }
 

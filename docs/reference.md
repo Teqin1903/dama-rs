@@ -38,3 +38,8 @@ For every legal move, look at the board after the move (the opponent is to move)
 - Draw by threefold repetition, after 50 plies without a capture, when each side has one piece left, or at ply 400.
 - Weight-landscape experiments: 200 games per pairing, colours alternate, 2 random opening plies,
   the same seeds for every pairing.
+- `dama arena` has two schedules (seeds in `engine/src/arena.rs`). `legacy` is the setting above, with one
+  generator per match: every row of `results/arena.csv` before the `schedule` column, and the games of
+  `bench/playgame_log.js`. `paired` (the default from then on): every game gets its own seeds from (seed, game),
+  4 random opening plies, and each opening is played twice with the colours swapped. Either can run on several
+  threads (`--threads`) with the same games; times per move count only from `--threads 1`.

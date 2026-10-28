@@ -42,3 +42,49 @@ impl Mulberry32 {
         (self.next_f64() * len as f64).floor() as usize
     }
 }
+
+/// The finaliser of MurmurHash3 (`fmix32`): a bijection on 32 bits in which every input bit
+/// changes about half of the output bits.
+const fn fmix32(mut h: u32) -> u32 {
+    h ^= h >> 16;
+    h = h.wrapping_mul(0x85EB_CA6B);
+    h ^= h >> 13;
+    h = h.wrapping_mul(0xC2B2_AE35);
+    h ^ (h >> 16)
+}
+
+/// A seed for item `index` of `stream`, made from `seed` alone: the arena gives game g its own
+/// seeds this way, so that no game depends on the games before it. Different streams (openings,
+/// agent A, agent B) keep the seeds of one item apart.
+pub const fn derive_seed(seed: u32, stream: u32, index: u32) -> u32 {
+    let h = fmix32(seed ^ stream.wrapping_mul(0x9E37_79B9));
+    fmix32(h ^ fmix32(index.wrapping_add(1)))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn fmix32_known_values() {
+        // MurmurHash3's finaliser maps 0 to 0; the others are from an independent JS version
+        // (Math.imul) of the same five lines.
+        assert_eq!(fmix32(0), 0);
+        assert_eq!(fmix32(1), 1364076727);
+        assert_eq!(derive_seed(1, 1, 0), 2896955211);
+        assert_eq!(derive_seed(1, 2, 0), 3020345282);
+        assert_eq!(derive_seed(1, 1, 1), 3643503889);
+        assert_eq!(derive_seed(u32::MAX, 3, 199), 28924130);
+    }
+
+    #[test]
+    fn derived_seeds_differ_across_streams_and_indices() {
+        let mut seen = std::collections::HashSet::new();
+        for stream in 1..=3 {
+            for index in 0..1000 {
+                assert!(seen.insert(derive_seed(1, stream, index)));
+            }
+        }
+        assert_ne!(derive_seed(1, 1, 0), derive_seed(2, 1, 0));
+    }
+}

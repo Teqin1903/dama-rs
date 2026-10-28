@@ -9,14 +9,18 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-use engine::{AgentSpec, Color, MatchRecord, MatchSettings, Thinking, play_match};
+use engine::{AgentSpec, Color, MatchPlan, MatchRecord, Schedule, Thinking, play_match};
 
 const HELP: &str = "\
-usage: dama arena <A> <B> [--games N] [--seed S] [--csv PATH] [--log PATH]
+usage: dama arena <A> <B> [--games N] [--seed S] [--schedule paired|legacy] [--threads T]
+                          [--csv PATH] [--log PATH]
 
-Plays N games between agents A and B from the start position. Colours alternate (A is White in
-even games), the first 2 plies of every game are random, and games end by the rules of
-docs/reference.md. Prints the result from A's point of view and appends one row to the CSV file.
+Plays N games between agents A and B from the start position and ends them by the rules of
+docs/reference.md. With the paired schedule (the default) every game has its own seeds, the first
+4 plies are random, and each opening is played twice with the colours swapped (A is White in even
+games). The legacy schedule is that of every match before it: one generator for the match and 2
+random plies; it repeats the old rows of results/arena.csv and the games of bench/playgame_log.js.
+Prints the result from A's point of view and appends one row to the CSV file.
 
 agents:
   random            a random legal move
@@ -35,16 +39,21 @@ agents:
                     side to move must capture is searched on, captures only, until it is quiet
 
 options:
-  --games N         the number of games (default 200)
+  --games N         the number of games, even for the paired schedule (default 200)
   --seed S          the seed of the match, 0 to 4294967295 (default 1)
+  --schedule NAME   paired or legacy (default paired)
+  --threads T       play T games at the same time (default 1). The games are the same with any
+                    T, the time per move is not: it is a measurement only with --threads 1, and
+                    the CSV row leaves it empty otherwise
   --csv PATH        the CSV file to append the row to (default results/arena.csv)
   --log PATH        also write every game with its moves to PATH, one TSV line per game
 ";
 
-/// The columns of the CSV file, one row per run.
+/// The columns of the CSV file, one row per run. `a_us_per_move` and `b_us_per_move` are empty
+/// when `threads` is more than 1; `wall_s` is the time of the whole match.
 const CSV_HEADER: &str = "date,version,build,a,b,games,seed,wins,draws,losses,score_pct,se_pct,\
 mean_plies,a_us_per_move,b_us_per_move,repetition,no_move,one_piece_each,fifty_quiet,cap,\
-a_nodes_per_move,b_nodes_per_move";
+a_nodes_per_move,b_nodes_per_move,schedule,opening_plies,threads,wall_s";
 
 /// Debug builds are many times slower: the times per move of a debug build are not measurements.
 const BUILD: &str = if cfg!(debug_assertions) {
@@ -60,8 +69,21 @@ struct Args {
     b: AgentSpec,
     games: u32,
     seed: u32,
+    schedule: Schedule,
+    threads: usize,
     csv: PathBuf,
     log: Option<PathBuf>,
+}
+
+impl Args {
+    fn plan(&self) -> MatchPlan {
+        MatchPlan {
+            games: self.games,
+            seed: self.seed,
+            schedule: self.schedule,
+            threads: self.threads,
+        }
+    }
 }
 
 /// Runs `dama arena` with the arguments that follow `arena`.
@@ -90,7 +112,8 @@ pub fn main(args: impl Iterator<Item = String>) -> ExitCode {
 fn parse_args(args: impl IntoIterator<Item = String>) -> Result<Option<Args>, String> {
     let mut args = args.into_iter();
     let mut agents = Vec::new();
-    let (mut games, mut seed) = (200, 1);
+    let (mut games, mut seed): (u32, u32) = (200, 1);
+    let (mut schedule, mut threads) = (Schedule::Paired, 1);
     let mut csv = PathBuf::from("results/arena.csv");
     let mut log = None;
     while let Some(arg) = args.next() {
@@ -115,6 +138,14 @@ fn parse_args(args: impl IntoIterator<Item = String>) -> Result<Option<Args>, St
                     .parse()
                     .map_err(|_| format!("--seed {value}: expected 0 to 4294967295"))?;
             }
+            "--schedule" => schedule = value.parse().map_err(|e| format!("--schedule: {e}"))?,
+            "--threads" => {
+                threads = value
+                    .parse()
+                    .ok()
+                    .filter(|&n| n > 0)
+                    .ok_or(format!("--threads {value}: expected a number of threads"))?;
+            }
             "--csv" => csv = PathBuf::from(value),
             "--log" => log = Some(PathBuf::from(value)),
             _ => return Err(format!("unknown option {arg}")),
@@ -123,11 +154,19 @@ fn parse_args(args: impl IntoIterator<Item = String>) -> Result<Option<Args>, St
     let [a, b]: [AgentSpec; 2] = agents
         .try_into()
         .map_err(|agents: Vec<_>| format!("expected two agents, found {}", agents.len()))?;
+    if schedule == Schedule::Paired && !games.is_multiple_of(2) {
+        return Err(format!(
+            "--games {games}: the paired schedule plays every opening twice, so it needs an even \
+             number of games"
+        ));
+    }
     Ok(Some(Args {
         a,
         b,
         games,
         seed,
+        schedule,
+        threads,
         csv,
         log,
     }))
@@ -136,15 +175,10 @@ fn parse_args(args: impl IntoIterator<Item = String>) -> Result<Option<Args>, St
 /// Plays the match, prints the report, writes the log if asked and appends the CSV row.
 /// `Box<dyn Error>` holds any error: an agent's, or one from the file system.
 fn run(args: &Args) -> Result<(), Box<dyn Error>> {
-    let (mut a, mut b) = (args.a.build(), args.b.build());
+    // Each thread of the match builds its own agents with these closures.
+    let (make_a, make_b) = (|| args.a.build(), || args.b.build());
     let started = Instant::now();
-    let record = play_match(
-        a.as_mut(),
-        b.as_mut(),
-        args.games,
-        args.seed,
-        &MatchSettings::REFERENCE,
-    )?;
+    let record = play_match(&make_a, &make_b, &args.plan())?;
     let elapsed = started.elapsed();
     let version = code_version().unwrap_or_else(|| {
         eprintln!("dama arena: warning: no version from git; writing \"unknown\"");
@@ -155,7 +189,7 @@ fn run(args: &Args) -> Result<(), Box<dyn Error>> {
         write_log(path, args, &record)?;
         println!("  games written to {}", path.display());
     }
-    let row = csv_row(&utc(unix_now()), &version, BUILD, args, &record);
+    let row = csv_row(&utc(unix_now()), &version, BUILD, args, &record, elapsed);
     append_csv(&args.csv, &row)?;
     println!("  appended to {}", args.csv.display());
     Ok(())
@@ -195,6 +229,22 @@ fn report(args: &Args, record: &MatchRecord, version: &str, elapsed: Duration) -
         Some(d) => format!("{} ({} moves)", duration(d), t.moves),
         None => "- (no moves)".to_string(),
     };
+    let timing = if args.threads > 1 {
+        format!(" ({} threads: not a measurement)", args.threads)
+    } else {
+        String::new()
+    };
+    let settings = args.schedule.settings();
+    let layout = match args.schedule {
+        Schedule::Legacy => format!(
+            "{} random opening plies, colours alternate",
+            settings.opening_plies
+        ),
+        Schedule::Paired => format!(
+            "openings of {} random plies, each played twice with the colours swapped",
+            settings.opening_plies
+        ),
+    };
     let nodes = |t: &Thinking| {
         t.nodes_per_move()
             .map_or("-".to_string(), |n| format!("{n:.1}"))
@@ -204,20 +254,19 @@ fn report(args: &Args, record: &MatchRecord, version: &str, elapsed: Duration) -
         .iter()
         .map(|(reason, n)| format!("{reason} {n}"))
         .collect();
-    let settings = MatchSettings::REFERENCE;
     format!(
-        "A {} vs B {}: {} games, seed {}, {} random opening plies, colours alternate\n\
+        "A {} vs B {}: {} games, seed {}, {} schedule: {layout}\n\
          \x20 A: +{wins} ={draws} -{losses}, score {}% (SE {})\n\
          \x20 plies per game: {}\n\
-         \x20 time per move: A {}, B {}\n\
+         \x20 time per move{timing}: A {}, B {}\n\
          \x20 nodes per move: A {}, B {}\n\
          \x20 endings: {}\n\
-         \x20 version {version} ({BUILD} build), {} in all\n",
+         \x20 version {version} ({BUILD} build), {} in all with {} thread{}\n",
         describe(&args.a),
         describe(&args.b),
         args.games,
         args.seed,
-        settings.opening_plies,
+        args.schedule,
         percent(record.score()),
         percent(record.standard_error()),
         record
@@ -229,6 +278,8 @@ fn report(args: &Args, record: &MatchRecord, version: &str, elapsed: Duration) -
         nodes(&record.b),
         endings.join(", "),
         duration(elapsed),
+        args.threads,
+        if args.threads == 1 { "" } else { "s" },
     )
 }
 
@@ -274,12 +325,23 @@ fn write_log(path: &Path, args: &Args, record: &MatchRecord) -> io::Result<()> {
 }
 
 /// One row of the CSV file; see `CSV_HEADER` for the columns.
-fn csv_row(date: &str, version: &str, build: &str, args: &Args, record: &MatchRecord) -> String {
+fn csv_row(
+    date: &str,
+    version: &str,
+    build: &str,
+    args: &Args,
+    record: &MatchRecord,
+    elapsed: Duration,
+) -> String {
     let (wins, draws, losses) = record.wins_draws_losses();
     let number = |x: Option<f64>, scale: f64, decimals: usize| {
         x.map_or(String::new(), |x| format!("{:.decimals$}", x * scale))
     };
-    let micros = |t: &Thinking| number(t.per_move().map(|d| d.as_secs_f64()), 1e6, 2);
+    // Threads that play at the same time slow each other down: no time per move then.
+    let micros = |t: &Thinking| {
+        let per_move = t.per_move().filter(|_| args.threads == 1);
+        number(per_move.map(|d| d.as_secs_f64()), 1e6, 2)
+    };
     let nodes = |t: &Thinking| number(t.nodes_per_move(), 1.0, 1);
     let endings: Vec<String> = record
         .endings()
@@ -305,6 +367,10 @@ fn csv_row(date: &str, version: &str, build: &str, args: &Args, record: &MatchRe
         endings.join(","),
         nodes(&record.a),
         nodes(&record.b),
+        args.schedule.to_string(),
+        args.schedule.settings().opening_plies.to_string(),
+        args.threads.to_string(),
+        format!("{:.1}", elapsed.as_secs_f64()),
     ];
     fields.join(",")
 }
@@ -415,9 +481,27 @@ mod tests {
                 b: AgentSpec::Random,
                 games: 200,
                 seed: 1,
+                schedule: Schedule::Paired,
+                threads: 1,
                 csv: PathBuf::from("results/arena.csv"),
                 log: None,
             }))
+        );
+        let args = parse(&[
+            "tuned",
+            "random",
+            "--schedule",
+            "legacy",
+            "--threads",
+            "6",
+            "--games",
+            "7",
+        ])
+        .unwrap()
+        .unwrap();
+        assert_eq!(
+            (args.schedule, args.threads, args.games),
+            (Schedule::Legacy, 6, 7)
         );
         let args = parse(&[
             "--games",
@@ -454,6 +538,9 @@ mod tests {
             &["tuned", "random", "--games", "-3"],
             &["tuned", "random", "--seed", "4294967296"],
             &["tuned", "random", "--sed", "1"],
+            &["tuned", "random", "--games", "7"],
+            &["tuned", "random", "--schedule", "pairs"],
+            &["tuned", "random", "--threads", "0"],
         ] {
             assert!(parse(args).is_err(), "{args:?} should be an error");
         }
@@ -485,19 +572,41 @@ mod tests {
         let args = parse(&["tuned", "u:1/2/0.2", "--games", "2"])
             .unwrap()
             .unwrap();
-        let row = csv_row(
-            "2026-10-25T00:00:00Z",
-            "baseline-1-gabc",
-            "release",
-            &args,
-            &record,
-        );
+        let row = |args: &Args| {
+            csv_row(
+                "2026-10-25T00:00:00Z",
+                "baseline-1-gabc",
+                "release",
+                args,
+                &record,
+                Duration::from_millis(12_340),
+            )
+        };
+        let one = row(&args);
         assert_eq!(
-            row,
+            one,
             "2026-10-25T00:00:00Z,baseline-1-gabc,release,tuned,u:1/2/0.2,2,1,1,1,0,75.00,25.00,\
-             40.0,2.50,,1,1,0,0,0,22.5,"
+             40.0,2.50,,1,1,0,0,0,22.5,,paired,4,1,12.3"
         );
-        assert_eq!(row.split(',').count(), CSV_HEADER.split(',').count());
+        assert_eq!(one.split(',').count(), CSV_HEADER.split(',').count());
+        // With several threads the time per move is left out.
+        let args = parse(&[
+            "tuned",
+            "u:1/2/0.2",
+            "--games",
+            "2",
+            "--schedule",
+            "legacy",
+            "--threads",
+            "6",
+        ])
+        .unwrap()
+        .unwrap();
+        assert_eq!(
+            row(&args),
+            "2026-10-25T00:00:00Z,baseline-1-gabc,release,tuned,u:1/2/0.2,2,1,1,1,0,75.00,25.00,\
+             40.0,,,1,1,0,0,0,22.5,,legacy,2,6,12.3"
+        );
     }
 
     #[test]

@@ -3,8 +3,8 @@
 //! outside the engine (an external program, later) would be played.
 
 use engine::{
-    Agent, AgentError, AgentSpec, Board, Color, EndReason, GameRecord, MatchSettings, Move,
-    Mulberry32, play_game, play_match,
+    Agent, AgentError, AgentSpec, Board, Color, EndReason, GameRecord, MatchGame, MatchPlan,
+    MatchSettings, Move, Mulberry32, Schedule, play_game, play_match,
 };
 
 /// Plays a script of moves, in order, by their notation. A move that is not legal is an error, so
@@ -249,18 +249,35 @@ fn spec(name: &str) -> AgentSpec {
     name.parse().unwrap()
 }
 
-/// A match between the agents named `a` and `b`.
-fn match_games(a: &str, b: &str, games: u32, seed: u32) -> Vec<engine::MatchGame> {
-    let (mut a, mut b) = (spec(a).build(), spec(b).build());
-    play_match(
-        a.as_mut(),
-        b.as_mut(),
+/// A match between the agents named `a` and `b` with this schedule and number of threads.
+fn scheduled(
+    a: &str,
+    b: &str,
+    games: u32,
+    seed: u32,
+    schedule: Schedule,
+    threads: usize,
+) -> Vec<MatchGame> {
+    let (a, b) = (spec(a), spec(b));
+    let plan = MatchPlan {
         games,
         seed,
-        &MatchSettings::REFERENCE,
-    )
-    .unwrap()
-    .games
+        schedule,
+        threads,
+    };
+    play_match(&|| a.build(), &|| b.build(), &plan)
+        .unwrap()
+        .games
+}
+
+/// A match between the agents named `a` and `b` with the legacy schedule, in one thread.
+fn match_games(a: &str, b: &str, games: u32, seed: u32) -> Vec<MatchGame> {
+    scheduled(a, b, games, seed, Schedule::Legacy, 1)
+}
+
+/// The same with the paired schedule.
+fn paired(a: &str, b: &str, games: u32, seed: u32) -> Vec<MatchGame> {
+    scheduled(a, b, games, seed, Schedule::Paired, 1)
 }
 
 #[test]
@@ -340,4 +357,104 @@ fn iterative_deepening_with_quiescence_plays_the_games_of_ab3q() {
         match_games("idq:d3", "tuned", 20, 1),
         match_games("ab3q", "tuned", 20, 1)
     );
+}
+
+#[test]
+fn the_legacy_schedule_has_the_settings_of_every_match_before_it() {
+    assert_eq!(Schedule::Legacy.settings(), MatchSettings::REFERENCE);
+    assert_eq!(MatchSettings::REFERENCE.opening_plies, 2);
+    assert_eq!(Schedule::Paired.settings().opening_plies, 4);
+}
+
+#[test]
+fn paired_games_play_each_opening_twice_with_the_colours_swapped() {
+    let games = paired("random", "random", 8, 3);
+    let a_white: Vec<bool> = games.iter().map(|g| g.a_white).collect();
+    assert_eq!(
+        a_white,
+        [true, false, true, false, true, false, true, false]
+    );
+    let openings: Vec<Vec<String>> = games
+        .iter()
+        .map(|g| notations(&g.record.moves[..4]))
+        .collect();
+    for pair in openings.chunks(2) {
+        assert_eq!(pair[0], pair[1]);
+    }
+    assert_ne!(openings[0], openings[2]);
+    // The agents' own random numbers are not those of the other game of the pair.
+    assert_ne!(games[0].record.moves, games[1].record.moves);
+}
+
+#[test]
+fn a_paired_game_does_not_depend_on_the_length_of_the_match_or_the_pairing() {
+    let ten = paired("random", "random", 10, 2026);
+    assert_eq!(paired("random", "random", 4, 2026)[..], ten[..4]);
+    assert_ne!(ten, paired("random", "random", 10, 2027));
+    let openings = |a: &str, b: &str| -> Vec<Vec<String>> {
+        paired(a, b, 6, 1)
+            .iter()
+            .map(|g| notations(&g.record.moves[..4]))
+            .collect()
+    };
+    assert_eq!(openings("tuned", "first"), openings("random", "random"));
+}
+
+#[test]
+fn the_games_are_the_same_with_any_number_of_threads() {
+    for schedule in [Schedule::Legacy, Schedule::Paired] {
+        let one = scheduled("ab2", "tuned", 24, 5, schedule, 1);
+        for threads in [2, 6, 50] {
+            assert_eq!(scheduled("ab2", "tuned", 24, 5, schedule, threads), one);
+        }
+    }
+}
+
+#[test]
+fn thinking_adds_up_over_the_threads() {
+    let (a, b) = (spec("ab2"), spec("random"));
+    let plan = |threads| MatchPlan {
+        games: 12,
+        seed: 1,
+        schedule: Schedule::Paired,
+        threads,
+    };
+    let one = play_match(&|| a.build(), &|| b.build(), &plan(1)).unwrap();
+    let six = play_match(&|| a.build(), &|| b.build(), &plan(6)).unwrap();
+    assert_eq!((one.a.moves, one.a.nodes), (six.a.moves, six.a.nodes));
+    assert_eq!(one.b.moves, six.b.moves);
+    assert!(one.a.nodes > 0);
+}
+
+/// Fails at its first move.
+struct Broken;
+
+impl Agent for Broken {
+    fn choose<'m>(
+        &mut self,
+        _board: &Board,
+        _side: Color,
+        _legal: &'m [Move],
+    ) -> Result<&'m Move, AgentError> {
+        Err(AgentError("broken".to_string()))
+    }
+}
+
+#[test]
+fn an_agent_error_ends_the_match() {
+    let random = spec("random");
+    let plan = MatchPlan {
+        games: 20,
+        seed: 1,
+        schedule: Schedule::Paired,
+        threads: 4,
+    };
+    let result = play_match(&|| random.build(), &|| Box::new(Broken), &plan);
+    assert_eq!(result.err(), Some(AgentError("broken".to_string())));
+}
+
+#[test]
+#[should_panic(expected = "even number of games")]
+fn the_paired_schedule_needs_an_even_number_of_games() {
+    paired("random", "random", 5, 1);
 }

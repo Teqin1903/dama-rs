@@ -1,9 +1,10 @@
-// Plays a match with playGame from reference/js/agent.js, with the seeds of engine/src/arena.rs,
+// Plays a match with playGame from reference/js/agent.js, with the legacy seeds of engine/src/arena.rs,
 // and prints every game as `dama arena --log` writes it. Identical output means the Rust arena
 // plays the same games as the prototype, move for move.
 //
 //   node bench/playgame_log.js tuned random 2000 1 > js.tsv
-//   cargo run --release -p cli -- arena tuned random --games 2000 --seed 1 --csv /tmp/x.csv --log rs.tsv
+//   cargo run --release -p cli -- arena tuned random --games 2000 --seed 1 --schedule legacy \
+//     --csv /tmp/x.csv --log rs.tsv
 //   cmp js.tsv rs.tsv
 //
 // Arguments: agent A, agent B (random, material, first or tuned), games, seed. `--csv` keeps the

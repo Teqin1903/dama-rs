@@ -21,14 +21,15 @@ pub use agent::{
     RandomAgent, UAgent,
 };
 pub use arena::{
-    EndReason, GameRecord, MatchGame, MatchRecord, MatchSettings, Thinking, play_game, play_match,
+    AgentFactory, EndReason, GameRecord, MatchGame, MatchPlan, MatchRecord, MatchSettings,
+    Schedule, Thinking, play_game, play_match,
 };
 pub use bitboard::Bitboard;
 pub use board::{Board, Color, Kind, ParseBoardError, Piece};
 pub use eval::{Features, U_EPSILON, WIN, Weights};
 pub use movegen::Move;
 pub use perft::perft;
-pub use rng::Mulberry32;
+pub use rng::{Mulberry32, derive_seed};
 pub use search::{
     Candidate, Decision, Deepening, Limits, MAX_ID_DEPTH, alpha_beta, alpha_beta_q, decide,
     iterative_deepening, minimax, minimax_q,
