@@ -30,11 +30,19 @@
 //! The seeds of every game are fixed before the first game starts, and every agent is reseeded at
 //! the start of a game, so a game does not depend on the games played before it: the games of a
 //! match can be played by several threads, in any order, with the same result.
+//!
+//! A match with an SPRT (`MatchPlan::sprt`, paired schedule only) stops as soon as the test decides
+//! (`crate::sprt`). The test counts the pairs in the order of the schedule: after each game it takes
+//! in every pair whose two games are both over and whose earlier pairs are all counted, so it sees
+//! pair 0, 1, 2, ... whatever order the threads finish them in. Once it decides at pair k, the threads
+//! stop taking new games, and the record keeps games 0 to 2k + 1 only: the same games, and the same
+//! verdict, with any number of threads, and the first games of the fixed match with the same seed.
 
 use std::collections::HashMap;
 use std::fmt;
 use std::ops::AddAssign;
 use std::str::FromStr;
+use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -43,6 +51,7 @@ use crate::agent::{Agent, AgentError};
 use crate::board::{Board, Color};
 use crate::movegen::Move;
 use crate::rng::{Mulberry32, derive_seed};
+use crate::sprt::{Pentanomial, Sprt, SprtResult, Verdict};
 
 /// A game is drawn when a position occurs for this many times, with the same side to move.
 const REPETITIONS: u32 = 3;
@@ -371,9 +380,14 @@ impl MatchGame {
 /// A finished match between agents A and B.
 #[derive(Clone, Debug)]
 pub struct MatchRecord {
+    /// The games in the order of the schedule; with an SPRT, those up to the pair that decided.
     pub games: Vec<MatchGame>,
+    /// The thinking of every game played, with an SPRT also of the games that were still being
+    /// played when the test decided (at most one per thread).
     pub a: Thinking,
     pub b: Thinking,
+    /// The outcome of the SPRT, if the match had one.
+    pub sprt: Option<SprtResult>,
 }
 
 impl MatchRecord {
@@ -433,16 +447,95 @@ impl MatchRecord {
 /// shared between threads (`Sync`) while the agents are not.
 pub type AgentFactory<'f> = dyn Fn() -> Box<dyn Agent> + Sync + 'f;
 
-/// What a match is: how many games, the seed, the schedule, and how many threads play them.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// What a match is: how many games, the seed, the schedule, how many threads play them, and
+/// whether an SPRT may stop it early.
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct MatchPlan {
-    /// The number of games; even for the paired schedule.
+    /// The number of games, or with an SPRT the most games; even for the paired schedule.
     pub games: u32,
     pub seed: u32,
     pub schedule: Schedule,
     /// The threads that play the games at the same time (at least 1). The games, and so the
     /// result, are the same with any number of threads; the time per move is not.
     pub threads: usize,
+    /// Stop when this test decides; only with the paired schedule.
+    pub sprt: Option<Sprt>,
+}
+
+/// The SPRT of a match while it is played, shared by its threads.
+struct Monitor {
+    sprt: Sprt,
+    state: Mutex<MonitorState>,
+    /// Set once the test has decided: the threads take no new game.
+    stop: AtomicBool,
+}
+
+struct MonitorState {
+    /// A's score in every game that is over, by game index.
+    scores: Vec<Option<f64>>,
+    /// The pairs counted so far: pairs 0 to `counted.pairs() - 1`.
+    counted: Pentanomial,
+    llr: f64,
+    verdict: Option<Verdict>,
+}
+
+impl Monitor {
+    fn new(sprt: Sprt, games: usize) -> Monitor {
+        Monitor {
+            sprt,
+            state: Mutex::new(MonitorState {
+                scores: vec![None; games],
+                counted: Pentanomial::default(),
+                llr: 0.0,
+                verdict: None,
+            }),
+            stop: AtomicBool::new(false),
+        }
+    }
+
+    /// Game `g` is over with A's score `score`: counts every pair that is now complete, in order,
+    /// until the test decides.
+    fn record(&self, g: usize, score: f64) {
+        // `lock` gives the one thread holding the mutex access to the state; a panic in another
+        // thread while holding it would make it an `Err`, and the match is lost anyway then.
+        let mut state = self.state.lock().expect("an arena thread panicked");
+        if state.verdict.is_some() {
+            return;
+        }
+        state.scores[g] = Some(score);
+        loop {
+            let p = state.counted.pairs() as usize;
+            if 2 * p == state.scores.len() {
+                state.verdict = Some(Verdict::Inconclusive);
+                break;
+            }
+            let (Some(first), Some(second)) = (state.scores[2 * p], state.scores[2 * p + 1]) else {
+                break;
+            };
+            state.counted.add(first + second);
+            state.llr = self.sprt.llr(&state.counted);
+            if let Some(verdict) = self.sprt.verdict(state.llr, state.counted.pairs()) {
+                state.verdict = Some(verdict);
+                break;
+            }
+        }
+        if state.verdict.is_some() {
+            self.stop.store(true, Ordering::Relaxed);
+        }
+    }
+
+    /// The outcome; the match must be over.
+    fn result(self) -> SprtResult {
+        let state = self.state.into_inner().expect("an arena thread panicked");
+        SprtResult {
+            sprt: self.sprt,
+            verdict: state
+                .verdict
+                .expect("every game was played or the test decided"),
+            llr: state.llr,
+            pairs: state.counted,
+        }
+    }
 }
 
 /// The games one thread played, with its agents' thinking, or the first error it met.
@@ -459,7 +552,8 @@ struct Played {
 /// stop after their current game, and the error of the earliest failed game is returned.
 ///
 /// # Panics
-/// If the paired schedule is asked for an odd number of games, or for 0 threads.
+/// If the paired schedule is asked for an odd number of games, an SPRT with the legacy
+/// schedule, or 0 threads.
 pub fn play_match(
     a: &AgentFactory,
     b: &AgentFactory,
@@ -469,17 +563,25 @@ pub fn play_match(
         plan.schedule != Schedule::Paired || plan.games.is_multiple_of(2),
         "the paired schedule plays every opening twice: an even number of games"
     );
+    assert!(
+        plan.sprt.is_none() || plan.schedule == Schedule::Paired,
+        "an SPRT counts pairs of games: it needs the paired schedule"
+    );
     assert!(plan.threads >= 1, "a match needs at least one thread");
     let seeds = plan.schedule.game_seeds(plan.seed, plan.games);
     let settings = plan.schedule.settings();
     let next = AtomicUsize::new(0);
     let failed = AtomicBool::new(false);
+    let monitor = plan.sprt.map(|sprt| Monitor::new(sprt, seeds.len()));
     let threads = plan.threads.min(seeds.len()).max(1);
     // `thread::scope` waits for every thread it spawned before it returns, so the threads may
     // borrow `seeds`, `next` and `failed` from this function.
     let parts: Vec<Played> = thread::scope(|scope| {
         let workers: Vec<_> = (0..threads)
-            .map(|_| scope.spawn(|| play_games(a, b, &seeds, &next, &failed, &settings)))
+            .map(|_| {
+                scope
+                    .spawn(|| play_games(a, b, &seeds, &next, &failed, monitor.as_ref(), &settings))
+            })
             .collect();
         workers
             .into_iter()
@@ -503,21 +605,28 @@ pub fn play_match(
         return Err(e);
     }
     games.sort_by_key(|(g, _)| *g);
+    let sprt = monitor.map(Monitor::result);
+    if let Some(result) = &sprt {
+        // The games after the pair that decided do not count; some may not even be there.
+        games.truncate(2 * result.pairs.pairs() as usize);
+    }
     Ok(MatchRecord {
         games: games.into_iter().map(|(_, game)| game).collect(),
         a: a_thinking,
         b: b_thinking,
+        sprt,
     })
 }
 
-/// One thread of `play_match`: takes the next unplayed game until there is none, or until a game
-/// anywhere has failed.
+/// One thread of `play_match`: takes the next unplayed game until there is none, until a game
+/// anywhere has failed, or until the SPRT has decided.
 fn play_games(
     a: &AgentFactory,
     b: &AgentFactory,
     seeds: &[GameSeeds],
     next: &AtomicUsize,
     failed: &AtomicBool,
+    monitor: Option<&Monitor>,
     settings: &MatchSettings,
 ) -> Played {
     let (mut a_agent, mut b_agent) = (a(), b());
@@ -530,14 +639,20 @@ fn play_games(
         thinking: Thinking::default(),
     };
     let mut played = Played::default();
-    while !failed.load(Ordering::Relaxed) {
+    let decided = || monitor.is_some_and(|m| m.stop.load(Ordering::Relaxed));
+    while !failed.load(Ordering::Relaxed) && !decided() {
         // `fetch_add` hands every game index to exactly one thread.
         let g = next.fetch_add(1, Ordering::Relaxed);
         let Some(game_seeds) = seeds.get(g) else {
             break;
         };
         match play_one(&mut a, &mut b, game_seeds, settings) {
-            Ok(game) => played.games.push((g, game)),
+            Ok(game) => {
+                if let Some(monitor) = monitor {
+                    monitor.record(g, game.a_score());
+                }
+                played.games.push((g, game));
+            }
             Err(e) => {
                 failed.store(true, Ordering::Relaxed);
                 played.error = Some((g, e));
@@ -597,6 +712,7 @@ mod tests {
             games,
             a: Thinking::default(),
             b: Thinking::default(),
+            sprt: None,
         }
     }
 

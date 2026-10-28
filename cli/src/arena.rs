@@ -9,10 +9,12 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-use engine::{AgentSpec, Color, MatchPlan, MatchRecord, Schedule, Thinking, play_match};
+use engine::{AgentSpec, Color, MatchPlan, MatchRecord, Schedule, Sprt, Thinking, play_match};
 
 const HELP: &str = "\
 usage: dama arena <A> <B> [--games N] [--seed S] [--schedule paired|legacy] [--threads T]
+                          [--sprt [--elo0 E0] [--elo1 E1] [--alpha A] [--beta B]
+                                  [--min-games M]]
                           [--csv PATH] [--log PATH]
 
 Plays N games between agents A and B from the start position and ends them by the rules of
@@ -20,7 +22,10 @@ docs/reference.md. With the paired schedule (the default) every game has its own
 4 plies are random, and each opening is played twice with the colours swapped (A is White in even
 games). The legacy schedule is that of every match before it: one generator for the match and 2
 random plies; it repeats the old rows of results/arena.csv and the games of bench/playgame_log.js.
-Prints the result from A's point of view and appends one row to the CSV file.
+With --sprt the match stops as soon as a sequential probability ratio test decides whether A is
+better than B (H1: A is E1 Elo stronger) or not (H0: A is E0 Elo stronger), counting the pairs of
+games of each opening; N is then the most games. Prints the result from A's point of view and
+appends one row to the CSV file.
 
 agents:
   random            a random legal move
@@ -42,21 +47,32 @@ agents:
   idqr:LIMITS       agent avoids repeating when ahead and seeks it when behind
 
 options:
-  --games N         the number of games, even for the paired schedule (default 200)
+  --games N         the number of games, even for the paired schedule (default 200); with --sprt
+                    the most games (default 2000)
   --seed S          the seed of the match, 0 to 4294967295 (default 1)
   --schedule NAME   paired or legacy (default paired)
   --threads T       play T games at the same time (default 1). The games are the same with any
                     T, the time per move is not: it is a measurement only with --threads 1, and
                     the CSV row leaves it empty otherwise
+  --sprt            stop when the SPRT decides (paired schedule only); the CSV row gets the
+                    verdict (H0, H1, or none when N games were played first) and its LLR
+  --elo0 E0         Elo of A over B under H0 (default 0)
+  --elo1 E1         Elo of A over B under H1, more than E0 (default 20)
+  --alpha A         the chance of accepting H1 when H0 holds, 0 < A < 0.5 (default 0.05)
+  --beta B          the chance of accepting H0 when H1 holds, 0 < B < 0.5 (default 0.05)
+  --min-games M     no verdict before M games, at most N (default 100)
   --csv PATH        the CSV file to append the row to (default results/arena.csv)
   --log PATH        also write every game with its moves to PATH, one TSV line per game
 ";
 
-/// The columns of the CSV file, one row per run. `a_us_per_move` and `b_us_per_move` are empty
-/// when `threads` is more than 1; `wall_s` is the time of the whole match.
+/// The columns of the CSV file, one row per run. `games` is the number of games played (with an
+/// SPRT, up to the pair that decided). `a_us_per_move` and `b_us_per_move` are empty when
+/// `threads` is more than 1; `wall_s` is the time of the whole match. The SPRT columns, `sprt`
+/// (H0, H1 or none) to `min_games`, are empty without an SPRT.
 const CSV_HEADER: &str = "date,version,build,a,b,games,seed,wins,draws,losses,score_pct,se_pct,\
 mean_plies,a_us_per_move,b_us_per_move,repetition,no_move,one_piece_each,fifty_quiet,cap,\
-a_nodes_per_move,b_nodes_per_move,schedule,opening_plies,threads,wall_s";
+a_nodes_per_move,b_nodes_per_move,schedule,opening_plies,threads,wall_s,\
+sprt,llr,elo0,elo1,alpha,beta,max_games,min_games";
 
 /// Debug builds are many times slower: the times per move of a debug build are not measurements.
 const BUILD: &str = if cfg!(debug_assertions) {
@@ -74,6 +90,8 @@ struct Args {
     seed: u32,
     schedule: Schedule,
     threads: usize,
+    /// Stop when this test decides; `games` is then the most games.
+    sprt: Option<Sprt>,
     csv: PathBuf,
     log: Option<PathBuf>,
 }
@@ -85,6 +103,7 @@ impl Args {
             seed: self.seed,
             schedule: self.schedule,
             threads: self.threads,
+            sprt: self.sprt,
         }
     }
 }
@@ -115,8 +134,11 @@ pub fn main(args: impl Iterator<Item = String>) -> ExitCode {
 fn parse_args(args: impl IntoIterator<Item = String>) -> Result<Option<Args>, String> {
     let mut args = args.into_iter();
     let mut agents = Vec::new();
-    let (mut games, mut seed): (u32, u32) = (200, 1);
+    let (mut games, mut seed): (Option<u32>, u32) = (None, 1);
     let (mut schedule, mut threads) = (Schedule::Paired, 1);
+    let mut sprt_flag = false;
+    let mut sprt = Sprt::default();
+    let mut sprt_options = Vec::new();
     let mut csv = PathBuf::from("results/arena.csv");
     let mut log = None;
     while let Some(arg) = args.next() {
@@ -127,14 +149,36 @@ fn parse_args(args: impl IntoIterator<Item = String>) -> Result<Option<Args>, St
             agents.push(arg.parse::<AgentSpec>().map_err(|e| e.to_string())?);
             continue;
         }
+        if arg == "--sprt" {
+            sprt_flag = true;
+            continue;
+        }
         let value = args.next().ok_or(format!("{arg} needs a value"))?;
+        let number = || {
+            value
+                .parse::<f64>()
+                .ok()
+                .filter(|x| x.is_finite())
+                .ok_or(format!("{arg} {value}: expected a number"))
+        };
         match arg.as_str() {
             "--games" => {
-                games = value
+                games = Some(
+                    value
+                        .parse()
+                        .ok()
+                        .filter(|&n| n > 0)
+                        .ok_or(format!("--games {value}: expected a number of games"))?,
+                );
+            }
+            "--elo0" => sprt.elo0 = number()?,
+            "--elo1" => sprt.elo1 = number()?,
+            "--alpha" => sprt.alpha = number()?,
+            "--beta" => sprt.beta = number()?,
+            "--min-games" => {
+                sprt.min_games = value
                     .parse()
-                    .ok()
-                    .filter(|&n| n > 0)
-                    .ok_or(format!("--games {value}: expected a number of games"))?;
+                    .map_err(|_| format!("--min-games {value}: expected a number of games"))?;
             }
             "--seed" => {
                 seed = value
@@ -153,10 +197,43 @@ fn parse_args(args: impl IntoIterator<Item = String>) -> Result<Option<Args>, St
             "--log" => log = Some(PathBuf::from(value)),
             _ => return Err(format!("unknown option {arg}")),
         }
+        if ["--elo0", "--elo1", "--alpha", "--beta", "--min-games"].contains(&arg.as_str()) {
+            sprt_options.push(arg);
+        }
     }
     let [a, b]: [AgentSpec; 2] = agents
         .try_into()
         .map_err(|agents: Vec<_>| format!("expected two agents, found {}", agents.len()))?;
+    let sprt = if sprt_flag {
+        if schedule != Schedule::Paired {
+            return Err("--sprt counts pairs of games: it needs the paired schedule".to_string());
+        }
+        if sprt.elo0 >= sprt.elo1 {
+            return Err(format!(
+                "--elo0 {} --elo1 {}: E0 must be less than E1",
+                sprt.elo0, sprt.elo1
+            ));
+        }
+        for (name, p) in [("--alpha", sprt.alpha), ("--beta", sprt.beta)] {
+            if !(p > 0.0 && p < 0.5) {
+                return Err(format!("{name} {p}: expected a number between 0 and 0.5"));
+            }
+        }
+        Some(sprt)
+    } else if let Some(option) = sprt_options.first() {
+        return Err(format!("{option} sets the SPRT: it needs --sprt"));
+    } else {
+        None
+    };
+    let games = games.unwrap_or(if sprt.is_some() { 2000 } else { 200 });
+    if let Some(sprt) = sprt
+        && sprt.min_games > games
+    {
+        return Err(format!(
+            "--min-games {}: more than the most games, {games}",
+            sprt.min_games
+        ));
+    }
     if schedule == Schedule::Paired && !games.is_multiple_of(2) {
         return Err(format!(
             "--games {games}: the paired schedule plays every opening twice, so it needs an even \
@@ -170,6 +247,7 @@ fn parse_args(args: impl IntoIterator<Item = String>) -> Result<Option<Args>, St
         seed,
         schedule,
         threads,
+        sprt,
         csv,
         log,
     }))
@@ -283,8 +361,35 @@ fn report(args: &Args, record: &MatchRecord, version: &str, elapsed: Duration) -
         .iter()
         .map(|(reason, n)| format!("{reason} {n}"))
         .collect();
+    let games = match &record.sprt {
+        Some(_) => format!("{} of at most {} games", record.games.len(), args.games),
+        None => format!("{} games", record.games.len()),
+    };
+    let sprt = record.sprt.map_or(String::new(), |result| {
+        let (lower, upper) = result.sprt.bounds();
+        let elo = match result.pairs.elo() {
+            Some((elo, error)) => format!("{elo:.1} ± {error:.1}"),
+            None => "-".to_string(),
+        };
+        let [p0, p1, p2, p3, p4] = result.pairs.0;
+        format!(
+            "  SPRT (Elo0 {}, Elo1 {}, alpha {}, beta {}, at least {} games): {} after {} pairs, \
+             LLR {:.3} \
+             (bounds {lower:.3}, {upper:.3})\n\
+             \x20 pairs scoring 0/0.5/1/1.5/2: {p0}/{p1}/{p2}/{p3}/{p4}; Elo of A over B {elo} (95%)\n",
+            result.sprt.elo0,
+            result.sprt.elo1,
+            result.sprt.alpha,
+            result.sprt.beta,
+            result.sprt.min_games,
+            result.verdict,
+            result.pairs.pairs(),
+            result.llr,
+        )
+    });
     format!(
-        "A {} vs B {}: {} games, seed {}, {} schedule: {layout}\n\
+        "A {} vs B {}: {games}, seed {}, {} schedule: {layout}\n\
+         {sprt}\
          \x20 A: +{wins} ={draws} -{losses}, score {}% (SE {})\n\
          \x20 plies per game: {}\n\
          \x20 time per move{timing}: A {}, B {}\n\
@@ -293,7 +398,6 @@ fn report(args: &Args, record: &MatchRecord, version: &str, elapsed: Duration) -
          \x20 version {version} ({BUILD} build), {} in all with {} thread{}\n",
         describe(&args.a),
         describe(&args.b),
-        args.games,
         args.seed,
         args.schedule,
         percent(record.score()),
@@ -383,7 +487,7 @@ fn csv_row(
         csv_field(build),
         csv_field(&args.a.to_string()),
         csv_field(&args.b.to_string()),
-        args.games.to_string(),
+        record.games.len().to_string(),
         args.seed.to_string(),
         wins.to_string(),
         draws.to_string(),
@@ -401,7 +505,20 @@ fn csv_row(
         args.threads.to_string(),
         format!("{:.1}", elapsed.as_secs_f64()),
     ];
-    fields.join(",")
+    let sprt: [String; 8] = match &record.sprt {
+        Some(result) => [
+            result.verdict.to_string(),
+            format!("{:.3}", result.llr),
+            result.sprt.elo0.to_string(),
+            result.sprt.elo1.to_string(),
+            result.sprt.alpha.to_string(),
+            result.sprt.beta.to_string(),
+            args.games.to_string(),
+            result.sprt.min_games.to_string(),
+        ],
+        None => Default::default(),
+    };
+    fields.join(",") + "," + &sprt.join(",")
 }
 
 /// A text field of a CSV row, quoted if it holds a comma or a quote.
@@ -512,6 +629,7 @@ mod tests {
                 seed: 1,
                 schedule: Schedule::Paired,
                 threads: 1,
+                sprt: None,
                 csv: PathBuf::from("results/arena.csv"),
                 log: None,
             }))
@@ -554,6 +672,35 @@ mod tests {
         assert_eq!(args.csv, PathBuf::from("x.csv"));
         assert_eq!(args.log, Some(PathBuf::from("g.tsv")));
         assert_eq!(parse(&["tuned", "--help"]), Ok(None));
+        let args = parse(&["tuned", "random", "--sprt"]).unwrap().unwrap();
+        assert_eq!((args.sprt, args.games), (Some(Sprt::default()), 2000));
+        let args = parse(&[
+            "tuned",
+            "random",
+            "--elo0",
+            "-5",
+            "--sprt",
+            "--elo1",
+            "5",
+            "--alpha",
+            "0.1",
+            "--beta",
+            "0.2",
+            "--games",
+            "500",
+            "--min-games",
+            "40",
+        ])
+        .unwrap()
+        .unwrap();
+        let sprt = Sprt {
+            elo0: -5.0,
+            elo1: 5.0,
+            alpha: 0.1,
+            beta: 0.2,
+            min_games: 40,
+        };
+        assert_eq!((args.sprt, args.games), (Some(sprt), 500));
     }
 
     #[test]
@@ -570,6 +717,24 @@ mod tests {
             &["tuned", "random", "--games", "7"],
             &["tuned", "random", "--schedule", "pairs"],
             &["tuned", "random", "--threads", "0"],
+            &["tuned", "random", "--elo1", "10"],
+            &["tuned", "random", "--sprt", "--schedule", "legacy"],
+            &["tuned", "random", "--sprt", "--elo0", "20"],
+            &["tuned", "random", "--sprt", "--elo1", "x"],
+            &["tuned", "random", "--sprt", "--alpha", "0.5"],
+            &["tuned", "random", "--sprt", "--beta", "0"],
+            &["tuned", "random", "--sprt", "--games", "7"],
+            &["tuned", "random", "--min-games", "50"],
+            &["tuned", "random", "--sprt", "--min-games", "-2"],
+            &[
+                "tuned",
+                "random",
+                "--sprt",
+                "--games",
+                "100",
+                "--min-games",
+                "102",
+            ],
         ] {
             assert!(parse(args).is_err(), "{args:?} should be an error");
         }
@@ -597,6 +762,7 @@ mod tests {
                 nodes: 90,
             },
             b: Thinking::default(),
+            sprt: None,
         };
         let args = parse(&["tuned", "u:1/2/0.2", "--games", "2"])
             .unwrap()
@@ -615,7 +781,7 @@ mod tests {
         assert_eq!(
             one,
             "2026-10-25T00:00:00Z,baseline-1-gabc,release,tuned,u:1/2/0.2,2,1,1,1,0,75.00,25.00,\
-             40.0,2.50,,1,1,0,0,0,22.5,,paired,4,1,12.3"
+             40.0,2.50,,1,1,0,0,0,22.5,,paired,4,1,12.3,,,,,,,,"
         );
         assert_eq!(one.split(',').count(), CSV_HEADER.split(',').count());
         // With several threads the time per move is left out.
@@ -634,8 +800,39 @@ mod tests {
         assert_eq!(
             row(&args),
             "2026-10-25T00:00:00Z,baseline-1-gabc,release,tuned,u:1/2/0.2,2,1,1,1,0,75.00,25.00,\
-             40.0,,,1,1,0,0,0,22.5,,legacy,2,6,12.3"
+             40.0,,,1,1,0,0,0,22.5,,legacy,2,6,12.3,,,,,,,,"
         );
+        // With an SPRT: the games played, the verdict and the most games.
+        let args = parse(&["tuned", "u:1/2/0.2", "--sprt", "--elo1", "10"])
+            .unwrap()
+            .unwrap();
+        let sprt = Sprt {
+            elo1: 10.0,
+            ..Sprt::default()
+        };
+        let record = MatchRecord {
+            sprt: Some(engine::SprtResult {
+                sprt,
+                verdict: engine::Verdict::H1,
+                llr: 2.9512,
+                pairs: engine::Pentanomial([0, 0, 0, 1, 0]),
+            }),
+            ..record.clone()
+        };
+        let with_sprt = csv_row(
+            "2026-10-25T00:00:00Z",
+            "baseline-1-gabc",
+            "release",
+            &args,
+            &record,
+            Duration::from_millis(12_340),
+        );
+        assert_eq!(
+            with_sprt,
+            "2026-10-25T00:00:00Z,baseline-1-gabc,release,tuned,u:1/2/0.2,2,1,1,1,0,75.00,25.00,\
+             40.0,2.50,,1,1,0,0,0,22.5,,paired,4,1,12.3,H1,2.951,0,10,0.05,0.05,2000,100"
+        );
+        assert_eq!(with_sprt.split(',').count(), CSV_HEADER.split(',').count());
     }
 
     #[test]

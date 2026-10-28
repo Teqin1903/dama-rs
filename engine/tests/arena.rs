@@ -4,7 +4,7 @@
 
 use engine::{
     Agent, AgentError, AgentSpec, Board, Color, EndReason, GameRecord, MatchGame, MatchPlan,
-    MatchSettings, Move, Mulberry32, Schedule, play_game, play_match,
+    MatchRecord, MatchSettings, Move, Mulberry32, Schedule, Sprt, Verdict, play_game, play_match,
 };
 
 /// Plays a script of moves, in order, by their notation. A move that is not legal is an error, so
@@ -264,6 +264,7 @@ fn scheduled(
         seed,
         schedule,
         threads,
+        sprt: None,
     };
     play_match(&|| a.build(), &|| b.build(), &plan)
         .unwrap()
@@ -418,6 +419,7 @@ fn thinking_adds_up_over_the_threads() {
         seed: 1,
         schedule: Schedule::Paired,
         threads,
+        sprt: None,
     };
     let one = play_match(&|| a.build(), &|| b.build(), &plan(1)).unwrap();
     let six = play_match(&|| a.build(), &|| b.build(), &plan(6)).unwrap();
@@ -448,6 +450,7 @@ fn an_agent_error_ends_the_match() {
         seed: 1,
         schedule: Schedule::Paired,
         threads: 4,
+        sprt: None,
     };
     let result = play_match(&|| random.build(), &|| Box::new(Broken), &plan);
     assert_eq!(result.err(), Some(AgentError("broken".to_string())));
@@ -457,4 +460,106 @@ fn an_agent_error_ends_the_match() {
 #[should_panic(expected = "even number of games")]
 fn the_paired_schedule_needs_an_even_number_of_games() {
     paired("random", "random", 5, 1);
+}
+
+/// A paired match of at most `games` games between `a` and `b`, seed 3, that stops when `sprt`
+/// decides.
+fn sprt_match_with(a: &str, b: &str, games: u32, threads: usize, sprt: Sprt) -> MatchRecord {
+    let (a, b) = (spec(a), spec(b));
+    let plan = MatchPlan {
+        games,
+        seed: 3,
+        schedule: Schedule::Paired,
+        threads,
+        sprt: Some(sprt),
+    };
+    play_match(&|| a.build(), &|| b.build(), &plan).unwrap()
+}
+
+/// The same with the default SPRT (at least 100 games).
+fn sprt_match(a: &str, b: &str, games: u32, threads: usize) -> MatchRecord {
+    sprt_match_with(a, b, games, threads, Sprt::default())
+}
+
+#[test]
+fn the_sprt_stops_a_clear_match_early_with_the_same_games_on_any_number_of_threads() {
+    let one = sprt_match("tuned", "random", 400, 1);
+    let result = one.sprt.unwrap();
+    assert_eq!(result.verdict, Verdict::H1);
+    let pairs = result.pairs.pairs() as usize;
+    assert!((50..200).contains(&pairs), "{pairs} pairs");
+    assert_eq!(one.games.len(), 2 * pairs);
+    assert!(result.llr >= Sprt::default().bounds().1);
+    // The games are the first ones of the fixed match with the same seed.
+    assert_eq!(
+        one.games,
+        scheduled("tuned", "random", 400, 3, Schedule::Paired, 1)[..2 * pairs]
+    );
+    for threads in [2, 6] {
+        let many = sprt_match("tuned", "random", 400, threads);
+        assert_eq!(many.games, one.games);
+        assert_eq!(many.sprt, one.sprt);
+    }
+}
+
+#[test]
+fn the_sprt_decides_no_earlier_than_its_minimum_of_games() {
+    // Without a minimum, tuned against random crosses the H1 bound within a few pairs.
+    let no_minimum = Sprt {
+        min_games: 0,
+        ..Sprt::default()
+    };
+    let early = sprt_match_with("tuned", "random", 400, 4, no_minimum);
+    let early = early.sprt.unwrap();
+    assert_eq!(early.verdict, Verdict::H1);
+    assert!(early.pairs.pairs() < 50, "{} pairs", early.pairs.pairs());
+    // With the default minimum the same match goes on to 100 games, the same games, and decides
+    // there: its LLR is past the bound by then.
+    let record = sprt_match("tuned", "random", 400, 4);
+    let result = record.sprt.unwrap();
+    assert_eq!(result.verdict, Verdict::H1);
+    assert_eq!(record.games.len(), 100);
+    // Any minimum: never fewer games than it.
+    for min_games in [10, 30, 64, 150] {
+        let sprt = Sprt {
+            min_games,
+            ..Sprt::default()
+        };
+        let record = sprt_match_with("tuned", "random", 400, 4, sprt);
+        assert_eq!(record.sprt.unwrap().verdict, Verdict::H1);
+        assert!(record.games.len() >= min_games as usize);
+    }
+}
+
+#[test]
+fn the_sprt_accepts_h0_for_a_weaker_agent() {
+    let record = sprt_match("random", "tuned", 400, 4);
+    let result = record.sprt.unwrap();
+    assert_eq!(result.verdict, Verdict::H0);
+    assert!(result.llr <= Sprt::default().bounds().0);
+    assert!(record.games.len() >= 100);
+    assert_eq!(record.games.len(), 2 * result.pairs.pairs() as usize);
+}
+
+#[test]
+fn an_sprt_without_a_decision_plays_every_game() {
+    // Fewer games than the minimum: no verdict is possible.
+    let record = sprt_match("tuned", "random", 20, 1);
+    let result = record.sprt.unwrap();
+    assert_eq!(result.verdict, Verdict::Inconclusive);
+    assert_eq!(record.games.len(), 20);
+}
+
+#[test]
+#[should_panic(expected = "needs the paired schedule")]
+fn the_sprt_needs_the_paired_schedule() {
+    let random = spec("random");
+    let plan = MatchPlan {
+        games: 10,
+        seed: 1,
+        schedule: Schedule::Legacy,
+        threads: 1,
+        sprt: Some(Sprt::default()),
+    };
+    let _ = play_match(&|| random.build(), &|| random.build(), &plan);
 }
