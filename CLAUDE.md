@@ -56,7 +56,9 @@ Never change an expected value to make a test pass: find the bug and explain whi
   alpha-beta for `abN` (the same decisions as `mmN` at the same depth, from fewer nodes; no move ordering
   yet), and iterative deepening for `id:dN:nK:tMS` (alpha-beta 1, 2, 3, ... plies within a per-move budget of
   depth, nodes and/or milliseconds; the deepest completed iteration decides, so `id:dN` plays as `abN`;
-  official comparisons use node budgets). Keep new search ideas there, behind the `Agent` trait.
+  official comparisons use node budgets), and quiescence for `abNq` and `idq:...` (past the depth limit,
+  captures only until the position is quiet; no stand pat, since capturing is mandatory; its nodes count
+  against the budget). Keep new search ideas there, behind the `Agent` trait.
 - Do not add Co-Authored-By trailers or "Generated with" lines to commits or pull requests.
 
 ## Talking to me
