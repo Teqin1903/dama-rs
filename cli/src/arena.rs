@@ -9,7 +9,9 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-use engine::{AgentSpec, Color, MatchPlan, MatchRecord, Schedule, Sprt, Thinking, play_match};
+use engine::{
+    AgentSpec, Color, MatchPlan, MatchRecord, Schedule, Sprt, Thinking, Weights, play_match,
+};
 
 const HELP: &str = "\
 usage: dama arena <A> <B> [--games N] [--seed S] [--schedule paired|legacy] [--threads T]
@@ -45,6 +47,17 @@ agents:
   abNr, abNqr,      abN, abNq, id:LIMITS and idq:LIMITS that recognise repetitions: a position
   idr:LIMITS,       of the game or of the search path that occurs again is a draw (0), so the
   idqr:LIMITS       agent avoids repeating when ahead and seeks it when behind
+
+weights: any agent but random may end in :KEY=VALUE parts that set weights of U, on top of the
+tuned weights for mm, ab and id, and of the named weights for the baseline agent, for example
+idqr:n2000:adv=0.1:qmob=0.02, ab3q:king=3 or tuned:cen=0.05. All features count ours minus theirs:
+  man, king, mob    men, kings and legal moves (U of the baseline agent)
+  adv               rows the men have advanced from their home row (rank 2 for White, 7 for Black)
+  back              men still on their home row
+  cen               men and kings on c3-f6
+  edge              men and kings on files a and h
+  qmob              quiet moves, counted as if capturing were not mandatory
+The positional weights (adv to qmob) are 0 unless set.
 
 options:
   --games N         the number of games, even for the paired schedule (default 200); with --sprt
@@ -276,44 +289,54 @@ fn run(args: &Args) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-/// `tuned (1/2.5/-0.05)`: the agent's name, and its weights if the name does not show them.
+/// `tuned (1/2.5/-0.05)`: the agent's name, and its weights if the name does not show them all.
 fn describe(spec: &AgentSpec) -> String {
     match (spec, spec.preset()) {
         (AgentSpec::U(weights), Some(name)) => format!("{name} ({weights})"),
-        (AgentSpec::Minimax(depth), _) => {
-            format!(
-                "{spec} (minimax, {depth} plies, {})",
-                engine::Weights::TUNED
-            )
+        (AgentSpec::Minimax { depth, weights }, _) => {
+            format!("{spec} (minimax, {depth} plies, {})", weights_text(weights))
         }
         (
             AgentSpec::AlphaBeta {
                 depth,
                 quiescence,
                 repetition,
+                weights,
             },
             _,
         ) => {
             format!(
                 "{spec} (alpha-beta, {depth} plies{}, {})",
                 extras(*quiescence, *repetition),
-                engine::Weights::TUNED
+                weights_text(weights)
             )
         }
         (
             AgentSpec::Deepening {
                 quiescence,
                 repetition,
+                weights,
                 ..
             },
             _,
         ) => format!(
             "{spec} (iterative deepening alpha-beta{}, {})",
             extras(*quiescence, *repetition),
-            engine::Weights::TUNED
+            weights_text(weights)
         ),
         _ => spec.to_string(),
     }
+}
+
+/// `1/2.5/-0.05`, followed by the positional weights that are not 0: `1/2.5/-0.05:adv=0.1`.
+fn weights_text(weights: &Weights) -> String {
+    let u_only = Weights {
+        man: weights.man,
+        king: weights.king,
+        mob: weights.mob,
+        ..Weights::ZERO
+    };
+    format!("{weights}{}", weights.overrides_from(&u_only))
 }
 
 /// `, quiescence` and `, repetitions` for the searches that have them.
@@ -623,7 +646,7 @@ mod tests {
         assert_eq!(
             parse(&["tuned", "random"]),
             Ok(Some(Args {
-                a: AgentSpec::U(engine::Weights::TUNED),
+                a: AgentSpec::U(Weights::TUNED),
                 b: AgentSpec::Random,
                 games: 200,
                 seed: 1,

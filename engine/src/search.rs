@@ -38,7 +38,7 @@
 use std::time::{Duration, Instant};
 
 use crate::board::{Board, Color};
-use crate::eval::{DRAW, Features, U_EPSILON, WIN, Weights};
+use crate::eval::{DRAW, Features, U_EPSILON, WIN, Weights, evaluate};
 use crate::movegen::Move;
 use crate::rng::Mulberry32;
 
@@ -70,15 +70,17 @@ pub struct Decision {
     pub q_nodes: u64,
 }
 
-/// Evaluates every legal move of `side` on `board` with U.
+/// Evaluates every legal move of `side` on `board` with U (`evaluate`: with the positional
+/// features when their weights are set).
 pub fn decide(board: &Board, side: Color, weights: Weights) -> Decision {
     let candidates: Vec<Candidate> = board
         .legal_moves(side)
         .into_iter()
         .map(|mv| {
-            let features = Features::of(&board.apply(&mv), side);
+            let after = board.apply(&mv);
+            let features = Features::of(&after, side);
             Candidate {
-                u: features.u(weights),
+                u: evaluate(&after, side, &features, weights),
                 features,
                 mv,
                 exact: true,
@@ -322,7 +324,7 @@ impl Context {
         ply >= self.depth && !(self.quiescence && moves[0].is_capture())
     }
 
-    /// U at a leaf where `to_move` has `moves`, from the root side's view.
+    /// U (`evaluate`) at a leaf where `to_move` has `moves`, from the root side's view.
     fn leaf_value(&self, board: &Board, to_move: Color, moves: &[Move]) -> f64 {
         let others = board.legal_moves(to_move.opponent()).len();
         let (ours, theirs) = if to_move == self.root {
@@ -330,7 +332,8 @@ impl Context {
         } else {
             (others, moves.len())
         };
-        Features::leaf(board, self.root, ours, theirs).u(self.weights)
+        let features = Features::leaf(board, self.root, ours, theirs);
+        evaluate(board, self.root, &features, self.weights)
     }
 
     /// The value of a position at `ply` where `to_move` has no legal move: a loss for `to_move`.

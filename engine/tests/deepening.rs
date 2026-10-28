@@ -36,6 +36,7 @@ fn positions() -> Vec<(String, Board, Color, Weights)> {
                 man: w.man,
                 king: w.king,
                 mob: w.mob,
+                ..Weights::ZERO
             });
             let label = format!("{file} #{i} {}", p.name.unwrap_or_default());
             all.push((

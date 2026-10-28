@@ -49,6 +49,7 @@ fn positions() -> Vec<(Board, Color, Weights)> {
                 man: w.man,
                 king: w.king,
                 mob: w.mob,
+                ..Weights::ZERO
             });
             all.push((p.board.parse().expect("bad board"), side, weights));
         }

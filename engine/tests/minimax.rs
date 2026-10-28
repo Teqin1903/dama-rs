@@ -78,6 +78,7 @@ fn depth_one_is_the_baseline_on_every_decision() {
             man: w.man,
             king: w.king,
             mob: w.mob,
+            ..Weights::ZERO
         };
         let (one_ply, mm1) = (
             decide(&board, side, weights),

@@ -28,7 +28,7 @@ pub use arena::{
 };
 pub use bitboard::Bitboard;
 pub use board::{Board, Color, Kind, ParseBoardError, Piece};
-pub use eval::{DRAW, Features, U_EPSILON, WIN, Weights};
+pub use eval::{DRAW, Features, Positional, U_EPSILON, WIN, Weights, evaluate};
 pub use movegen::Move;
 pub use perft::perft;
 pub use rng::{Mulberry32, derive_seed};

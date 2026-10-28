@@ -364,29 +364,38 @@ impl Agent for DeepeningAgent {
 
 /// An agent as the command line names it: `random`, a preset name (`material`, `first`,
 /// `tuned`), `u:MAN/KING/MOB` for the baseline agent with any weights, `mmN` for minimax N
-/// plies deep with the tuned weights, `abN` for alpha-beta N plies deep with the tuned weights,
-/// or `id:LIMITS` for iterative deepening with the tuned weights. LIMITS are one or more of `dN`
+/// plies deep, `abN` for alpha-beta N plies deep, or `id:LIMITS` for iterative deepening, the
+/// searches with the tuned weights. LIMITS are one or more of `dN`
 /// (at most N plies), `nK` (at most K nodes per move) and `tMS` (at most MS milliseconds per move),
 /// separated by `:`, for example `id:n20000` or `id:d5:t50`. `abNq` and `idq:LIMITS` add
 /// quiescence; a final `r` (`abNr`, `abNqr`, `idr:LIMITS`, `idqr:LIMITS`) adds repetitions.
+///
+/// Any name but `random` may end in `:KEY=VALUE` parts that set weights (`Weights::KEYS`), on top
+/// of the tuned weights for a search and of the named weights for the baseline agent:
+/// `idqr:n2000:adv=0.1:qmob=0.02`, `ab3q:king=3`, `tuned:cen=0.05`.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum AgentSpec {
     Random,
     /// The baseline agent with these weights.
     U(Weights),
-    /// Minimax this many plies deep, 1 to `MAX_DEPTH`, with the tuned weights.
-    Minimax(u32),
-    /// Alpha-beta `depth` plies deep, 1 to `MAX_DEPTH`, with the tuned weights.
+    /// Minimax `depth` plies deep, 1 to `MAX_DEPTH`.
+    Minimax {
+        depth: u32,
+        weights: Weights,
+    },
+    /// Alpha-beta `depth` plies deep, 1 to `MAX_DEPTH`.
     AlphaBeta {
         depth: u32,
         quiescence: bool,
         repetition: bool,
+        weights: Weights,
     },
-    /// Iterative deepening within `limits`, with the tuned weights.
+    /// Iterative deepening within `limits`.
     Deepening {
         limits: Limits,
         quiescence: bool,
         repetition: bool,
+        weights: Weights,
     },
 }
 
@@ -406,7 +415,7 @@ impl AgentSpec {
     pub fn preset(&self) -> Option<&'static str> {
         match self {
             AgentSpec::Random
-            | AgentSpec::Minimax(_)
+            | AgentSpec::Minimax { .. }
             | AgentSpec::AlphaBeta { .. }
             | AgentSpec::Deepening { .. } => None,
             AgentSpec::U(weights) => AgentSpec::PRESETS
@@ -416,27 +425,49 @@ impl AgentSpec {
         }
     }
 
+    /// The weights of U this agent plays with; none for `random`.
+    pub fn weights(&self) -> Option<Weights> {
+        match *self {
+            AgentSpec::Random => None,
+            AgentSpec::U(weights)
+            | AgentSpec::Minimax { weights, .. }
+            | AgentSpec::AlphaBeta { weights, .. }
+            | AgentSpec::Deepening { weights, .. } => Some(weights),
+        }
+    }
+
+    /// The weights, to change them; none for `random`.
+    fn weights_mut(&mut self) -> Option<&mut Weights> {
+        match self {
+            AgentSpec::Random => None,
+            AgentSpec::U(weights)
+            | AgentSpec::Minimax { weights, .. }
+            | AgentSpec::AlphaBeta { weights, .. }
+            | AgentSpec::Deepening { weights, .. } => Some(weights),
+        }
+    }
+
     /// A new agent of this kind. The arena reseeds it before every game.
     pub fn build(&self) -> Box<dyn Agent> {
         match *self {
             AgentSpec::Random => Box::new(RandomAgent::new(0)),
             AgentSpec::U(weights) => Box::new(UAgent::new(weights, 0)),
-            AgentSpec::Minimax(depth) => Box::new(MinimaxAgent::new(Weights::TUNED, depth, 0)),
+            AgentSpec::Minimax { depth, weights } => Box::new(MinimaxAgent::new(weights, depth, 0)),
             AgentSpec::AlphaBeta {
                 depth,
                 quiescence,
                 repetition,
+                weights,
             } => Box::new(
-                AlphaBetaAgent::new(Weights::TUNED, depth, quiescence, 0)
-                    .with_repetitions(repetition),
+                AlphaBetaAgent::new(weights, depth, quiescence, 0).with_repetitions(repetition),
             ),
             AgentSpec::Deepening {
                 limits,
                 quiescence,
                 repetition,
+                weights,
             } => Box::new(
-                DeepeningAgent::new(Weights::TUNED, limits, quiescence, 0)
-                    .with_repetitions(repetition),
+                DeepeningAgent::new(weights, limits, quiescence, 0).with_repetitions(repetition),
             ),
         }
     }
@@ -445,26 +476,46 @@ impl AgentSpec {
 impl fmt::Display for AgentSpec {
     /// The canonical name: `random`, `mmN`, `abN` (`abNq`, `abNr`, `abNqr`), `id:` (`idq:`, `idr:`,
     /// `idqr:`) with the limits in the order d, n, t, the preset's name, or else `u:MAN/KING/MOB`.
-    /// `"u:1/3/0".parse()` therefore prints as `material`.
+    /// `"u:1/3/0".parse()` therefore prints as `material`. Then the weights as `:KEY=VALUE` in the
+    /// order of `Weights::KEYS`: for a search those that differ from the tuned weights, for the
+    /// baseline agent (unless it is a preset) the positional weights that are not 0. A weight set
+    /// to its default is left out: `idqr:n2000:adv=0` prints as `idqr:n2000`.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match (self, self.preset()) {
             (AgentSpec::Random, _) => f.write_str("random"),
             (AgentSpec::U(_), Some(name)) => f.write_str(name),
-            (AgentSpec::U(weights), None) => write!(f, "u:{weights}"),
-            (AgentSpec::Minimax(depth), _) => write!(f, "mm{depth}"),
+            (AgentSpec::U(weights), None) => {
+                let u_only = Weights {
+                    man: weights.man,
+                    king: weights.king,
+                    mob: weights.mob,
+                    ..Weights::ZERO
+                };
+                write!(f, "u:{weights}{}", weights.overrides_from(&u_only))
+            }
+            (AgentSpec::Minimax { depth, weights }, _) => {
+                write!(f, "mm{depth}{}", weights.overrides_from(&Weights::TUNED))
+            }
             (
                 AgentSpec::AlphaBeta {
                     depth,
                     quiescence,
                     repetition,
+                    weights,
                 },
                 _,
-            ) => write!(f, "ab{depth}{}", suffix(*quiescence, *repetition)),
+            ) => write!(
+                f,
+                "ab{depth}{}{}",
+                suffix(*quiescence, *repetition),
+                weights.overrides_from(&Weights::TUNED)
+            ),
             (
                 AgentSpec::Deepening {
                     limits,
                     quiescence,
                     repetition,
+                    weights,
                 },
                 _,
             ) => {
@@ -478,7 +529,7 @@ impl fmt::Display for AgentSpec {
                 if let Some(time) = limits.time {
                     write!(f, ":t{}", time.as_millis())?;
                 }
-                Ok(())
+                f.write_str(&weights.overrides_from(&Weights::TUNED))
             }
         }
     }
@@ -508,6 +559,9 @@ pub enum ParseAgentError {
     /// `id`, `idq`, `idr` or `idqr` is not followed by one to three different limits `:dN`, `:nK`, `:tMS`, each a
     /// positive whole number (N at most `MAX_ID_DEPTH`).
     Limits(String),
+    /// The `:KEY=VALUE` parts at the end of the name (the first string) do not set weights; the
+    /// second string says why.
+    Weight(String, String),
 }
 
 impl fmt::Display for ParseAgentError {
@@ -535,6 +589,13 @@ impl fmt::Display for ParseAgentError {
                  {MAX_ID_DEPTH}), nK (nodes per move), tMS (milliseconds per move), \
                  for example id:n20000 or id:d5:t50"
             ),
+            ParseAgentError::Weight(name, why) => write!(
+                f,
+                "agent {name:?}: {why}; weights are set with :KEY=VALUE at the end of the name, \
+                 KEY one of {} (each once) and VALUE a finite number, for example \
+                 idqr:n2000:adv=0.1",
+                Weights::KEYS.join(", ")
+            ),
         }
     }
 }
@@ -544,74 +605,108 @@ impl std::error::Error for ParseAgentError {}
 impl FromStr for AgentSpec {
     type Err = ParseAgentError;
 
+    /// The name without its `:KEY=VALUE` parts is read by `parse_base`; the parts then set weights.
     fn from_str(s: &str) -> Result<AgentSpec, ParseAgentError> {
-        if s == "random" {
-            return Ok(AgentSpec::Random);
+        let parts: Vec<&str> = s.split(':').collect();
+        // The weights are the parts after the last one without '='.
+        let first_weight = parts
+            .iter()
+            .rposition(|part| !part.contains('='))
+            .map_or(0, |i| i + 1);
+        if first_weight == parts.len() {
+            return parse_base(s);
         }
-        if let Some((_, weights)) = AgentSpec::PRESETS.iter().find(|(name, _)| *name == s) {
-            return Ok(AgentSpec::U(*weights));
+        if first_weight == 0 {
+            return Err(ParseAgentError::Unknown(s.to_string()));
         }
-        // The longest prefixes first, since "idqr:..." also starts with "idq" and "id".
-        let deepening = [
-            ("idqr", true, true),
-            ("idq", true, false),
-            ("idr", false, true),
-            ("id", false, false),
-        ]
-        .into_iter()
-        .find_map(|(prefix, quiescence, repetition)| {
-            let limits = s.strip_prefix(prefix)?;
-            // "idq" must not be read as "id" followed by limits "q".
-            (limits.is_empty() || limits.starts_with(':'))
-                .then_some((limits, quiescence, repetition))
-        });
-        if let Some((limits, quiescence, repetition)) = deepening {
-            return parse_limits(limits)
-                .map(|limits| AgentSpec::Deepening {
-                    limits,
-                    quiescence,
-                    repetition,
-                })
-                .ok_or_else(|| ParseAgentError::Limits(s.to_string()));
-        }
-        let depth = |digits: &str| -> Result<u32, ParseAgentError> {
-            digits
-                .parse()
-                .ok()
-                .filter(|d| (1..=AgentSpec::MAX_DEPTH).contains(d))
-                .ok_or_else(|| ParseAgentError::Depth(s.to_string()))
-        };
-        if let Some(digits) = s.strip_prefix("mm") {
-            return depth(digits).map(AgentSpec::Minimax);
-        }
-        if let Some(rest) = s.strip_prefix("ab") {
-            // `q` comes before `r`, so they are taken off from the end in the other order.
-            let (rest, repetition) = match rest.strip_suffix('r') {
-                Some(rest) => (rest, true),
-                None => (rest, false),
-            };
-            let (digits, quiescence) = match rest.strip_suffix('q') {
-                Some(digits) => (digits, true),
-                None => (rest, false),
-            };
-            return depth(digits).map(|depth| AgentSpec::AlphaBeta {
-                depth,
+        let mut spec = parse_base(&parts[..first_weight].join(":"))?;
+        let overrides = parts[first_weight..].join(":");
+        let weight_error = |why: String| ParseAgentError::Weight(s.to_string(), why);
+        let weights = spec
+            .weights_mut()
+            .ok_or_else(|| weight_error("random has no weights".to_string()))?;
+        *weights = weights.with_overrides(&overrides).map_err(weight_error)?;
+        Ok(spec)
+    }
+}
+
+/// An agent name without weights.
+fn parse_base(s: &str) -> Result<AgentSpec, ParseAgentError> {
+    if s == "random" {
+        return Ok(AgentSpec::Random);
+    }
+    if let Some((_, weights)) = AgentSpec::PRESETS.iter().find(|(name, _)| *name == s) {
+        return Ok(AgentSpec::U(*weights));
+    }
+    // The longest prefixes first, since "idqr:..." also starts with "idq" and "id".
+    let deepening = [
+        ("idqr", true, true),
+        ("idq", true, false),
+        ("idr", false, true),
+        ("id", false, false),
+    ]
+    .into_iter()
+    .find_map(|(prefix, quiescence, repetition)| {
+        let limits = s.strip_prefix(prefix)?;
+        // "idq" must not be read as "id" followed by limits "q".
+        (limits.is_empty() || limits.starts_with(':')).then_some((limits, quiescence, repetition))
+    });
+    if let Some((limits, quiescence, repetition)) = deepening {
+        return parse_limits(limits)
+            .map(|limits| AgentSpec::Deepening {
+                limits,
                 quiescence,
                 repetition,
-            });
-        }
-        let Some(numbers) = s.strip_prefix("u:") else {
-            return Err(ParseAgentError::Unknown(s.to_string()));
+                weights: Weights::TUNED,
+            })
+            .ok_or_else(|| ParseAgentError::Limits(s.to_string()));
+    }
+    let depth = |digits: &str| -> Result<u32, ParseAgentError> {
+        digits
+            .parse()
+            .ok()
+            .filter(|d| (1..=AgentSpec::MAX_DEPTH).contains(d))
+            .ok_or_else(|| ParseAgentError::Depth(s.to_string()))
+    };
+    if let Some(digits) = s.strip_prefix("mm") {
+        return depth(digits).map(|depth| AgentSpec::Minimax {
+            depth,
+            weights: Weights::TUNED,
+        });
+    }
+    if let Some(rest) = s.strip_prefix("ab") {
+        // `q` comes before `r`, so they are taken off from the end in the other order.
+        let (rest, repetition) = match rest.strip_suffix('r') {
+            Some(rest) => (rest, true),
+            None => (rest, false),
         };
-        // `collect` into an Option stops at the first part that is not a finite number.
-        let numbers: Option<Vec<f64>> = numbers
-            .split('/')
-            .map(|part| part.parse::<f64>().ok().filter(|x| x.is_finite()))
-            .collect();
-        match numbers.as_deref() {
-            Some(&[man, king, mob]) => Ok(AgentSpec::U(Weights { man, king, mob })),
-            _ => Err(ParseAgentError::Weights(s.to_string())),
-        }
+        let (digits, quiescence) = match rest.strip_suffix('q') {
+            Some(digits) => (digits, true),
+            None => (rest, false),
+        };
+        return depth(digits).map(|depth| AgentSpec::AlphaBeta {
+            depth,
+            quiescence,
+            repetition,
+            weights: Weights::TUNED,
+        });
+    }
+    let Some(numbers) = s.strip_prefix("u:") else {
+        return Err(ParseAgentError::Unknown(s.to_string()));
+    };
+    // `collect` into an Option stops at the first part that is not a finite number.
+    let numbers: Option<Vec<f64>> = numbers
+        .split('/')
+        .map(|part| part.parse::<f64>().ok().filter(|x| x.is_finite()))
+        .collect();
+    match numbers.as_deref() {
+        Some(&[man, king, mob]) => Ok(AgentSpec::U(Weights {
+            man,
+            king,
+            mob,
+            ..Weights::ZERO
+        })),
+        _ => Err(ParseAgentError::Weights(s.to_string())),
     }
 }
 
@@ -657,11 +752,18 @@ mod tests {
         assert_eq!(spec("material"), AgentSpec::U(Weights::MATERIAL));
         assert_eq!(spec("first"), AgentSpec::U(Weights::FIRST_GUESS));
         assert_eq!(spec("tuned"), AgentSpec::U(Weights::TUNED));
-        assert_eq!(spec("mm3"), AgentSpec::Minimax(3));
+        assert_eq!(
+            spec("mm3"),
+            AgentSpec::Minimax {
+                depth: 3,
+                weights: Weights::TUNED
+            }
+        );
         let ab = |depth, quiescence, repetition| AgentSpec::AlphaBeta {
             depth,
             quiescence,
             repetition,
+            weights: Weights::TUNED,
         };
         assert_eq!(spec("ab5"), ab(5, false, false));
         assert_eq!(spec("ab3q"), ab(3, true, false));
@@ -675,6 +777,7 @@ mod tests {
             limits,
             quiescence,
             repetition,
+            weights: Weights::TUNED,
         };
         assert_eq!(spec("id:n20000"), id(nodes, false, false));
         assert_eq!(spec("idq:n20000"), id(nodes, true, false));
@@ -691,9 +794,124 @@ mod tests {
             AgentSpec::U(Weights {
                 man: 1.0,
                 king: 2.0,
-                mob: 0.2
+                mob: 0.2,
+                ..Weights::ZERO
             })
         );
+    }
+
+    #[test]
+    fn weights_at_the_end_of_a_name() {
+        let weights = |s: &str| spec(s).weights().unwrap();
+        assert_eq!(
+            weights("idqr:n2000:adv=0.1:qmob=-0.02"),
+            Weights {
+                adv: 0.1,
+                qmob: -0.02,
+                ..Weights::TUNED
+            }
+        );
+        assert_eq!(
+            spec("idqr:n2000:adv=0.1"),
+            AgentSpec::Deepening {
+                limits: Limits {
+                    nodes: Some(2000),
+                    ..Limits::default()
+                },
+                quiescence: true,
+                repetition: true,
+                weights: Weights {
+                    adv: 0.1,
+                    ..Weights::TUNED
+                },
+            }
+        );
+        // The king's value, and the other weights of U, are set the same way.
+        assert_eq!(
+            weights("ab3q:king=3:mob=0"),
+            Weights {
+                king: 3.0,
+                mob: 0.0,
+                ..Weights::TUNED
+            }
+        );
+        // On top of the named weights for the baseline agent.
+        assert_eq!(
+            weights("material:cen=0.5"),
+            Weights {
+                cen: 0.5,
+                ..Weights::MATERIAL
+            }
+        );
+        assert_eq!(
+            weights("u:1/2/0.2:edge=-1:back=2"),
+            Weights {
+                man: 1.0,
+                king: 2.0,
+                mob: 0.2,
+                edge: -1.0,
+                back: 2.0,
+                ..Weights::ZERO
+            }
+        );
+        // A weight set to its default changes nothing.
+        assert_eq!(spec("idqr:n2000:adv=0:king=2.5"), spec("idqr:n2000"));
+        assert_eq!(spec("tuned:qmob=0"), spec("tuned"));
+    }
+
+    #[test]
+    fn names_with_weights_are_canonical_and_parse_back() {
+        for name in [
+            "mm3:adv=0.1",
+            "ab3q:king=3",
+            "ab5qr:man=1.5:adv=0.25:back=-1:cen=0.05:edge=-0.1:qmob=0.01",
+            "id:d5:n100:t50:mob=0",
+            "idqr:n2000:adv=0.1:qmob=0.02",
+            "u:1/2.5/-0.05:cen=0.05",
+            "u:1/2/0.2:adv=0.00001",
+        ] {
+            assert_eq!(spec(name).to_string(), name);
+        }
+        // Rust writes f64 without an exponent.
+        assert_eq!(spec("ab3:adv=1e-5").to_string(), "ab3:adv=0.00001");
+        // Weights in any order come out in the order of Weights::KEYS.
+        assert_eq!(
+            spec("idqr:n2000:qmob=0.02:adv=0.1:king=3").to_string(),
+            "idqr:n2000:king=3:adv=0.1:qmob=0.02"
+        );
+        // A preset with a positional weight is written with its numbers.
+        assert_eq!(spec("tuned:cen=0.05").to_string(), "u:1/2.5/-0.05:cen=0.05");
+        assert_eq!(spec("ab3:king=2.5").to_string(), "ab3");
+    }
+
+    #[test]
+    fn bad_weights_are_errors() {
+        let weight = |s: &str| match s.parse::<AgentSpec>() {
+            Err(ParseAgentError::Weight(name, _)) => name == s,
+            _ => false,
+        };
+        for s in [
+            "ab3:adv=",
+            "ab3:adv=x",
+            "ab3:adv=inf",
+            "ab3:adv=NaN",
+            "ab3:speed=1",
+            "ab3:adv=1:adv=2",
+            "ab3:adv=1=2",
+            "random:adv=1",
+            "idqr:n2000:ADV=1",
+        ] {
+            assert!(weight(s), "{s} should be a weight error");
+        }
+        // A weight in front of the agent's own parts leaves those unreadable.
+        assert_eq!(
+            "adv=1".parse::<AgentSpec>(),
+            Err(ParseAgentError::Unknown("adv=1".to_string()))
+        );
+        assert!(matches!(
+            "id:adv=1:n200".parse::<AgentSpec>(),
+            Err(ParseAgentError::Limits(_))
+        ));
     }
 
     #[test]

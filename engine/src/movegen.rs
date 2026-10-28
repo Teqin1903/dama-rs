@@ -87,6 +87,32 @@ impl Board {
         self.quiet_moves(side)
     }
 
+    /// The number of quiet moves `side` has, whether or not it must capture: the length of
+    /// `quiet_moves(side)`, counted without building the moves. For the `qmob` feature of U.
+    pub(crate) fn quiet_move_count(&self, side: Color) -> u32 {
+        const NOT_FILE_A: u64 = !0x0101_0101_0101_0101;
+        const NOT_FILE_H: u64 = !0x8080_8080_8080_8080;
+        let empty = self.empty_squares();
+        let pieces = self.pieces(side);
+        let (men, e) = ((pieces & !self.kings()).bits(), empty.bits());
+        // Bit i is square i = rank * 8 + file: up is << 8, right (towards h) is << 1. A man is
+        // never on its last rank, so no step forward leaves the board.
+        let forward = match side {
+            Color::White => men << 8,
+            Color::Black => men >> 8,
+        };
+        let right = (men & NOT_FILE_H) << 1;
+        let left = (men & NOT_FILE_A) >> 1;
+        let mut count =
+            (forward & e).count_ones() + (right & e).count_ones() + (left & e).count_ones();
+        for king in pieces & self.kings() {
+            for dir in Dir::ALL {
+                count += king.ray(dir).take_while(|&s| empty.contains(s)).count() as u32;
+            }
+        }
+        count
+    }
+
     /// A man steps one square forward or sideways; a king flies to any empty square in a line.
     fn quiet_moves(&self, side: Color) -> Vec<Move> {
         let empty = self.empty_squares();
@@ -240,6 +266,25 @@ mod tests {
 
     fn sq(file: u8, rank: u8) -> Square {
         Square::new(file, rank)
+    }
+
+    #[test]
+    fn quiet_move_count_is_the_number_of_quiet_moves() {
+        // The 400 positions of testdata/movegen.json, both sides, captures or not.
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../testdata/movegen.json");
+        let json = std::fs::read_to_string(path).unwrap();
+        let positions: Vec<serde_json::Value> = serde_json::from_str(&json).unwrap();
+        assert_eq!(positions.len(), 400);
+        for position in &positions {
+            let board: Board = position["board"].as_str().unwrap().parse().unwrap();
+            for side in [Color::White, Color::Black] {
+                assert_eq!(
+                    board.quiet_move_count(side) as usize,
+                    board.quiet_moves(side).len(),
+                    "{board:?} {side:?}"
+                );
+            }
+        }
     }
 
     #[test]

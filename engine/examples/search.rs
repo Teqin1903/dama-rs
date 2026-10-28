@@ -6,7 +6,8 @@
 //!
 //! Each argument is a search: `mmN` (minimax), `abN` (alpha-beta) or `idN` (iterative deepening
 //! up to N plies, no node or time limit), N plies deep, and with a `q` after N (`ab3q`) with
-//! quiescence. One pass over all positions is a sample; 3 samples per search, after one warm-up
+//! quiescence. A search may end in `:KEY=VALUE` parts that set weights on top of each position's
+//! (`ab4q:adv=0.01:qmob=0.01`, as in agent names). One pass over all positions is a sample; 3 samples per search, after one warm-up
 //! pass, and the time per move is the median sample / the number of positions.
 //!
 //! Output: one tab-separated line per search: search, positions, nodes per move (quiescence nodes
@@ -53,6 +54,7 @@ fn positions() -> Vec<(Board, Color, Weights)> {
                 man: w.man,
                 king: w.king,
                 mob: w.mob,
+                ..Weights::ZERO
             });
             all.push((p.board.parse().expect("bad board"), side, weights));
         }
@@ -104,6 +106,20 @@ fn main() {
     let positions = positions();
     println!("search\tpositions\tnodes_per_move\tq_nodes_per_move\tus_per_move\tslowest_us");
     for name in std::env::args().skip(1) {
+        let (search_name, overrides) = name.split_once(':').unwrap_or((&name, ""));
+        let positions: Vec<(Board, Color, Weights)> = positions
+            .iter()
+            .map(|&(board, side, weights)| {
+                let weights = if overrides.is_empty() {
+                    weights
+                } else {
+                    weights
+                        .with_overrides(overrides)
+                        .unwrap_or_else(|e| panic!("{name}: {e}"))
+                };
+                (board, side, weights)
+            })
+            .collect();
         let searches: [(&str, Search, Search); 3] = [
             ("mm", minimax, minimax_q),
             ("ab", alpha_beta, alpha_beta_q),
@@ -112,7 +128,7 @@ fn main() {
         let (search, depth) = searches
             .iter()
             .find_map(|&(prefix, plain, with_q)| {
-                let rest = name.strip_prefix(prefix)?;
+                let rest = search_name.strip_prefix(prefix)?;
                 Some(match rest.strip_suffix('q') {
                     Some(depth) => (with_q, depth),
                     None => (plain, rest),

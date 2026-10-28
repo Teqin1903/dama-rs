@@ -53,6 +53,7 @@ fn differences(entry: &Entry) -> Vec<String> {
         man: w.man,
         king: w.king,
         mob: w.mob,
+        ..Weights::ZERO
     };
     let decision = decide(&board, common::side(&entry.side), weights);
     let mut found = Vec::new();
@@ -158,7 +159,8 @@ fn talk_slide7() {
         Weights {
             man: w.man,
             king: w.king,
-            mob: w.mob
+            mob: w.mob,
+            ..Weights::ZERO
         },
         Weights::TUNED
     );
