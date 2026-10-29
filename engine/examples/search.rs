@@ -6,7 +6,8 @@
 //!
 //! Each argument is a search: `mmN` (minimax), `abN` (alpha-beta) or `idN` (iterative deepening
 //! up to N plies, no node or time limit), N plies deep, and with a `q` after N (`ab3q`) with
-//! quiescence; for `ab` and `id` a final `o` (`ab6o`, `id5qo`) orders the moves. A search may end in `:KEY=VALUE` parts that set weights on top of each position's
+//! quiescence; for `ab` and `id` an `o` (`ab6o`, `id5qo`) orders the moves and a final `t`
+//! (`ab6ot`) adds a transposition table of 16 MB, emptied before each position. A search may end in `:KEY=VALUE` parts that set weights on top of each position's
 //! (`ab4q:adv=0.01:qmob=0.01`, as in agent names). One pass over all positions is a sample; 3 samples per search, after one warm-up
 //! pass, and the time per move is the median sample / the number of positions.
 //!
@@ -19,7 +20,7 @@ use std::path::Path;
 use std::time::{Duration, Instant};
 
 use engine::{
-    Board, Color, Decision, Limits, SearchOptions, Weights, alpha_beta_with,
+    Board, Color, Decision, Limits, SearchOptions, Table, TableOptions, Weights, alpha_beta_with,
     iterative_deepening_with, minimax, minimax_q,
 };
 use serde::Deserialize;
@@ -74,30 +75,43 @@ enum Search {
 }
 
 impl Search {
-    fn run(self, board: &Board, side: Color, weights: Weights, depth: u32) -> Decision {
+    fn run(
+        self,
+        board: &Board,
+        side: Color,
+        weights: Weights,
+        depth: u32,
+        table: Option<&mut Table>,
+    ) -> Decision {
         match self {
             Search::Minimax { quiescence: false } => minimax(board, side, weights, depth),
             Search::Minimax { quiescence: true } => minimax_q(board, side, weights, depth),
             Search::AlphaBeta(options) => {
-                alpha_beta_with(board, side, weights, depth, options, None)
+                alpha_beta_with(board, side, weights, depth, options, None, table)
             }
             Search::Deepening(options) => {
                 let limits = Limits {
                     depth: Some(depth),
                     ..Limits::default()
                 };
-                iterative_deepening_with(board, side, weights, limits, options, None).decision
+                iterative_deepening_with(board, side, weights, limits, options, None, table)
+                    .decision
             }
         }
     }
 
-    /// `mmN`, `abN`, `idN`, with `q` and (not for mm) `o` after N: the search and N.
-    fn parse(name: &str) -> Option<(Search, u32)> {
+    /// `mmN`, `abN`, `idN`, with `q` and (not for mm) `o` and `t` after N: the search, N and
+    /// whether it has a table.
+    fn parse(name: &str) -> Option<(Search, u32, bool)> {
         let (prefix, rest) = name.split_at_checked(2)?;
         let digits = rest
             .find(|c: char| !c.is_ascii_digit())
             .unwrap_or(rest.len());
         let (depth, letters) = rest.split_at(digits);
+        let (letters, table) = match letters.strip_suffix('t') {
+            Some(letters) => (letters, true),
+            None => (letters, false),
+        };
         let (quiescence, order) = match letters {
             "" => (false, false),
             "q" => (true, false),
@@ -107,12 +121,12 @@ impl Search {
         };
         let options = SearchOptions { quiescence, order };
         let search = match prefix {
-            "mm" if !order => Search::Minimax { quiescence },
+            "mm" if !order && !table => Search::Minimax { quiescence },
             "ab" => Search::AlphaBeta(options),
             "id" => Search::Deepening(options),
             _ => return None,
         };
-        Some((search, depth.parse().ok()?))
+        Some((search, depth.parse().ok()?, table))
     }
 }
 
@@ -122,11 +136,21 @@ fn sample(
     positions: &[(Board, Color, Weights)],
     search: Search,
     depth: u32,
+    mut table: Option<&mut Table>,
 ) -> (Duration, Duration, u64, u64) {
     let (mut total, mut slowest, mut nodes, mut q_nodes) = (Duration::ZERO, Duration::ZERO, 0, 0);
     for (board, side, weights) in positions {
+        if let Some(table) = table.as_deref_mut() {
+            table.clear();
+        }
         let start = Instant::now();
-        let decision = black_box(search.run(black_box(board), *side, *weights, depth));
+        let decision = black_box(search.run(
+            black_box(board),
+            *side,
+            *weights,
+            depth,
+            table.as_deref_mut(),
+        ));
         let took = start.elapsed();
         total += took;
         slowest = slowest.max(took);
@@ -154,11 +178,14 @@ fn main() {
                 (board, side, weights)
             })
             .collect();
-        let (search, depth) = Search::parse(search_name).unwrap_or_else(|| {
-            panic!("{name}: expected mmN, abN or idN, optionally with q, and o for ab and id")
+        let (search, depth, table) = Search::parse(search_name).unwrap_or_else(|| {
+            panic!("{name}: expected mmN, abN or idN, optionally with q, and o and t for ab and id")
         });
-        sample(&positions, search, depth); // warm-up
-        let mut samples: Vec<_> = (0..3).map(|_| sample(&positions, search, depth)).collect();
+        let mut table = table.then(|| Table::new(TableOptions::default()));
+        sample(&positions, search, depth, table.as_mut()); // warm-up
+        let mut samples: Vec<_> = (0..3)
+            .map(|_| sample(&positions, search, depth, table.as_mut()))
+            .collect();
         samples.sort();
         let (total, slowest, nodes, q_nodes) = samples[1];
         let n = positions.len();

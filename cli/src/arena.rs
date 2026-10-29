@@ -10,7 +10,8 @@ use std::process::{Command, ExitCode};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use engine::{
-    AgentSpec, Color, MatchPlan, MatchRecord, Schedule, Sprt, Thinking, Weights, play_match,
+    AgentSpec, Color, MatchPlan, MatchRecord, Schedule, Sprt, TableOptions, Thinking, Weights,
+    play_match,
 };
 
 const HELP: &str = "\
@@ -54,6 +55,11 @@ agents:
                     killer moves, history heuristic): the same moves as without at a fixed depth,
                     from fewer nodes, so deeper within a node budget. Letters come in the order
                     q, r, o: ab6o, ab3qro, idqro:n20000
+  abNt, idqrot:...  a final t adds a transposition table (Zobrist keys; each game starts with an
+                    empty one): 16 MB unless :hash=MB says otherwise, e.g. idqrot:n20000:hash=64.
+                    :tt=strict is the referee's mode: a value is used only from a search of the
+                    same depth and, with repetitions, only where it cannot depend on the path, so
+                    the games are those without a table
 
 weights: any agent but random may end in :KEY=VALUE parts that set weights of U, on top of the
 tuned weights for mm, ab and id, and of the named weights for the baseline agent, for example
@@ -311,13 +317,14 @@ fn describe(spec: &AgentSpec) -> String {
                 quiescence,
                 repetition,
                 order,
+                table,
                 weights,
             },
             _,
         ) => {
             format!(
                 "{spec} (alpha-beta, {depth} plies{}, {})",
-                extras(*quiescence, *repetition, *order),
+                extras(*quiescence, *repetition, *order, table),
                 weights_text(weights)
             )
         }
@@ -326,13 +333,14 @@ fn describe(spec: &AgentSpec) -> String {
                 quiescence,
                 repetition,
                 order,
+                table,
                 weights,
                 ..
             },
             _,
         ) => format!(
             "{spec} (iterative deepening alpha-beta{}, {})",
-            extras(*quiescence, *repetition, *order),
+            extras(*quiescence, *repetition, *order, table),
             weights_text(weights)
         ),
         _ => spec.to_string(),
@@ -350,8 +358,9 @@ fn weights_text(weights: &Weights) -> String {
     format!("{weights}{}", weights.overrides_from(&u_only))
 }
 
-/// `, quiescence`, `, repetitions` and `, move ordering` for the searches that have them.
-fn extras(quiescence: bool, repetition: bool, order: bool) -> String {
+/// `, quiescence`, `, repetitions`, `, move ordering` and `, table 16 MB` for the searches that
+/// have them.
+fn extras(quiescence: bool, repetition: bool, order: bool, table: &Option<TableOptions>) -> String {
     let mut extras = String::new();
     if quiescence {
         extras.push_str(", quiescence");
@@ -361,6 +370,9 @@ fn extras(quiescence: bool, repetition: bool, order: bool) -> String {
     }
     if order {
         extras.push_str(", move ordering");
+    }
+    if let Some(table) = table {
+        extras.push_str(&format!(", table {table}"));
     }
     extras
 }

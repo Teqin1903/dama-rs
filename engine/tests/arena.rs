@@ -379,6 +379,54 @@ fn ordered_agents_play_the_games_of_unordered_ones_at_depths_3_and_4() {
 }
 
 #[test]
+fn strict_tables_play_the_games_without_a_table() {
+    assert_eq!(
+        paired("ab2ot:tt=strict", "ab3t:tt=strict:hash=1", 6, 1),
+        paired("ab2o", "ab3", 6, 1)
+    );
+}
+
+#[test]
+#[ignore = "slow in a debug build; run with --release -- --ignored"]
+fn strict_tables_play_the_games_without_a_table_at_depths_3_and_4() {
+    assert_eq!(
+        paired(
+            "ab3ot:w=texel1:tt=strict",
+            "ab4ot:w=texel1:tt=strict",
+            20,
+            1
+        ),
+        paired("ab3o:w=texel1", "ab4o:w=texel1", 20, 1)
+    );
+    assert_eq!(
+        paired(
+            "idqot:d3:tt=strict",
+            "idqrot:d4:w=texel1:hash=1:tt=strict",
+            20,
+            1
+        ),
+        paired("idqo:d3", "idqro:d4:w=texel1", 20, 1)
+    );
+}
+
+#[test]
+fn games_with_tables_are_the_same_on_any_number_of_threads() {
+    let games = |threads| {
+        scheduled(
+            "idqrot:n2000:hash=1",
+            "idqot:n1000:hash=1",
+            12,
+            1,
+            Schedule::Paired,
+            threads,
+        )
+    };
+    let one = games(1);
+    assert_eq!(games(3), one);
+    assert_eq!(games(6), one);
+}
+
+#[test]
 fn the_legacy_schedule_has_the_settings_of_every_match_before_it() {
     assert_eq!(Schedule::Legacy.settings(), MatchSettings::REFERENCE);
     assert_eq!(MatchSettings::REFERENCE.opening_plies, 2);

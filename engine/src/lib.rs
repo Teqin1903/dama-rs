@@ -17,7 +17,9 @@ mod rng;
 mod search;
 mod sprt;
 mod square;
+mod table;
 mod texel;
+mod zobrist;
 
 pub use agent::{
     Agent, AgentError, AgentSpec, AlphaBetaAgent, DeepeningAgent, MinimaxAgent, ParseAgentError,
@@ -40,7 +42,9 @@ pub use search::{
 };
 pub use sprt::{Pentanomial, Sprt, SprtResult, Verdict, elo_of, expected_score};
 pub use square::Square;
+pub use table::{Table, TableOptions};
 pub use texel::{
     DataSet, N_WEIGHTS, STEPS, Sample, Tuning, features_of, fit_k, from_array, is_validation, mse,
     quiet_positions, samples_of, to_array, tune, value,
 };
+pub use zobrist::{zobrist, zobrist_after};

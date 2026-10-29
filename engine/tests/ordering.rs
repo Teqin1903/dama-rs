@@ -121,8 +121,8 @@ fn same_decisions_at(depth: u32) {
                     ..plain
                 };
                 let what = format!("depth {depth}, {label}, {weights}, {plain:?} {history:?}");
-                let p = alpha_beta_with(&board, side, weights, depth, plain, history);
-                let o = alpha_beta_with(&board, side, weights, depth, ordered, history);
+                let p = alpha_beta_with(&board, side, weights, depth, plain, history, None);
+                let o = alpha_beta_with(&board, side, weights, depth, ordered, history, None);
                 errors.extend(compare(&what, &p, &o));
             }
         }
@@ -183,9 +183,24 @@ fn same_decisions_after_a_repetition_in_the_game() {
                     order: true,
                     ..plain
                 };
-                let p = alpha_beta_with(&board, side, Weights::TUNED, depth, plain, Some(&history));
-                let o =
-                    alpha_beta_with(&board, side, Weights::TUNED, depth, ordered, Some(&history));
+                let p = alpha_beta_with(
+                    &board,
+                    side,
+                    Weights::TUNED,
+                    depth,
+                    plain,
+                    Some(&history),
+                    None,
+                );
+                let o = alpha_beta_with(
+                    &board,
+                    side,
+                    Weights::TUNED,
+                    depth,
+                    ordered,
+                    Some(&history),
+                    None,
+                );
                 let errors = compare(&format!("{start}, depth {depth}"), &p, &o);
                 assert!(errors.is_empty(), "{}", errors.join("\n"));
             }
@@ -206,18 +221,19 @@ fn deepening_decides_as_alpha_beta(limits: Limits, quiescence: bool, step: usize
             order: false,
             ..ordered
         };
-        let id = iterative_deepening_with(&board, side, weights, limits, ordered, Some(&[][..]));
-        let ab = alpha_beta_with(&board, side, weights, id.depth, plain, Some(&[][..]));
+        let id =
+            iterative_deepening_with(&board, side, weights, limits, ordered, Some(&[][..]), None);
+        let ab = alpha_beta_with(&board, side, weights, id.depth, plain, Some(&[][..]), None);
         let what = format!("{limits:?}, {label}, reached {}", id.depth);
         errors.extend(compare(&what, &ab, &id.decision));
         if let Some(max) = limits.nodes {
-            let first = alpha_beta_with(&board, side, weights, 1, plain, None).nodes;
+            let first = alpha_beta_with(&board, side, weights, 1, plain, None, None).nodes;
             if id.decision.nodes > max.max(first) {
                 errors.push(format!("{what}: spent {} nodes", id.decision.nodes));
             }
         }
         if let Some(max) = limits.depth {
-            let at_max = alpha_beta_with(&board, side, weights, max, plain, Some(&[][..]));
+            let at_max = alpha_beta_with(&board, side, weights, max, plain, Some(&[][..]), None);
             errors.extend(compare(&format!("{what}, ab{max}"), &at_max, &id.decision));
         }
     }
@@ -255,8 +271,8 @@ fn ordering_needs_fewer_nodes_on_the_whole() {
             order: true,
             ..plain
         };
-        plain_nodes += alpha_beta_with(&board, side, weights, 3, plain, None).nodes;
-        ordered_nodes += alpha_beta_with(&board, side, weights, 3, ordered, None).nodes;
+        plain_nodes += alpha_beta_with(&board, side, weights, 3, plain, None, None).nodes;
+        ordered_nodes += alpha_beta_with(&board, side, weights, 3, ordered, None, None).nodes;
     }
     assert!(
         ordered_nodes < plain_nodes,

@@ -21,6 +21,7 @@ use crate::search::{
 };
 #[cfg(test)]
 use crate::search::{alpha_beta, iterative_deepening};
+use crate::table::{Table, TableOptions};
 
 /// A player in the arena.
 ///
@@ -224,6 +225,8 @@ pub struct AlphaBetaAgent {
     depth: u32,
     quiescence: bool,
     order: bool,
+    /// `Some` with a transposition table.
+    table: Option<Table>,
     /// `Some` when repetitions are recognised: the game so far.
     history: Option<GameHistory>,
     rng: Mulberry32,
@@ -237,6 +240,7 @@ impl AlphaBetaAgent {
             depth,
             quiescence,
             order: false,
+            table: None,
             history: None,
             rng: Mulberry32::new(seed),
             nodes: 0,
@@ -254,6 +258,13 @@ impl AlphaBetaAgent {
         self.order = on;
         self
     }
+
+    /// The same agent, with a transposition table of these options if `Some` (cleared at the start
+    /// of every game).
+    pub fn with_table(mut self, options: Option<TableOptions>) -> AlphaBetaAgent {
+        self.table = options.map(Table::new);
+        self
+    }
 }
 
 impl Agent for AlphaBetaAgent {
@@ -261,6 +272,9 @@ impl Agent for AlphaBetaAgent {
         self.rng = Mulberry32::new(seed);
         if let Some(history) = &mut self.history {
             history.clear();
+        }
+        if let Some(table) = &mut self.table {
+            table.clear();
         }
         Ok(())
     }
@@ -276,7 +290,15 @@ impl Agent for AlphaBetaAgent {
             order: self.order,
         };
         let history = self.history.as_ref().map(|h| h.positions.as_slice());
-        let decision = alpha_beta_with(board, side, self.weights, self.depth, options, history);
+        let decision = alpha_beta_with(
+            board,
+            side,
+            self.weights,
+            self.depth,
+            options,
+            history,
+            self.table.as_mut(),
+        );
         self.nodes += decision.nodes;
         Ok(play(&decision, &mut self.rng, legal))
     }
@@ -304,6 +326,8 @@ pub struct DeepeningAgent {
     limits: Limits,
     quiescence: bool,
     order: bool,
+    /// `Some` with a transposition table.
+    table: Option<Table>,
     /// `Some` when repetitions are recognised: the game so far.
     history: Option<GameHistory>,
     rng: Mulberry32,
@@ -317,6 +341,7 @@ impl DeepeningAgent {
             limits,
             quiescence,
             order: false,
+            table: None,
             history: None,
             rng: Mulberry32::new(seed),
             nodes: 0,
@@ -334,6 +359,13 @@ impl DeepeningAgent {
         self.order = on;
         self
     }
+
+    /// The same agent, with a transposition table of these options if `Some` (cleared at the start
+    /// of every game).
+    pub fn with_table(mut self, options: Option<TableOptions>) -> DeepeningAgent {
+        self.table = options.map(Table::new);
+        self
+    }
 }
 
 impl Agent for DeepeningAgent {
@@ -341,6 +373,9 @@ impl Agent for DeepeningAgent {
         self.rng = Mulberry32::new(seed);
         if let Some(history) = &mut self.history {
             history.clear();
+        }
+        if let Some(table) = &mut self.table {
+            table.clear();
         }
         Ok(())
     }
@@ -356,8 +391,15 @@ impl Agent for DeepeningAgent {
             order: self.order,
         };
         let history = self.history.as_ref().map(|h| h.positions.as_slice());
-        let deepening =
-            iterative_deepening_with(board, side, self.weights, self.limits, options, history);
+        let deepening = iterative_deepening_with(
+            board,
+            side,
+            self.weights,
+            self.limits,
+            options,
+            history,
+            self.table.as_mut(),
+        );
         self.nodes += deepening.decision.nodes;
         Ok(play(&deepening.decision, &mut self.rng, legal))
     }
@@ -380,7 +422,9 @@ impl Agent for DeepeningAgent {
 /// (at most N plies), `nK` (at most K nodes per move) and `tMS` (at most MS milliseconds per move),
 /// separated by `:`, for example `id:n20000` or `id:d5:t50`. Letters after `abN` and `id` add to
 /// the search, each at most once and in this order: `q` quiescence (`abNq`, `idq:LIMITS`), `r`
-/// repetitions (`abNr`, `abNqr`, `idqr:LIMITS`), `o` move ordering (`abNo`, `idqro:LIMITS`).
+/// repetitions (`abNr`, `abNqr`, `idqr:LIMITS`), `o` move ordering (`abNo`, `idqro:LIMITS`), `t` a
+/// transposition table (`abNot`, `idqrot:LIMITS`) of 16 MB unless a part `:hash=MB` says
+/// otherwise, in the referee's strict mode with a part `:tt=strict`.
 ///
 /// Any name but `random` may end in `:KEY=VALUE` parts that set weights (`Weights::KEYS`), on top
 /// of the tuned weights for a search and of the named weights for the baseline agent:
@@ -402,6 +446,7 @@ pub enum AgentSpec {
         quiescence: bool,
         repetition: bool,
         order: bool,
+        table: Option<TableOptions>,
         weights: Weights,
     },
     /// Iterative deepening within `limits`.
@@ -410,6 +455,7 @@ pub enum AgentSpec {
         quiescence: bool,
         repetition: bool,
         order: bool,
+        table: Option<TableOptions>,
         weights: Weights,
     },
 }
@@ -447,6 +493,16 @@ impl AgentSpec {
         }
     }
 
+    /// The table's options, to change them; none without a table.
+    fn table_mut(&mut self) -> Option<&mut TableOptions> {
+        match self {
+            AgentSpec::AlphaBeta { table, .. } | AgentSpec::Deepening { table, .. } => {
+                table.as_mut()
+            }
+            _ => None,
+        }
+    }
+
     /// The weights, to change them; none for `random`.
     fn weights_mut(&mut self) -> Option<&mut Weights> {
         match self {
@@ -469,22 +525,26 @@ impl AgentSpec {
                 quiescence,
                 repetition,
                 order,
+                table,
                 weights,
             } => Box::new(
                 AlphaBetaAgent::new(weights, depth, quiescence, 0)
                     .with_repetitions(repetition)
-                    .with_ordering(order),
+                    .with_ordering(order)
+                    .with_table(table),
             ),
             AgentSpec::Deepening {
                 limits,
                 quiescence,
                 repetition,
                 order,
+                table,
                 weights,
             } => Box::new(
                 DeepeningAgent::new(weights, limits, quiescence, 0)
                     .with_repetitions(repetition)
-                    .with_ordering(order),
+                    .with_ordering(order)
+                    .with_table(table),
             ),
         }
     }
@@ -492,13 +552,13 @@ impl AgentSpec {
 
 impl fmt::Display for AgentSpec {
     /// The canonical name: `random`, `mmN`, `abN` and `id:` with their letters in the order `q`,
-    /// `r`, `o` (`abNqr`, `idqro:`) and the limits in the order d, n, t, the preset's name, or else `u:MAN/KING/MOB`.
+    /// `r`, `o`, `t` (`abNqr`, `idqrot:`) and the limits in the order d, n, t, the preset's name, or else `u:MAN/KING/MOB`.
     /// `"u:1/3/0".parse()` therefore prints as `material`. Then the weights as `:KEY=VALUE` in the
     /// order of `Weights::KEYS`: for a search those that differ from the tuned weights or, when
     /// that takes fewer parts, `:w=NAME` and those that differ from that named set
     /// (`Weights::suffix`), for the baseline agent (unless it is a preset) the positional weights
     /// that are not 0. A weight set to its default is left out: `idqr:n2000:adv=0` prints as
-    /// `idqr:n2000`.
+    /// `idqr:n2000`. Last the table's options that are not the default: `:hash=MB`, `:tt=strict`.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match (self, self.preset()) {
             (AgentSpec::Random, _) => f.write_str("random"),
@@ -521,14 +581,16 @@ impl fmt::Display for AgentSpec {
                     quiescence,
                     repetition,
                     order,
+                    table,
                     weights,
                 },
                 _,
             ) => write!(
                 f,
-                "ab{depth}{}{}",
-                letters(*quiescence, *repetition, *order),
-                weights.suffix()
+                "ab{depth}{}{}{}",
+                letters(*quiescence, *repetition, *order, table.is_some()),
+                weights.suffix(),
+                table_suffix(table)
             ),
             (
                 AgentSpec::Deepening {
@@ -536,11 +598,16 @@ impl fmt::Display for AgentSpec {
                     quiescence,
                     repetition,
                     order,
+                    table,
                     weights,
                 },
                 _,
             ) => {
-                write!(f, "id{}", letters(*quiescence, *repetition, *order))?;
+                write!(
+                    f,
+                    "id{}",
+                    letters(*quiescence, *repetition, *order, table.is_some())
+                )?;
                 if let Some(depth) = limits.depth {
                     write!(f, ":d{depth}")?;
                 }
@@ -550,24 +617,44 @@ impl fmt::Display for AgentSpec {
                 if let Some(time) = limits.time {
                     write!(f, ":t{}", time.as_millis())?;
                 }
-                f.write_str(&weights.suffix())
+                write!(f, "{}{}", weights.suffix(), table_suffix(table))
             }
         }
     }
 }
 
 /// The letters of `ab` and `id` names: `q` for quiescence, `r` for repetitions, `o` for move
-/// ordering, in that order.
-fn letters(quiescence: bool, repetition: bool, order: bool) -> String {
-    [(quiescence, 'q'), (repetition, 'r'), (order, 'o')]
-        .into_iter()
-        .filter_map(|(on, letter)| on.then_some(letter))
-        .collect()
+/// ordering, `t` for a transposition table, in that order.
+fn letters(quiescence: bool, repetition: bool, order: bool, table: bool) -> String {
+    [
+        (quiescence, 'q'),
+        (repetition, 'r'),
+        (order, 'o'),
+        (table, 't'),
+    ]
+    .into_iter()
+    .filter_map(|(on, letter)| on.then_some(letter))
+    .collect()
 }
 
-/// The search options of `letters` (see `letters`): quiescence, repetitions, ordering; `None`
-/// unless each of `q`, `r`, `o` appears at most once and in that order, with nothing else.
-fn parse_letters(letters: &str) -> Option<(bool, bool, bool)> {
+/// The table's parts of a name: `:hash=MB` unless the default, `:tt=strict` in strict mode.
+fn table_suffix(table: &Option<TableOptions>) -> String {
+    let mut suffix = String::new();
+    if let Some(options) = table {
+        if options.mb != TableOptions::DEFAULT_MB {
+            suffix.push_str(&format!(":hash={}", options.mb));
+        }
+        if options.strict {
+            suffix.push_str(":tt=strict");
+        }
+    }
+    suffix
+}
+
+/// The search options of `letters` (see `letters`): quiescence, repetitions, ordering, table;
+/// `None` unless each of `q`, `r`, `o`, `t` appears at most once and in that order, with nothing
+/// else.
+fn parse_letters(letters: &str) -> Option<(bool, bool, bool, bool)> {
     let mut rest = letters;
     let mut take = |letter: char| match rest.strip_prefix(letter) {
         Some(after) => {
@@ -576,7 +663,7 @@ fn parse_letters(letters: &str) -> Option<(bool, bool, bool)> {
         }
         None => false,
     };
-    let options = (take('q'), take('r'), take('o'));
+    let options = (take('q'), take('r'), take('o'), take('t'));
     rest.is_empty().then_some(options)
 }
 
@@ -597,6 +684,9 @@ pub enum ParseAgentError {
     /// The `:KEY=VALUE` parts at the end of the name (the first string) do not set weights; the
     /// second string says why.
     Weight(String, String),
+    /// The `:hash=MB` and `:tt=strict` parts of the name (the first string) do not set a table;
+    /// the second string says why.
+    Table(String, String),
 }
 
 impl fmt::Display for ParseAgentError {
@@ -607,7 +697,8 @@ impl fmt::Display for ParseAgentError {
                 "unknown agent {name:?}: expected random, material, first, tuned, texel1, texel2, texel2s, \
                  u:MAN/KING/MOB, \
                  mmN, abN, id:LIMITS, the last two with letters q (quiescence), r (repetitions) \
-                 and o (move ordering) in that order: abNqro, idqro:LIMITS"
+                 o (move ordering) and t (transposition table) in that order: abNqrot, \
+                 idqrot:LIMITS"
             ),
             ParseAgentError::Depth(name) => write!(
                 f,
@@ -633,6 +724,13 @@ impl fmt::Display for ParseAgentError {
                  idqr:n2000:adv=0.1; a first part w=NAME starts from a named weight set",
                 Weights::KEYS.join(", ")
             ),
+            ParseAgentError::Table(name, why) => write!(
+                f,
+                "agent {name:?}: {why}; an ab or id agent with the letter t has a transposition \
+                 table, sized with :hash=MB (default {} MB) and made strict with :tt=strict, for \
+                 example idqrot:n20000:hash=64",
+                TableOptions::DEFAULT_MB
+            ),
         }
     }
 }
@@ -657,12 +755,51 @@ impl FromStr for AgentSpec {
             return Err(ParseAgentError::Unknown(s.to_string()));
         }
         let mut spec = parse_base(&parts[..first_weight].join(":"))?;
-        let overrides = parts[first_weight..].join(":");
-        let weight_error = |why: String| ParseAgentError::Weight(s.to_string(), why);
-        let weights = spec
-            .weights_mut()
-            .ok_or_else(|| weight_error("random has no weights".to_string()))?;
-        *weights = weights.with_overrides(&overrides).map_err(weight_error)?;
+        // `hash` and `tt` set the table; every other part sets a weight.
+        let (table_parts, weight_parts): (Vec<&str>, Vec<&str>) = parts[first_weight..]
+            .iter()
+            .partition(|part| part.starts_with("hash=") || part.starts_with("tt="));
+        if !table_parts.is_empty() {
+            let table_error = |why: &str| ParseAgentError::Table(s.to_string(), why.to_string());
+            let table = spec
+                .table_mut()
+                .ok_or_else(|| table_error("hash and tt need a table, the letter t"))?;
+            let (mut mb, mut strict) = (None, None);
+            for part in table_parts {
+                match part.split_once('=') {
+                    Some(("hash", value)) if mb.is_none() => {
+                        mb = Some(
+                            value
+                                .parse::<u32>()
+                                .ok()
+                                .filter(|n| (1..=TableOptions::MAX_MB).contains(n))
+                                .filter(|_| value.bytes().all(|b| b.is_ascii_digit()))
+                                .ok_or_else(|| {
+                                    table_error("hash is a whole number of megabytes, 1 to 65536")
+                                })?,
+                        )
+                    }
+                    Some(("tt", "strict")) if strict.is_none() => strict = Some(true),
+                    Some(("tt", _)) if strict.is_none() => {
+                        return Err(table_error("tt=strict is the only table mode to name"));
+                    }
+                    _ => return Err(table_error("hash and tt may each be given once")),
+                }
+            }
+            *table = TableOptions {
+                mb: mb.unwrap_or(table.mb),
+                strict: strict.unwrap_or(table.strict),
+            };
+        }
+        if !weight_parts.is_empty() {
+            let weight_error = |why: String| ParseAgentError::Weight(s.to_string(), why);
+            let weights = spec
+                .weights_mut()
+                .ok_or_else(|| weight_error("random has no weights".to_string()))?;
+            *weights = weights
+                .with_overrides(&weight_parts.join(":"))
+                .map_err(weight_error)?;
+        }
         Ok(spec)
     }
 }
@@ -680,13 +817,14 @@ fn parse_base(s: &str) -> Result<AgentSpec, ParseAgentError> {
         let (letters, limits) = rest.split_at(rest.find(':').unwrap_or(rest.len()));
         Some((parse_letters(letters)?, limits))
     });
-    if let Some(((quiescence, repetition, order), limits)) = deepening {
+    if let Some(((quiescence, repetition, order, table), limits)) = deepening {
         return parse_limits(limits)
             .map(|limits| AgentSpec::Deepening {
                 limits,
                 quiescence,
                 repetition,
                 order,
+                table: table.then(TableOptions::default),
                 weights: Weights::TUNED,
             })
             .ok_or_else(|| ParseAgentError::Limits(s.to_string()));
@@ -709,13 +847,14 @@ fn parse_base(s: &str) -> Result<AgentSpec, ParseAgentError> {
             rest.find(|c: char| !c.is_ascii_digit())
                 .unwrap_or(rest.len()),
         );
-        let (quiescence, repetition, order) =
+        let (quiescence, repetition, order, table) =
             parse_letters(letters).ok_or_else(|| ParseAgentError::Depth(s.to_string()))?;
         return depth(digits).map(|depth| AgentSpec::AlphaBeta {
             depth,
             quiescence,
             repetition,
             order,
+            table: table.then(TableOptions::default),
             weights: Weights::TUNED,
         });
     }
@@ -792,6 +931,7 @@ mod tests {
             quiescence,
             repetition,
             order,
+            table: None,
             weights: Weights::TUNED,
         };
         let ab = |depth, quiescence, repetition| ab_with(depth, quiescence, repetition, false);
@@ -813,6 +953,7 @@ mod tests {
             quiescence,
             repetition,
             order,
+            table: None,
             weights: Weights::TUNED,
         };
         let id = |limits, quiescence, repetition| id_with(limits, quiescence, repetition, false);
@@ -860,6 +1001,7 @@ mod tests {
                 quiescence: true,
                 repetition: true,
                 order: false,
+                table: None,
                 weights: Weights {
                     adv: 0.1,
                     ..Weights::TUNED
@@ -1155,6 +1297,76 @@ mod tests {
             assert_eq!(agent.choose(&board, Color::White, &legal).ok(), expected);
         }
         assert_eq!(agent.nodes(), 4 * ab.nodes);
+    }
+
+    #[test]
+    fn table_letters_and_parts() {
+        let table = |s: &str| match spec(s) {
+            AgentSpec::AlphaBeta { table, .. } | AgentSpec::Deepening { table, .. } => table,
+            _ => panic!("{s} is not a search"),
+        };
+        assert_eq!(table("ab6o"), None);
+        assert_eq!(table("ab6ot"), Some(TableOptions::default()));
+        assert_eq!(table("ab6t"), Some(TableOptions::default()));
+        assert_eq!(
+            table("idqrot:n20000:w=texel1:hash=64"),
+            Some(TableOptions {
+                mb: 64,
+                strict: false
+            })
+        );
+        assert_eq!(
+            table("ab4ot:tt=strict:hash=2"),
+            Some(TableOptions {
+                mb: 2,
+                strict: true
+            })
+        );
+        // The weights are read beside the table's parts, in any order.
+        assert_eq!(
+            spec("idqrot:n20000:hash=64:w=texel1").weights(),
+            Some(Weights::TEXEL1)
+        );
+        for name in [
+            "ab6ot",
+            "ab3qrot",
+            "idqrot:n20000",
+            "idqrot:n20000:w=texel1:hash=64",
+            "ab4ot:tt=strict",
+            "idt:d3:hash=1:tt=strict",
+        ] {
+            assert_eq!(spec(name).to_string(), name);
+        }
+        assert_eq!(spec("ab6ot:hash=16").to_string(), "ab6ot");
+        assert_eq!(
+            spec("ab6ot:tt=strict:king=3:hash=8").to_string(),
+            "ab6ot:king=3:hash=8:tt=strict"
+        );
+        let table_error =
+            |s: &str| matches!(s.parse::<AgentSpec>(), Err(ParseAgentError::Table(..)));
+        for s in [
+            "ab6o:hash=16",
+            "idqr:n2000:tt=strict",
+            "tuned:hash=1",
+            "random:hash=1",
+            "ab6ot:hash=0",
+            "ab6ot:hash=65537",
+            "ab6ot:hash=+4",
+            "ab6ot:hash=x",
+            "ab6ot:tt=loose",
+            "ab6ot:hash=1:hash=2",
+            "ab6ot:tt=strict:tt=strict",
+        ] {
+            assert!(table_error(s), "{s} should be a table error");
+        }
+        assert!(matches!(
+            "ab6to".parse::<AgentSpec>(),
+            Err(ParseAgentError::Depth(_))
+        ));
+        assert!(matches!(
+            "idto:d3".parse::<AgentSpec>(),
+            Err(ParseAgentError::Unknown(_))
+        ));
     }
 
     #[test]

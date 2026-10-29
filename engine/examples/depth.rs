@@ -7,7 +7,8 @@
 //!
 //! Each argument is a time limit in milliseconds per move (`id:tMS` with each position's weights),
 //! or the name of an iterative-deepening agent (`id:...`, `idqro:...`, as in `dama arena`), which
-//! searches with its own limits, options and weights, on an empty game. One pass over all positions
+//! searches with its own limits, options, table and weights, on an empty game (a table is emptied
+//! before each position). One pass over all positions
 //! per argument, after one warm-up pass of alpha-beta at depth 3. With a time limit the results
 //! depend on the clock and the machine, so two runs can differ by an iteration here and there; with
 //! a node or depth limit they are the same every time.
@@ -21,7 +22,8 @@ use std::path::Path;
 use std::time::{Duration, Instant};
 
 use engine::{
-    AgentSpec, Board, Color, Limits, SearchOptions, Weights, alpha_beta, iterative_deepening_with,
+    AgentSpec, Board, Color, Limits, SearchOptions, Table, Weights, alpha_beta,
+    iterative_deepening_with,
 };
 use serde::Deserialize;
 
@@ -73,13 +75,13 @@ fn main() {
     );
     for arg in std::env::args().skip(1) {
         // A number is a time limit with each position's weights; a name brings its own weights.
-        let (limits, options, history, own_weights) = match arg.parse::<u64>() {
+        let (limits, options, history, own_weights, mut table) = match arg.parse::<u64>() {
             Ok(ms) => {
                 let limits = Limits {
                     time: Some(Duration::from_millis(ms)),
                     ..Limits::default()
                 };
-                (limits, SearchOptions::default(), None, None)
+                (limits, SearchOptions::default(), None, None, None)
             }
             Err(_) => match arg.parse::<AgentSpec>() {
                 Ok(AgentSpec::Deepening {
@@ -87,14 +89,17 @@ fn main() {
                     quiescence,
                     repetition,
                     order,
+                    table,
                     weights,
                 }) => {
                     let options = SearchOptions { quiescence, order };
+                    let history = repetition.then_some(&[][..]);
                     (
                         limits,
                         options,
-                        repetition.then_some(&[][..]),
+                        history,
                         Some(weights),
+                        table.map(Table::new),
                     )
                 }
                 _ => panic!("{arg}: expected milliseconds or an iterative-deepening agent"),
@@ -103,9 +108,21 @@ fn main() {
         let mut depths = BTreeMap::new();
         let (mut nodes, mut total, mut longest) = (0, Duration::ZERO, Duration::ZERO);
         for (board, side, weights) in &positions {
+            // A table starts empty for every position, as at the start of a game.
+            if let Some(table) = &mut table {
+                table.clear();
+            }
             let start = Instant::now();
             let weights = own_weights.unwrap_or(*weights);
-            let id = iterative_deepening_with(board, *side, weights, limits, options, history);
+            let id = iterative_deepening_with(
+                board,
+                *side,
+                weights,
+                limits,
+                options,
+                history,
+                table.as_mut(),
+            );
             let took = start.elapsed();
             *depths.entry(id.depth).or_insert(0) += 1;
             nodes += id.decision.nodes;
