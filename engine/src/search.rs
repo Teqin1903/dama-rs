@@ -18,8 +18,16 @@
 //! so every value it finds exactly is bit for bit the minimax value. At the root it needs exact
 //! values only for the moves that can be within `U_EPSILON` of the best (see `alpha_beta`).
 //!
-//! Iterative deepening has no move ordering yet, so its iterations do not depend on each other: a
+//! Without move ordering, iterative deepening's iterations do not depend on each other: a
 //! completed iteration at depth d is exactly `alpha_beta` at depth d.
+//!
+//! Move ordering (`SearchOptions::order`) searches likely refutations first, so that alpha-beta
+//! cuts off sooner: at the root of an iteration the previous iteration's best move, below the root
+//! promotions first, then the killer moves of the ply, then the quiet moves by the history
+//! heuristic (`Heuristics`); ties keep the legal order. It changes the nodes, never the decision:
+//! every value alpha-beta finds exactly is the minimax value whatever the order, and a root move
+//! that gets only a bound is out of `top` whatever the order (see `alpha_beta`), so `top` and the
+//! values in it are the same, and `candidates` stay in legal-move order for `pick`.
 //!
 //! Quiescence (`minimax_q`, `alpha_beta_q`, and iterative deepening with `quiescence`) changes only
 //! the depth limit: a position there whose side to move must capture is not scored, and every
@@ -35,12 +43,24 @@
 //! the root side's view, a side ahead (U > 0) avoids the repetition and a side behind (U < 0)
 //! welcomes it. Without repetitions, the search is the one above, node for node.
 
+use std::cmp::Reverse;
+use std::ops::Range;
 use std::time::{Duration, Instant};
 
 use crate::board::{Board, Color};
 use crate::eval::{DRAW, Features, U_EPSILON, WIN, Weights, evaluate};
 use crate::movegen::Move;
 use crate::rng::Mulberry32;
+use crate::square::Square;
+
+/// How an alpha-beta search goes beyond its depth limit and weights.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct SearchOptions {
+    /// Search captures past the depth limit until the position is quiet.
+    pub quiescence: bool,
+    /// Order the moves (see the module documentation); the decision stays the same.
+    pub order: bool,
+}
 
 /// A legal move with the features and U of the board after it.
 #[derive(Clone, Debug)]
@@ -143,12 +163,16 @@ fn root_minimax(
 /// that move cannot end up within `U_EPSILON` of the best: best only grows. The margin of 2ε,
 /// instead of ε, keeps rounding in `best - ε` from deciding whether a tied move is searched exactly.
 pub fn alpha_beta(board: &Board, side: Color, weights: Weights, depth: u32) -> Decision {
-    unlimited_alpha_beta(board, side, weights, depth, false, None)
+    alpha_beta_with(board, side, weights, depth, SearchOptions::default(), None)
 }
 
 /// `alpha_beta` with quiescence at the depth limit: the decision of `minimax_q`.
 pub fn alpha_beta_q(board: &Board, side: Color, weights: Weights, depth: u32) -> Decision {
-    unlimited_alpha_beta(board, side, weights, depth, true, None)
+    let options = SearchOptions {
+        quiescence: true,
+        ..SearchOptions::default()
+    };
+    alpha_beta_with(board, side, weights, depth, options, None)
 }
 
 /// `alpha_beta` (or `alpha_beta_q` with `quiescence`) that scores a repetition as a draw: a
@@ -162,33 +186,33 @@ pub fn alpha_beta_rep(
     quiescence: bool,
     history: &[(Board, Color)],
 ) -> Decision {
-    let mut repetitions = Repetitions::new(history);
-    unlimited_alpha_beta(
-        board,
-        side,
-        weights,
-        depth,
+    let options = SearchOptions {
         quiescence,
-        Some(&mut repetitions),
-    )
+        ..SearchOptions::default()
+    };
+    alpha_beta_with(board, side, weights, depth, options, Some(history))
 }
 
-fn unlimited_alpha_beta(
+/// Alpha-beta with any `options`, and with `history` (the positions of the game so far) a
+/// repetition is a draw, as in `alpha_beta_rep`. With `options.order` the same decision as without,
+/// from other nodes.
+pub fn alpha_beta_with(
     board: &Board,
     side: Color,
     weights: Weights,
     depth: u32,
-    quiescence: bool,
-    repetitions: Option<&mut Repetitions>,
+    options: SearchOptions,
+    history: Option<&[(Board, Color)]>,
 ) -> Decision {
     assert!(depth >= 1, "alpha-beta needs a depth of at least 1");
     let context = Context {
         root: side,
         weights,
         depth,
-        quiescence,
+        quiescence: options.quiescence,
     };
-    root_alpha_beta(board, &context, &mut Counter::unlimited(), repetitions)
+    let mut search = Search::new(options, history);
+    root_alpha_beta(board, &context, &mut search, None)
         .expect("a search without a budget is never interrupted")
 }
 
@@ -233,7 +257,11 @@ pub fn iterative_deepening(
     limits: Limits,
     quiescence: bool,
 ) -> Deepening {
-    deepening(board, side, weights, limits, quiescence, None)
+    let options = SearchOptions {
+        quiescence,
+        ..SearchOptions::default()
+    };
+    iterative_deepening_with(board, side, weights, limits, options, None)
 }
 
 /// `iterative_deepening` whose iterations score a repetition as a draw, as `alpha_beta_rep` does.
@@ -245,25 +273,25 @@ pub fn iterative_deepening_rep(
     quiescence: bool,
     history: &[(Board, Color)],
 ) -> Deepening {
-    let mut repetitions = Repetitions::new(history);
-    deepening(
-        board,
-        side,
-        weights,
-        limits,
+    let options = SearchOptions {
         quiescence,
-        Some(&mut repetitions),
-    )
+        ..SearchOptions::default()
+    };
+    iterative_deepening_with(board, side, weights, limits, options, Some(history))
 }
 
-fn deepening(
+/// Iterative deepening with any `options`, and with `history` a repetition is a draw, as in
+/// `iterative_deepening_rep`. With `options.order`, each iteration searches the best move of the
+/// one before first, and the killer moves and history heuristic carry over from iteration to
+/// iteration; an iteration at depth d makes the decision of `alpha_beta` at depth d, from other
+/// nodes.
+pub fn iterative_deepening_with(
     board: &Board,
     side: Color,
     weights: Weights,
     limits: Limits,
-    quiescence: bool,
-    // `mut` on the binding: `as_deref_mut` below lends the `&mut` out once per iteration.
-    mut repetitions: Option<&mut Repetitions>,
+    options: SearchOptions,
+    history: Option<&[(Board, Color)]>,
 ) -> Deepening {
     assert!(
         limits != Limits::default(),
@@ -279,19 +307,24 @@ fn deepening(
         root: side,
         weights,
         depth: 1,
-        quiescence,
+        quiescence: options.quiescence,
     };
-    let mut counter = Counter::unlimited();
-    let mut decision = root_alpha_beta(board, &context, &mut counter, repetitions.as_deref_mut())
+    let mut search = Search::new(options, history);
+    let mut decision = root_alpha_beta(board, &context, &mut search, None)
         .expect("a search without a budget is never interrupted");
-    counter.max_nodes = limits.nodes;
-    counter.deadline = deadline;
-    while context.depth < max_depth && counter.horizon {
-        counter.horizon = false;
+    search.counter.max_nodes = limits.nodes;
+    search.counter.deadline = deadline;
+    while context.depth < max_depth && search.counter.horizon {
+        search.counter.horizon = false;
         context.depth += 1;
+        // The first of the best moves, in legal order: the move the agent would play without rng.
+        let first = options
+            .order
+            .then(|| decision.top.first().copied())
+            .flatten();
         // `?` cannot help here: an interrupted iteration is not an error of this function, so the
         // `Option` is matched and `None` ends the loop.
-        match root_alpha_beta(board, &context, &mut counter, repetitions.as_deref_mut()) {
+        match root_alpha_beta(board, &context, &mut search, first) {
             Some(deeper) => decision = deeper,
             None => {
                 context.depth -= 1;
@@ -299,8 +332,8 @@ fn deepening(
             }
         }
     }
-    decision.nodes = counter.nodes;
-    decision.q_nodes = counter.q_nodes;
+    decision.nodes = search.counter.nodes;
+    decision.q_nodes = search.counter.q_nodes;
     Deepening {
         decision,
         depth: context.depth,
@@ -408,25 +441,137 @@ impl<'h> Repetitions<'h> {
     }
 }
 
-/// Alpha-beta at the root, as `alpha_beta` describes, counting in `counter`: `None` if the budget
-/// ran out. The decision's `nodes` and `q_nodes` are the counter's at the end. With
-/// `repetitions`, a repetition below the root is a draw.
+/// Move ordering below the root. A killer move is one of the last two quiet moves that caused a
+/// cutoff at the same ply; the history heuristic adds up, per side and per from and to square,
+/// the remaining depth squared of every cutoff a quiet move caused. Both are kept for all the
+/// iterations of one search. Captures are not scored by either: when a side can capture it must,
+/// so the moves of a node are all captures or all quiet, and among captures only a promotion is
+/// put first.
+struct Heuristics {
+    killers: Vec<[Option<(Square, Square)>; 2]>,
+    /// Indexed by side, from square, to square.
+    history: Box<[[[u32; 64]; 64]; 2]>,
+}
+
+impl Heuristics {
+    fn new() -> Heuristics {
+        Heuristics {
+            killers: Vec::new(),
+            history: Box::new([[[0; 64]; 64]; 2]),
+        }
+    }
+
+    /// The indices of `moves` (`side` to move at `ply`) in the order to search them: promotions,
+    /// then the killers (the newer first), then by history. Equal moves keep the legal order.
+    fn order(&self, moves: &[Move], side: Color, ply: u32) -> Vec<usize> {
+        let killers = self.killers.get(ply as usize).copied().unwrap_or([None; 2]);
+        let score = |mv: &Move| -> (u8, u32) {
+            if mv.promotes() {
+                return (3, 0);
+            }
+            if mv.is_capture() {
+                return (0, 0);
+            }
+            let key = Some((mv.from(), mv.to()));
+            let class = match () {
+                _ if key == killers[0] => 2,
+                _ if key == killers[1] => 1,
+                _ => 0,
+            };
+            (
+                class,
+                self.history[side as usize][mv.from().index()][mv.to().index()],
+            )
+        };
+        let mut order: Vec<usize> = (0..moves.len()).collect();
+        // `sort_by_key` is stable: moves with the same score stay in legal order.
+        order.sort_by_key(|&i| Reverse(score(&moves[i])));
+        order
+    }
+
+    /// `mv`, played by `side` at `ply` of a search `depth` plies deep, caused a cutoff.
+    fn cutoff(&mut self, mv: &Move, side: Color, ply: u32, depth: u32) {
+        if mv.is_capture() {
+            return;
+        }
+        let ply = ply as usize;
+        if self.killers.len() <= ply {
+            self.killers.resize(ply + 1, [None; 2]);
+        }
+        let key = Some((mv.from(), mv.to()));
+        let killers = &mut self.killers[ply];
+        if killers[0] != key {
+            killers[1] = killers[0];
+            killers[0] = key;
+        }
+        // A quiet move is searched only above the depth limit, so at least 1 ply remains.
+        let remaining = depth.saturating_sub(ply as u32);
+        let count = &mut self.history[side as usize][mv.from().index()][mv.to().index()];
+        *count = count.saturating_add(remaining * remaining);
+    }
+}
+
+/// The order in which a node's moves are searched, as indices into its legal moves.
+enum MoveOrder {
+    Legal(Range<usize>),
+    Sorted(std::vec::IntoIter<usize>),
+}
+
+impl Iterator for MoveOrder {
+    type Item = usize;
+
+    fn next(&mut self) -> Option<usize> {
+        match self {
+            MoveOrder::Legal(indices) => indices.next(),
+            MoveOrder::Sorted(indices) => indices.next(),
+        }
+    }
+}
+
+/// What a search changes as it goes: the node counter and budget, the positions a repetition is
+/// compared against (with repetitions), and the move-ordering heuristics (with ordering).
+struct Search<'h> {
+    counter: Counter,
+    repetitions: Option<Repetitions<'h>>,
+    heuristics: Option<Heuristics>,
+}
+
+impl<'h> Search<'h> {
+    fn new(options: SearchOptions, history: Option<&'h [(Board, Color)]>) -> Search<'h> {
+        Search {
+            counter: Counter::unlimited(),
+            repetitions: history.map(Repetitions::new),
+            heuristics: options.order.then(Heuristics::new),
+        }
+    }
+}
+
+/// Alpha-beta at the root, as `alpha_beta` describes, counting in `search.counter`: `None` if the
+/// budget ran out. The root moves are searched in legal order, or with `first` that move first and
+/// then the others in legal order; `candidates` are in legal order either way. The decision's
+/// `nodes` and `q_nodes` are the counter's at the end. With repetitions, a repetition below the
+/// root is a draw.
 fn root_alpha_beta(
     board: &Board,
     context: &Context,
-    counter: &mut Counter,
-    mut repetitions: Option<&mut Repetitions>,
+    search: &mut Search,
+    first: Option<usize>,
 ) -> Option<Decision> {
     let side = context.root;
-    if let Some(repetitions) = repetitions.as_deref_mut() {
+    if let Some(repetitions) = &mut search.repetitions {
         // An interrupted search leaves its path behind; every search starts from the root.
         repetitions.path.clear();
         repetitions.path.push((*board, side));
     }
+    let moves = board.legal_moves(side);
+    let order = first
+        .into_iter()
+        .chain((0..moves.len()).filter(|&i| Some(i) != first));
     let mut best = f64::NEG_INFINITY;
-    let mut candidates = Vec::new();
-    for mv in board.legal_moves(side) {
-        let after = board.apply(&mv);
+    let mut candidates: Vec<Option<Candidate>> = vec![None; moves.len()];
+    for i in order {
+        let mv = &moves[i];
+        let after = board.apply(mv);
         let alpha = best - 2.0 * U_EPSILON;
         let u = bounded_value(
             &after,
@@ -434,17 +579,21 @@ fn root_alpha_beta(
             1,
             (alpha, f64::INFINITY),
             context,
-            counter,
-            repetitions.as_deref_mut(),
+            search,
         )?;
         best = best.max(u);
-        candidates.push(Candidate {
+        candidates[i] = Some(Candidate {
             features: Features::of(&after, side),
             u,
             exact: u > alpha,
-            mv,
+            mv: mv.clone(),
         });
     }
+    let candidates = candidates
+        .into_iter()
+        .map(|c| c.expect("every root move is searched"))
+        .collect();
+    let counter = &search.counter;
     Some(Decision::new(candidates, counter.nodes, counter.q_nodes))
 }
 
@@ -477,20 +626,19 @@ fn value(board: &Board, to_move: Color, ply: u32, context: &Context, counter: &m
 
 /// `value` searched with alpha-beta in the window `(alpha, beta)`, fail-soft: a result strictly
 /// inside the window is the exact minimax value; a result `<= alpha` is an upper bound of it and a
-/// result `>= beta` a lower bound. Counts every board it visits in `counter`, as `value` does, and
-/// gives `None` as soon as the counter's budget runs out. With `repetitions`, a position seen
-/// before is worth `DRAW`.
+/// result `>= beta` a lower bound. Counts every board it visits in `search.counter`, as `value`
+/// does, and gives `None` as soon as the counter's budget runs out. With repetitions, a position
+/// seen before is worth `DRAW`; with heuristics, the moves are ordered.
 fn bounded_value(
     board: &Board,
     to_move: Color,
     ply: u32,
     (mut alpha, mut beta): (f64, f64),
     context: &Context,
-    counter: &mut Counter,
-    mut repetitions: Option<&mut Repetitions>,
+    search: &mut Search,
 ) -> Option<f64> {
-    counter.visit(ply, context)?;
-    if repetitions.as_ref().is_some_and(|r| r.seen(board, to_move)) {
+    search.counter.visit(ply, context)?;
+    if (search.repetitions.as_ref()).is_some_and(|r| r.seen(board, to_move)) {
         return Some(DRAW);
     }
     let moves = board.legal_moves(to_move);
@@ -498,7 +646,7 @@ fn bounded_value(
         return Some(context.no_move_value(to_move, ply));
     }
     if context.is_leaf(ply, &moves) {
-        counter.horizon = true;
+        search.counter.horizon = true;
         return Some(context.leaf_value(board, to_move, &moves));
     }
     let maximising = to_move == context.root;
@@ -507,18 +655,22 @@ fn bounded_value(
     } else {
         f64::INFINITY
     };
-    if let Some(repetitions) = repetitions.as_deref_mut() {
+    if let Some(repetitions) = &mut search.repetitions {
         repetitions.path.push((*board, to_move));
     }
-    for mv in &moves {
+    let order = match &search.heuristics {
+        Some(heuristics) => MoveOrder::Sorted(heuristics.order(&moves, to_move, ply).into_iter()),
+        None => MoveOrder::Legal(0..moves.len()),
+    };
+    for i in order {
+        let mv = &moves[i];
         let v = bounded_value(
             &board.apply(mv),
             to_move.opponent(),
             ply + 1,
             (alpha, beta),
             context,
-            counter,
-            repetitions.as_deref_mut(),
+            search,
         )?;
         if maximising {
             best = best.max(v);
@@ -528,10 +680,13 @@ fn bounded_value(
             beta = beta.min(v);
         }
         if alpha >= beta {
+            if let Some(heuristics) = &mut search.heuristics {
+                heuristics.cutoff(mv, to_move, ply, context.depth);
+            }
             break;
         }
     }
-    if let Some(repetitions) = repetitions {
+    if let Some(repetitions) = &mut search.repetitions {
         repetitions.path.pop();
     }
     Some(best)
@@ -680,37 +835,62 @@ mod tests {
             depth: 3,
             quiescence: false,
         };
-        let mut repetitions = Repetitions::new(&[]);
-        repetitions.path.push((board, Color::Black));
-        let mut counter = Counter::unlimited();
+        let mut search = Search::new(SearchOptions::default(), Some(&[][..]));
+        let path = |search: &Search| search.repetitions.as_ref().unwrap().path.clone();
+        search
+            .repetitions
+            .as_mut()
+            .unwrap()
+            .path
+            .push((board, Color::Black));
         let window = (f64::NEG_INFINITY, f64::INFINITY);
-        let draw = bounded_value(
-            &board,
-            Color::Black,
-            1,
-            window,
-            &context,
-            &mut counter,
-            Some(&mut repetitions),
-        );
+        let draw = bounded_value(&board, Color::Black, 1, window, &context, &mut search);
         // A repetition is a node, but nothing below it is searched.
-        assert_eq!((draw, counter.nodes), (Some(DRAW), 1));
+        assert_eq!((draw, search.counter.nodes), (Some(DRAW), 1));
         // The same side to move is part of the position.
-        let searched = bounded_value(
-            &board,
-            Color::White,
-            1,
-            window,
-            &context,
-            &mut counter,
-            Some(&mut repetitions),
-        );
+        let searched = bounded_value(&board, Color::White, 1, window, &context, &mut search);
         assert_ne!(searched, Some(DRAW));
-        assert!(counter.nodes > 2);
-        assert_eq!(repetitions.path, [(board, Color::Black)]);
+        assert!(search.counter.nodes > 2);
+        assert_eq!(path(&search), [(board, Color::Black)]);
         // A root search leaves only the root on the path.
-        root_alpha_beta(&board, &context, &mut counter, Some(&mut repetitions)).unwrap();
-        assert_eq!(repetitions.path, [(board, Color::White)]);
+        root_alpha_beta(&board, &context, &mut search, None).unwrap();
+        assert_eq!(path(&search), [(board, Color::White)]);
+    }
+
+    #[test]
+    fn heuristics_put_promotions_then_killers_then_history_first() {
+        // White men on b2, d7 and g3: d7-d8 promotes. Black king on a8 keeps Black in the game.
+        let board: Board =
+            "B......./...w..../......../......../......../......w./.w....../........"
+                .parse()
+                .unwrap();
+        let moves = board.legal_moves(Color::White);
+        let index = |name: &str| moves.iter().position(|m| m.to_string() == name).unwrap();
+        let mut heuristics = Heuristics::new();
+        let legal: Vec<usize> = (0..moves.len()).collect();
+        let promotion = index("d7-d8=K");
+        let mut expected = vec![promotion];
+        expected.extend(legal.iter().filter(|&&i| i != promotion));
+        assert_eq!(heuristics.order(&moves, Color::White, 2), expected);
+        // g3-g4 cut off at ply 2 of a 4-ply search: a killer at ply 2 and 4 in the history.
+        let killer = index("g3-g4");
+        heuristics.cutoff(&moves[killer], Color::White, 2, 4);
+        assert_eq!(
+            heuristics.history[0][moves[killer].from().index()][moves[killer].to().index()],
+            4
+        );
+        let order = heuristics.order(&moves, Color::White, 2);
+        assert_eq!(order[..2], [promotion, killer]);
+        // At another ply it is not a killer, but its history still puts it before the rest.
+        let order = heuristics.order(&moves, Color::White, 3);
+        assert_eq!(order[..2], [promotion, killer]);
+        // A newer killer comes first; the older stays second.
+        let newer = index("b2-b3");
+        heuristics.cutoff(&moves[newer], Color::White, 2, 4);
+        let order = heuristics.order(&moves, Color::White, 2);
+        assert_eq!(order[..3], [promotion, newer, killer]);
+        // Black's history is its own.
+        assert!(heuristics.history[1].iter().flatten().all(|&n| n == 0));
     }
 
     #[test]

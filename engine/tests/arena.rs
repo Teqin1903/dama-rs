@@ -361,6 +361,24 @@ fn iterative_deepening_with_quiescence_plays_the_games_of_ab3q() {
 }
 
 #[test]
+fn ordered_agents_play_the_games_of_unordered_ones() {
+    assert_eq!(paired("ab2o", "ab3o", 6, 1), paired("ab2", "ab3", 6, 1));
+}
+
+#[test]
+#[ignore = "slow in a debug build; run with --release -- --ignored"]
+fn ordered_agents_play_the_games_of_unordered_ones_at_depths_3_and_4() {
+    assert_eq!(
+        paired("ab3o:w=texel1", "ab4o:w=texel1", 20, 1),
+        paired("ab3:w=texel1", "ab4:w=texel1", 20, 1)
+    );
+    assert_eq!(
+        paired("idqo:d3", "idqro:d3:w=texel1", 20, 1),
+        paired("idq:d3", "idqr:d3:w=texel1", 20, 1)
+    );
+}
+
+#[test]
 fn the_legacy_schedule_has_the_settings_of_every_match_before_it() {
     assert_eq!(Schedule::Legacy.settings(), MatchSettings::REFERENCE);
     assert_eq!(MatchSettings::REFERENCE.opening_plies, 2);

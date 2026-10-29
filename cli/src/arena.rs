@@ -50,6 +50,10 @@ agents:
   abNr, abNqr,      abN, abNq, id:LIMITS and idq:LIMITS that recognise repetitions: a position
   idr:LIMITS,       of the game or of the search path that occurs again is a draw (0), so the
   idqr:LIMITS       agent avoids repeating when ahead and seeks it when behind
+  abNo, idqro:...   a final o orders the moves (the best move of the last iteration, promotions,
+                    killer moves, history heuristic): the same moves as without at a fixed depth,
+                    from fewer nodes, so deeper within a node budget. Letters come in the order
+                    q, r, o: ab6o, ab3qro, idqro:n20000
 
 weights: any agent but random may end in :KEY=VALUE parts that set weights of U, on top of the
 tuned weights for mm, ab and id, and of the named weights for the baseline agent, for example
@@ -306,13 +310,14 @@ fn describe(spec: &AgentSpec) -> String {
                 depth,
                 quiescence,
                 repetition,
+                order,
                 weights,
             },
             _,
         ) => {
             format!(
                 "{spec} (alpha-beta, {depth} plies{}, {})",
-                extras(*quiescence, *repetition),
+                extras(*quiescence, *repetition, *order),
                 weights_text(weights)
             )
         }
@@ -320,13 +325,14 @@ fn describe(spec: &AgentSpec) -> String {
             AgentSpec::Deepening {
                 quiescence,
                 repetition,
+                order,
                 weights,
                 ..
             },
             _,
         ) => format!(
             "{spec} (iterative deepening alpha-beta{}, {})",
-            extras(*quiescence, *repetition),
+            extras(*quiescence, *repetition, *order),
             weights_text(weights)
         ),
         _ => spec.to_string(),
@@ -344,14 +350,17 @@ fn weights_text(weights: &Weights) -> String {
     format!("{weights}{}", weights.overrides_from(&u_only))
 }
 
-/// `, quiescence` and `, repetitions` for the searches that have them.
-fn extras(quiescence: bool, repetition: bool) -> String {
+/// `, quiescence`, `, repetitions` and `, move ordering` for the searches that have them.
+fn extras(quiescence: bool, repetition: bool, order: bool) -> String {
     let mut extras = String::new();
     if quiescence {
         extras.push_str(", quiescence");
     }
     if repetition {
         extras.push_str(", repetitions");
+    }
+    if order {
+        extras.push_str(", move ordering");
     }
     extras
 }

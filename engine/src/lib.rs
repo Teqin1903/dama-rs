@@ -34,8 +34,9 @@ pub use movegen::Move;
 pub use perft::perft;
 pub use rng::{Mulberry32, derive_seed};
 pub use search::{
-    Candidate, Decision, Deepening, Limits, MAX_ID_DEPTH, alpha_beta, alpha_beta_q, alpha_beta_rep,
-    decide, iterative_deepening, iterative_deepening_rep, minimax, minimax_q,
+    Candidate, Decision, Deepening, Limits, MAX_ID_DEPTH, SearchOptions, alpha_beta, alpha_beta_q,
+    alpha_beta_rep, alpha_beta_with, decide, iterative_deepening, iterative_deepening_rep,
+    iterative_deepening_with, minimax, minimax_q,
 };
 pub use sprt::{Pentanomial, Sprt, SprtResult, Verdict, elo_of, expected_score};
 pub use square::Square;
