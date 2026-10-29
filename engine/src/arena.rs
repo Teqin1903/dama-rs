@@ -124,7 +124,7 @@ impl Schedule {
             }
             Schedule::Paired => (0..games)
                 .map(|g| GameSeeds {
-                    opening: derive_seed(seed, OPENING, g / 2),
+                    opening: paired_opening_seed(seed, g),
                     a: derive_seed(seed, AGENT_A, g),
                     b: derive_seed(seed, AGENT_B, g),
                     a_white: g % 2 == 0,
@@ -132,6 +132,12 @@ impl Schedule {
                 .collect(),
         }
     }
+}
+
+/// The seed of the random opening plies of game `game` in a paired match with seed `seed`: the
+/// same for games 2p and 2p + 1.
+pub fn paired_opening_seed(seed: u32, game: u32) -> u32 {
+    derive_seed(seed, OPENING, game / 2)
 }
 
 impl fmt::Display for Schedule {
@@ -292,6 +298,8 @@ pub struct Thinking {
     pub time: Duration,
     /// The positions its search produced while choosing them (`Agent::nodes`).
     pub nodes: u64,
+    /// The depths of the searches that chose them, added up (`Agent::depths`).
+    pub depths: u64,
 }
 
 impl Thinking {
@@ -304,6 +312,23 @@ impl Thinking {
     pub fn nodes_per_move(&self) -> Option<f64> {
         (self.moves > 0).then(|| self.nodes as f64 / self.moves as f64)
     }
+
+    /// The mean depth per move, or `None` if the agent never moved.
+    pub fn depth_per_move(&self) -> Option<f64> {
+        (self.moves > 0).then(|| self.depths as f64 / self.moves as f64)
+    }
+}
+
+impl Thinking {
+    /// The thinking done since `earlier`, a copy of this one taken before.
+    fn since(&self, earlier: Thinking) -> Thinking {
+        Thinking {
+            moves: self.moves - earlier.moves,
+            time: self.time - earlier.time,
+            nodes: self.nodes - earlier.nodes,
+            depths: self.depths - earlier.depths,
+        }
+    }
 }
 
 /// `+=` adds up the thinking of an agent in several threads.
@@ -312,6 +337,7 @@ impl AddAssign for Thinking {
         self.moves += other.moves;
         self.time += other.time;
         self.nodes += other.nodes;
+        self.depths += other.depths;
     }
 }
 
@@ -336,16 +362,21 @@ impl Agent for Timed<'_> {
         side: Color,
         legal: &'m [Move],
     ) -> Result<&'m Move, AgentError> {
-        let (start, nodes) = (Instant::now(), self.agent.nodes());
+        let (start, nodes, depths) = (Instant::now(), self.agent.nodes(), self.agent.depths());
         let chosen = self.agent.choose(board, side, legal);
         self.thinking.time += start.elapsed();
         self.thinking.nodes += self.agent.nodes() - nodes;
+        self.thinking.depths += self.agent.depths() - depths;
         self.thinking.moves += 1;
         chosen
     }
 
     fn nodes(&self) -> u64 {
         self.agent.nodes()
+    }
+
+    fn depths(&self) -> u64 {
+        self.agent.depths()
     }
 }
 
@@ -382,6 +413,9 @@ impl MatchGame {
 pub struct MatchRecord {
     /// The games in the order of the schedule; with an SPRT, those up to the pair that decided.
     pub games: Vec<MatchGame>,
+    /// The thinking of A and of B in each game of `games`, in the same order. It is kept apart
+    /// from the games because the time differs from run to run while the games do not.
+    pub per_game: Vec<[Thinking; 2]>,
     /// The thinking of every game played, with an SPRT also of the games that were still being
     /// played when the test decided (at most one per thread).
     pub a: Thinking,
@@ -541,7 +575,7 @@ impl Monitor {
 /// The games one thread played, with its agents' thinking, or the first error it met.
 #[derive(Default)]
 struct Played {
-    games: Vec<(usize, MatchGame)>,
+    games: Vec<(usize, MatchGame, [Thinking; 2])>,
     error: Option<(usize, AgentError)>,
     a: Thinking,
     b: Thinking,
@@ -604,14 +638,20 @@ pub fn play_match(
     if let Some((_, e)) = error {
         return Err(e);
     }
-    games.sort_by_key(|(g, _)| *g);
+    games.sort_by_key(|(g, _, _)| *g);
     let sprt = monitor.map(Monitor::result);
     if let Some(result) = &sprt {
         // The games after the pair that decided do not count; some may not even be there.
         games.truncate(2 * result.pairs.pairs() as usize);
     }
+    // `unzip` splits an iterator of pairs into two collections.
+    let (games, per_game) = games
+        .into_iter()
+        .map(|(_, game, thinking)| (game, thinking))
+        .unzip();
     Ok(MatchRecord {
-        games: games.into_iter().map(|(_, game)| game).collect(),
+        games,
+        per_game,
         a: a_thinking,
         b: b_thinking,
         sprt,
@@ -646,12 +686,14 @@ fn play_games(
         let Some(game_seeds) = seeds.get(g) else {
             break;
         };
+        let (a_before, b_before) = (a.thinking, b.thinking);
         match play_one(&mut a, &mut b, game_seeds, settings) {
             Ok(game) => {
                 if let Some(monitor) = monitor {
                     monitor.record(g, game.a_score());
                 }
-                played.games.push((g, game));
+                let thinking = [a.thinking.since(a_before), b.thinking.since(b_before)];
+                played.games.push((g, game, thinking));
             }
             Err(e) => {
                 failed.store(true, Ordering::Relaxed);
@@ -709,6 +751,7 @@ mod tests {
 
     fn record(games: Vec<MatchGame>) -> MatchRecord {
         MatchRecord {
+            per_game: vec![[Thinking::default(); 2]; games.len()],
             games,
             a: Thinking::default(),
             b: Thinking::default(),
@@ -764,9 +807,12 @@ mod tests {
             moves: 4,
             time: Duration::from_micros(10),
             nodes: 90,
+            depths: 10,
         };
         assert_eq!(thinking.per_move(), Some(Duration::from_nanos(2500)));
         assert_eq!(thinking.nodes_per_move(), Some(22.5));
+        assert_eq!(thinking.depth_per_move(), Some(2.5));
+        assert_eq!(Thinking::default().depth_per_move(), None);
         assert_eq!(Thinking::default().per_move(), None);
         assert_eq!(Thinking::default().nodes_per_move(), None);
     }

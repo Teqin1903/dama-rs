@@ -53,6 +53,13 @@ pub trait Agent {
     fn nodes(&self) -> u64 {
         0
     }
+
+    /// The depths of the searches that chose this agent's moves since it was built, added up: the
+    /// completed depth of iterative deepening, the fixed depth of the others (1 for the baseline
+    /// agent), quiescence not counted. 0 for an agent that does not search.
+    fn depths(&self) -> u64 {
+        0
+    }
 }
 
 /// Why an agent could not play, in words.
@@ -129,6 +136,8 @@ pub struct UAgent {
     weights: Weights,
     rng: Mulberry32,
     nodes: u64,
+    /// The sum of `Agent::depths`.
+    depths: u64,
 }
 
 impl UAgent {
@@ -137,6 +146,7 @@ impl UAgent {
             weights,
             rng: Mulberry32::new(seed),
             nodes: 0,
+            depths: 0,
         }
     }
 }
@@ -163,11 +173,16 @@ impl Agent for UAgent {
     ) -> Result<&'m Move, AgentError> {
         let decision = decide(board, side, self.weights);
         self.nodes += decision.nodes;
+        self.depths += 1;
         Ok(play(&decision, &mut self.rng, legal))
     }
 
     fn nodes(&self) -> u64 {
         self.nodes
+    }
+
+    fn depths(&self) -> u64 {
+        self.depths
     }
 }
 
@@ -179,6 +194,8 @@ pub struct MinimaxAgent {
     depth: u32,
     rng: Mulberry32,
     nodes: u64,
+    /// The sum of `Agent::depths`.
+    depths: u64,
 }
 
 impl MinimaxAgent {
@@ -188,6 +205,7 @@ impl MinimaxAgent {
             depth,
             rng: Mulberry32::new(seed),
             nodes: 0,
+            depths: 0,
         }
     }
 }
@@ -206,11 +224,16 @@ impl Agent for MinimaxAgent {
     ) -> Result<&'m Move, AgentError> {
         let decision = minimax(board, side, self.weights, self.depth);
         self.nodes += decision.nodes;
+        self.depths += u64::from(self.depth);
         Ok(play(&decision, &mut self.rng, legal))
     }
 
     fn nodes(&self) -> u64 {
         self.nodes
+    }
+
+    fn depths(&self) -> u64 {
+        self.depths
     }
 }
 
@@ -231,6 +254,8 @@ pub struct AlphaBetaAgent {
     history: Option<GameHistory>,
     rng: Mulberry32,
     nodes: u64,
+    /// The sum of `Agent::depths`.
+    depths: u64,
 }
 
 impl AlphaBetaAgent {
@@ -244,6 +269,7 @@ impl AlphaBetaAgent {
             history: None,
             rng: Mulberry32::new(seed),
             nodes: 0,
+            depths: 0,
         }
     }
 
@@ -300,6 +326,7 @@ impl Agent for AlphaBetaAgent {
             self.table.as_mut(),
         );
         self.nodes += decision.nodes;
+        self.depths += u64::from(self.depth);
         Ok(play(&decision, &mut self.rng, legal))
     }
 
@@ -311,6 +338,10 @@ impl Agent for AlphaBetaAgent {
 
     fn nodes(&self) -> u64 {
         self.nodes
+    }
+
+    fn depths(&self) -> u64 {
+        self.depths
     }
 }
 
@@ -332,6 +363,8 @@ pub struct DeepeningAgent {
     history: Option<GameHistory>,
     rng: Mulberry32,
     nodes: u64,
+    /// The sum of `Agent::depths`.
+    depths: u64,
 }
 
 impl DeepeningAgent {
@@ -345,6 +378,7 @@ impl DeepeningAgent {
             history: None,
             rng: Mulberry32::new(seed),
             nodes: 0,
+            depths: 0,
         }
     }
 
@@ -401,6 +435,7 @@ impl Agent for DeepeningAgent {
             self.table.as_mut(),
         );
         self.nodes += deepening.decision.nodes;
+        self.depths += u64::from(deepening.depth);
         Ok(play(&deepening.decision, &mut self.rng, legal))
     }
 
@@ -412,6 +447,10 @@ impl Agent for DeepeningAgent {
 
     fn nodes(&self) -> u64 {
         self.nodes
+    }
+
+    fn depths(&self) -> u64 {
+        self.depths
     }
 }
 

@@ -103,7 +103,7 @@ a_nodes_per_move,b_nodes_per_move,schedule,opening_plies,threads,wall_s,\
 sprt,llr,elo0,elo1,alpha,beta,max_games,min_games";
 
 /// Debug builds are many times slower: the times per move of a debug build are not measurements.
-const BUILD: &str = if cfg!(debug_assertions) {
+pub(crate) const BUILD: &str = if cfg!(debug_assertions) {
     "debug"
 } else {
     "release"
@@ -111,21 +111,21 @@ const BUILD: &str = if cfg!(debug_assertions) {
 
 /// What the command line asks for.
 #[derive(Debug, PartialEq)]
-struct Args {
-    a: AgentSpec,
-    b: AgentSpec,
-    games: u32,
-    seed: u32,
-    schedule: Schedule,
-    threads: usize,
+pub(crate) struct Args {
+    pub(crate) a: AgentSpec,
+    pub(crate) b: AgentSpec,
+    pub(crate) games: u32,
+    pub(crate) seed: u32,
+    pub(crate) schedule: Schedule,
+    pub(crate) threads: usize,
     /// Stop when this test decides; `games` is then the most games.
-    sprt: Option<Sprt>,
-    csv: PathBuf,
-    log: Option<PathBuf>,
+    pub(crate) sprt: Option<Sprt>,
+    pub(crate) csv: PathBuf,
+    pub(crate) log: Option<PathBuf>,
 }
 
 impl Args {
-    fn plan(&self) -> MatchPlan {
+    pub(crate) fn plan(&self) -> MatchPlan {
         MatchPlan {
             games: self.games,
             seed: self.seed,
@@ -507,7 +507,7 @@ fn write_log(path: &Path, args: &Args, record: &MatchRecord) -> io::Result<()> {
 }
 
 /// One row of the CSV file; see `CSV_HEADER` for the columns.
-fn csv_row(
+pub(crate) fn csv_row(
     date: &str,
     version: &str,
     build: &str,
@@ -581,7 +581,7 @@ fn csv_field(s: &str) -> String {
 
 /// Appends `row` to the CSV file at `path`, writing the header first if the file is new or empty.
 /// A file with other columns is left alone: the new row would not match them.
-fn append_csv(path: &Path, row: &str) -> io::Result<()> {
+pub(crate) fn append_csv(path: &Path, row: &str) -> io::Result<()> {
     if let Some(dir) = path.parent().filter(|dir| !dir.as_os_str().is_empty()) {
         fs::create_dir_all(dir)?;
     }
@@ -606,7 +606,7 @@ fn append_csv(path: &Path, row: &str) -> io::Result<()> {
 /// The version of the code: `git describe --tags --always`, and `-dirty` if a tracked file
 /// outside results/ differs from HEAD. The rows the arena appends to results/ do not count, so
 /// two runs of the same code report the same version. `None` if git cannot tell.
-fn code_version() -> Option<String> {
+pub(crate) fn code_version() -> Option<String> {
     let describe = git(&["describe", "--tags", "--always"])?;
     let changed = git(&[
         "status",
@@ -630,7 +630,7 @@ fn git(args: &[&str]) -> Option<String> {
 }
 
 /// Seconds since 1970-01-01T00:00:00Z.
-fn unix_now() -> u64 {
+pub(crate) fn unix_now() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_or(0, |d| d.as_secs())
@@ -639,7 +639,7 @@ fn unix_now() -> u64 {
 /// Seconds since 1970-01-01T00:00:00Z as ISO 8601 in UTC, for example 2026-10-25T16:20:05Z.
 /// The date is Howard Hinnant's `civil_from_days`: it counts in eras of 400 years, which start
 /// on March 1st so that the leap day comes last.
-fn utc(secs: u64) -> String {
+pub(crate) fn utc(secs: u64) -> String {
     let (days, time) = (secs / 86_400, secs % 86_400);
     let z = days + 719_468; // days since 0000-03-01
     let (era, day_of_era) = (z / 146_097, z % 146_097);
@@ -805,10 +805,12 @@ mod tests {
                 game(true, Some(Color::White), EndReason::NoMove),
                 game(false, None, EndReason::Repetition),
             ],
+            per_game: vec![[Thinking::default(); 2]; 2],
             a: Thinking {
                 moves: 4,
                 time: Duration::from_micros(10),
                 nodes: 90,
+                depths: 8,
             },
             b: Thinking::default(),
             sprt: None,

@@ -10,7 +10,9 @@ mod agent;
 mod arena;
 mod bitboard;
 mod board;
+mod elo;
 mod eval;
+mod ladder;
 mod movegen;
 mod perft;
 mod rng;
@@ -27,11 +29,17 @@ pub use agent::{
 };
 pub use arena::{
     AgentFactory, EndReason, GameRecord, MatchGame, MatchPlan, MatchRecord, MatchSettings,
-    Schedule, Thinking, play_game, play_match,
+    Schedule, Thinking, paired_opening_seed, play_game, play_match,
 };
 pub use bitboard::Bitboard;
 pub use board::{Board, Color, Kind, ParseBoardError, Piece};
+pub use elo::{Bootstrap, Fit, PairedMatch, Score, bootstrap, elo_or_infinite, fit, percentile};
 pub use eval::{DRAW, Features, Positional, U_EPSILON, WIN, Weights, evaluate};
+pub use ladder::{
+    ANCHOR, FOOTNOTES, GAMES_HEADER, GameRow, Json, LADDER, LONG_MATCH, MID, Meta, Pairing,
+    PairingSummary, Report, Role, Rung, SEED, SHORT_MATCH, SideStats, VersionSummary, plan, rate,
+    rows_of,
+};
 pub use movegen::Move;
 pub use perft::perft;
 pub use rng::{Mulberry32, derive_seed};

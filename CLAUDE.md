@@ -7,7 +7,8 @@ match kish 1.1.2, and every number in our Assignment 3 talk came from it.
 ## Layout
 - `engine/`: library crate with the board, move generation, evaluation (U and its positional features, `eval.rs`),
   search, Zobrist keys (`zobrist.rs`) and the transposition table (`table.rs`), the arena and its SPRT (`sprt.rs`),
-  and Texel tuning of the weights (`texel.rs`)
+  Texel tuning of the weights (`texel.rs`), and the Elo ladder (`ladder.rs`: rungs, pairings, game rows) with its
+  Bradley-Terry fit and bootstrap (`elo.rs`)
 - `cli/`: binary crate that speaks the text protocol (position / go / bestmove)
 - `reference/js/`: the JS prototype. Read it; never edit it.
 - `testdata/`: perft counts, rule cases, move lists of sampled positions, decisions of the baseline agent
@@ -45,6 +46,11 @@ match kish 1.1.2, and every number in our Assignment 3 talk came from it.
   `--agents`, `--games`, `--start W` (as in an agent name, `w=texel1:qmob=0`), `--fixed KEYS` (left at the start
   value besides man) and `--compare NAMES` set up other runs; the split is by whole games and is reported.
   `texel2` and `texel2s` came from the second run (seed 2, 6000 games; the commands are in docs/decisions.md)
+- Elo ladder (docs/ladder.md): `cargo run --release -p cli -- ladder run --estimate` (12 games per pairing, prints
+  the time of the whole run), `ladder run` (25 pairings, 6800 games; resumable: one file per finished pairing in
+  `results/ladder/games/`, skipped on a rerun; `results/ladder/progress.log` is not committed), `ladder rate`
+  (writes `results/ladder/ladder.json` from the games, plays nothing). Rungs and pairings are `LADDER` and `plan`
+  in `engine/src/ladder.rs`; the zero is V1 (`mm3`), the mid opponent V6 (`idqr:n20000`)
 - Regenerate testdata (only when I ask): `node reference/js/make_testdata.js`
 
 ## Rules (TÜDAF): the parts that are easy to get wrong
