@@ -6,7 +6,8 @@ match kish 1.1.2, and every number in our Assignment 3 talk came from it.
 
 ## Layout
 - `engine/`: library crate with the board, move generation, evaluation (U and its positional features, `eval.rs`),
-  search, the arena and its SPRT (`sprt.rs`), and Texel tuning of the weights (`texel.rs`)
+  search, Zobrist keys (`zobrist.rs`) and the transposition table (`table.rs`), the arena and its SPRT (`sprt.rs`),
+  and Texel tuning of the weights (`texel.rs`)
 - `cli/`: binary crate that speaks the text protocol (position / go / bestmove)
 - `reference/js/`: the JS prototype. Read it; never edit it.
 - `testdata/`: perft counts, rule cases, move lists of sampled positions, decisions of the baseline agent
@@ -31,6 +32,8 @@ match kish 1.1.2, and every number in our Assignment 3 talk came from it.
   agents). The default `paired` schedule gives every game its own seeds, 4 random opening plies, each opening twice
   with the colours swapped; `--schedule legacy` repeats the old rows and `bench/playgame_log.js`. The games are the
   same with any `--threads`; measure time per move with `--threads 1` (pinned with `taskset`)
+- Search speed and depth (541 fixed positions, pin with `taskset -c 2`): `target/release/examples/search ab6o ab6ot`
+  (nodes and time per move), `target/release/examples/depth idqrot:n20000:w=texel1` (depth reached within a budget)
 - SPRT arena: `cargo run --release -p cli -- arena idqr:n2000:adv=0.1 idqr:n2000 --sprt --threads 6` stops when the
   test decides (defaults `--elo0 0 --elo1 20 --alpha 0.05 --beta 0.05`, at most `--games 2000`, no verdict before
   `--min-games 100`; paired schedule only). Use it for comparisons; fixed `--games N` stays for measurements
@@ -75,14 +78,20 @@ Never change an expected value to make a test pass: find the bug and explain whi
 - Ask before adding a crate. `kish` may be used only as a dev-dependency, in tests.
 - Keep the binaries thin; logic lives in `engine/`.
 - Search lives in its own module: one ply for the baseline (`tuned`), depth-limited minimax for `mmN`,
-  alpha-beta for `abN` (the same decisions as `mmN` at the same depth, from fewer nodes; no move ordering
-  yet), and iterative deepening for `id:dN:nK:tMS` (alpha-beta 1, 2, 3, ... plies within a per-move budget of
+  alpha-beta for `abN` (the same decisions as `mmN` at the same depth, from fewer nodes; legal move order unless
+  the name has `o`), and iterative deepening for `id:dN:nK:tMS` (alpha-beta 1, 2, 3, ... plies within a per-move budget of
   depth, nodes and/or milliseconds; the deepest completed iteration decides, so `id:dN` plays as `abN`;
   official comparisons use node budgets), and quiescence for `abNq` and `idq:...` (past the depth limit,
   captures only until the position is quiet; no stand pat, since capturing is mandatory; its nodes count
   against the budget), and repetitions for `abNr`, `abNqr`, `idr:...` and `idqr:...` (a position of the game or of
-the search path that occurs again is a draw, 0; agents learn the game through `Agent::observe`). Keep new search
-ideas there, behind the `Agent` trait.
+the search path that occurs again is a draw, 0; agents learn the game through `Agent::observe`), and move ordering
+for a final `o` (`ab6o`, `idqro:...`: the previous iteration's best move at the root, then promotions, killers,
+history; the same decisions at a fixed depth, so deeper within a budget), and a transposition table for a final `t`
+(`ab6ot`, `idqrot:n20000`; letters always in the order q, r, o, t). The table belongs to the agent, is cleared at
+every game, is 16 MB unless `:hash=MB`, and does not keep a value that scored a repetition below it; `:tt=strict` is
+the referee's mode (same draft only and, with repetitions, only where the value cannot depend on the path), whose
+games equal those without a table: check new table ideas against it. Keep new search ideas there, behind the
+`Agent` trait.
 - Evaluation lives in `eval.rs`: U (`man`, `king`, `mob`) plus the positional features `adv`, `back`, `cen`, `edge`,
   `qmob` (defined there), whose weights are 0 unless set. Any agent name but `random` may end in `:KEY=VALUE` parts
   (`idqr:n2000:adv=0.1:king=3`, `tuned:cen=0.05`) on top of the tuned or named weights; a first part `w=NAME`
