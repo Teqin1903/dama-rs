@@ -181,3 +181,27 @@ So this row measures the ordering the table does not already give.
   +365 against V0 directly; on the ladder's scale +664.
 - Each part is measured with all the others on. Their losses do not add up to V0's 365, and need not: the parts
   depend on each other (ordering needs iterative deepening, the weights need depth to matter).
+
+### Quiescence with the tuned weights
+
+Quiescence is worth 265 to V10 but was worth only +53 as a rung (V4–V3, 202 against 149). The guess: the Texel
+weights were fitted on quiet positions only, and without quiescence they are applied in the middle of capture
+sequences, where they are out of their training range. The test is the same pair with the A3 weights in place of
+texel1 (`arena idqrot:n20000:w=tuned idrot:n20000:w=tuned --games 400 --seed 1 --threads 6`, same settings,
+version `ablation-1-3-gc32f484`, 387 s, row in `results/arena.csv`):
+
+| weights | with q | without q | + = − (with q's view) | score | q is worth | 95% | draws: rep / 50 / one each |
+|---|---|---|---|---:|---:|---|---|
+| texel1 | `idqrot:n20000:w=texel1` | `idrot:n20000:w=texel1` | +297 =63 −40 | 82.1% | **265** | [230, 301] | 6 / 12 / 45 |
+| tuned | `idqrot:n20000:w=tuned` | `idrot:n20000:w=tuned` | +142 =176 −82 | 57.5% | **53** | [27, 78] | 30 / 115 / 31 |
+
+(Elo from the score; the interval is score ± 1.96 SE, SE 1.84 points for tuned.)
+
+- With the tuned weights quiescence is worth +53, the same as the ladder's V4–V3 (+53), although r, o and t
+  are now on in both agents. The intervals of the two rows do not overlap. Most of the 265 therefore comes from the weights, not from
+  the rest of V10: quiescence matters five times more with texel1 than with the weights it was added with.
+- This agrees with the guess and does not prove it. The tuned weights are also U alone (`man`, `king`, `mob`, every
+  positional weight 0), so they may simply misjudge fewer unquiet positions, whether or not those were in a training set. A direct
+  test would fit weights on all positions, quiet or not, and repeat the pair.
+- With the tuned weights the games are longer (123 plies against 88) and end drawn far more often (176 of
+  400, 115 of them by 50 quiet plies), as in the ladder's lower rungs.
