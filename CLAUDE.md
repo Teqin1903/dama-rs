@@ -51,6 +51,9 @@ match kish 1.1.2, and every number in our Assignment 3 talk came from it.
   `results/ladder/games/`, skipped on a rerun; `results/ladder/progress.log` is not committed), `ladder rate`
   (writes `results/ladder/ladder.json` from the games, plays nothing). Rungs and pairings are `LADDER` and `plan`
   in `engine/src/ladder.rs`; the zero is V1 (`mm3`), the mid opponent V6 (`idqr:n20000`)
+- Ablation (docs/ladder.md): `ladder run --set ablation` (and `--estimate`, `rate --set ablation`): V10 against
+  itself with one part off (`ABLATION`: q, r, o, t, the Texel weights) and against V0, 400 games each, into
+  `results/ablation/` and `ablation.json`; V10–V9 (no table) is the ladder's pairing, read from `results/ladder/games/`
 - Regenerate testdata (only when I ask): `node reference/js/make_testdata.js`
 
 ## Rules (TÜDAF): the parts that are easy to get wrong

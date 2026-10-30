@@ -2,8 +2,8 @@
 //! thinking per game that the rows come from.
 
 use engine::{
-    ANCHOR, AgentSpec, Color, EndReason, GameRow, LADDER, MID, MatchPlan, Role, SEED, Schedule,
-    SideStats, Thinking, plan, play_match, rate, rows_of,
+    ABLATION, ANCHOR, AgentSpec, Color, EndReason, GameRow, LADDER, MID, MatchPlan, Role, SEED,
+    Schedule, SideStats, Thinking, plan, play_match, rate, rows_of,
 };
 
 /// A pairing as `(a, b, roles, games)` with the ids of its rungs.
@@ -177,12 +177,103 @@ fn rate_counts_from_the_newer_rungs_view() {
             threads: 6,
             wall_s: None,
         },
-        LADDER,
-        MID,
+        &engine::LADDER_SET,
     );
+    assert!(!json.contains("\"removed\""));
     assert!(
         json.contains("\"roles\": [\"previous\", \"anchor\"]"),
         "{json}"
     );
     assert!(json.contains("\"wall_s\": null"));
+}
+
+#[test]
+fn the_ablation_plays_v10_against_five_parts_off_and_the_baseline() {
+    let set = engine::ABLATION_SET;
+    let pairings = set.plan();
+    let got: Vec<_> = pairings
+        .iter()
+        .map(|p| (ABLATION[p.a].id, ABLATION[p.b].id, p.games, p.reused))
+        .collect();
+    let want = vec![
+        ("V10", "V10-q", 400, false),
+        ("V10", "V10-r", 400, false),
+        ("V10", "V10-o", 400, false),
+        ("V10", "V9", 400, true),
+        ("V10", "V10-w", 400, false),
+        ("V10", "V0", 400, false),
+    ];
+    assert_eq!(got, want);
+    let played: u32 = pairings.iter().filter(|p| !p.reused).map(|p| p.games).sum();
+    assert_eq!(played, 2000);
+    // The reused pairing is the ladder's file, with the ladder's agents.
+    let v9 = &pairings[3];
+    assert!(
+        plan(LADDER, ANCHOR, MID)
+            .iter()
+            .any(|p| p.name(LADDER) == v9.name(ABLATION)
+                && LADDER[p.a].spec == ABLATION[v9.a].spec
+                && LADDER[p.b].spec == ABLATION[v9.b].spec)
+    );
+    // V10 is the ladder's V10, V9 the ladder's V9, V0 the ladder's V0.
+    for id in ["V10", "V9", "V0"] {
+        let spec = |rungs: &[engine::Rung]| rungs.iter().find(|r| r.id == id).unwrap().spec;
+        assert_eq!(spec(ABLATION), spec(LADDER), "{id}");
+    }
+    for rung in ABLATION {
+        assert!(rung.spec.parse::<AgentSpec>().is_ok(), "{}", rung.spec);
+        assert_eq!(rung.removed.is_none(), rung.id == "V10", "{}", rung.id);
+    }
+    assert_eq!(set.zero_index(), 0);
+}
+
+#[test]
+fn in_the_ablation_each_rating_is_its_own_pairings_elo() {
+    let set = engine::ABLATION_SET;
+    let pairings = set.plan();
+    let (w, b) = (Some(Color::White), Some(Color::Black));
+    // Pairing k: V10 wins k + 1 of 8 pairs (both games), the rest drawn.
+    let rows: Vec<Vec<GameRow>> = (0..pairings.len())
+        .map(|k| {
+            (0..16)
+                .map(|g| {
+                    let winner = if g / 2 <= k as u32 {
+                        if g % 2 == 0 { w } else { b }
+                    } else {
+                        None
+                    };
+                    let reason = if winner.is_some() {
+                        EndReason::NoMove
+                    } else {
+                        EndReason::Repetition
+                    };
+                    row(g, winner, reason)
+                })
+                .collect()
+        })
+        .collect();
+    let report = rate(ABLATION, &pairings, &rows, set.zero_index(), 50, 1);
+    for p in &report.pairings {
+        let lacking = &report.versions[p.pairing.b];
+        assert!(
+            (lacking.elo.unwrap() + p.elo_diff.unwrap()).abs() < 1e-6,
+            "{}: {:?} against {:?}",
+            lacking.rung.id,
+            lacking.elo,
+            p.elo_diff
+        );
+    }
+    let json = report.json(
+        &engine::Meta {
+            commit: "x".to_string(),
+            date: "d".to_string(),
+            threads: 6,
+            wall_s: None,
+        },
+        &set,
+    );
+    assert!(json.contains("\"removed\": \"quiescence\""), "{json}");
+    assert!(json.contains("\"reused\": true"));
+    assert!(json.contains("\"mid_opponent\": null"));
+    assert!(json.contains("\"roles\": [\"ablation\"]"));
 }

@@ -36,9 +36,9 @@ pub use board::{Board, Color, Kind, ParseBoardError, Piece};
 pub use elo::{Bootstrap, Fit, PairedMatch, Score, bootstrap, elo_or_infinite, fit, percentile};
 pub use eval::{DRAW, Features, Positional, U_EPSILON, WIN, Weights, evaluate};
 pub use ladder::{
-    ANCHOR, FOOTNOTES, GAMES_HEADER, GameRow, Json, LADDER, LONG_MATCH, MID, Meta, Pairing,
-    PairingSummary, Report, Role, Rung, SEED, SHORT_MATCH, SideStats, VersionSummary, plan, rate,
-    rows_of,
+    ABLATION, ABLATION_FOOTNOTES, ABLATION_SET, ANCHOR, FOOTNOTES, GAMES_HEADER, GameRow, Json,
+    LADDER, LADDER_SET, LONG_MATCH, MID, Meta, Pairing, PairingSummary, Report, Role, Rung, SEED,
+    SHORT_MATCH, Set, SideStats, VersionSummary, ablation_plan, plan, rate, rows_of,
 };
 pub use movegen::Move;
 pub use perft::perft;

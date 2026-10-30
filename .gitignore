@@ -3,3 +3,5 @@ CLAUDE.local.md
 .claude/settings.local.json
 results/ladder/progress.log
 results/ladder/games/*.tmp
+results/ablation/progress.log
+results/ablation/games/*.tmp

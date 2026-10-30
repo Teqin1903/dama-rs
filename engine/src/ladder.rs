@@ -27,6 +27,8 @@ pub struct Rung {
     pub adds: &'static str,
     /// For a side rung, the id of the rung it stands beside; side rungs are not in the chain.
     pub beside: Option<&'static str>,
+    /// For a rung of the ablation, the part of the full agent it lacks.
+    pub removed: Option<&'static str>,
 }
 
 const fn rung(
@@ -43,6 +45,7 @@ const fn rung(
         label,
         adds,
         beside: None,
+        removed: None,
     }
 }
 
@@ -139,6 +142,90 @@ pub const FOOTNOTES: &[(&str, &str, &str)] = &[
     ),
 ];
 
+/// The ablation: the top rung against itself with one part turned off, and against the A3 agent.
+/// V9 is V10 without its table, so V10–V9 is the ladder's pairing, not played again.
+pub const ABLATION: &[Rung] = &[
+    rung(
+        "V10",
+        "v10-transposition-table",
+        "idqrot:n20000:w=texel1",
+        "V10_TranspositionTable",
+        "the full agent",
+    ),
+    ablated(
+        "V10-q",
+        "idrot:n20000:w=texel1",
+        "V10_NoQuiescence",
+        "quiescence",
+    ),
+    ablated(
+        "V10-r",
+        "idqot:n20000:w=texel1",
+        "V10_NoRepetition",
+        "repetitions in the search",
+    ),
+    ablated(
+        "V10-o",
+        "idqrt:n20000:w=texel1",
+        "V10_NoOrdering",
+        "move ordering (the table's move is still searched first)",
+    ),
+    Rung {
+        removed: Some("transposition table"),
+        ..rung(
+            "V9",
+            "v9-move-ordering",
+            "idqro:n20000:w=texel1",
+            "V9_MoveOrdering",
+            "move ordering: previous best move, promotions, killers, history",
+        )
+    },
+    ablated(
+        "V10-w",
+        "idqrot:n20000:w=tuned",
+        "V10_TunedWeights",
+        "Texel weights (the tuned U instead)",
+    ),
+    Rung {
+        removed: Some("everything since A3: the one-ply baseline agent"),
+        ..rung(
+            "V0",
+            "baseline",
+            "tuned",
+            "V0_Baseline",
+            "one ply, U = 1/2.5/-0.05",
+        )
+    },
+];
+
+/// A rung of the ablation that is V10 with `removed` turned off.
+const fn ablated(
+    id: &'static str,
+    spec: &'static str,
+    label: &'static str,
+    removed: &'static str,
+) -> Rung {
+    Rung {
+        removed: Some(removed),
+        ..rung(id, "v10-transposition-table", spec, label, "")
+    }
+}
+
+/// Notes on the ablation's rungs.
+pub const ABLATION_FOOTNOTES: &[(&str, &str, &str)] = &[
+    (
+        "V10-o",
+        "v10-transposition-table",
+        "without `o` the search still tries the table's move first at every node; only the \
+         previous iteration's best move at the root, promotions, killers and history are off",
+    ),
+    (
+        "V9",
+        "v9-move-ordering",
+        "V10 without its table; the games of V10_vs_V9 are the ladder's (results/ladder/games)",
+    ),
+];
+
 /// The reference opponent, whose Elo is 0.
 pub const ANCHOR: &str = "V1";
 /// The mid-ladder opponent of the upper rungs.
@@ -158,6 +245,8 @@ pub enum Role {
     Mid,
     SelfPlay,
     Side,
+    /// The full agent against a version with one part turned off.
+    Ablation,
 }
 
 impl fmt::Display for Role {
@@ -169,6 +258,7 @@ impl fmt::Display for Role {
             Role::Mid => "mid",
             Role::SelfPlay => "self",
             Role::Side => "side",
+            Role::Ablation => "ablation",
         })
     }
 }
@@ -180,6 +270,8 @@ pub struct Pairing {
     pub b: usize,
     pub roles: Vec<Role>,
     pub games: u32,
+    /// Its games are those of the ladder's pairing of the same name: it is not played again.
+    pub reused: bool,
 }
 
 impl Pairing {
@@ -236,10 +328,95 @@ pub fn plan(rungs: &[Rung], anchor: &str, mid: &str) -> Vec<Pairing> {
                 b,
                 roles: vec![role],
                 games,
+                reused: false,
             }),
         }
     }
     pairings
+}
+
+/// The pairings of the ablation: every rung against `zero` (the full agent, as `a`), 400 games
+/// each, in the order of `rungs`. A pairing whose agents and games the ladder has already played
+/// is `reused`.
+///
+/// # Panics
+/// If `zero` is not one of `rungs`.
+pub fn ablation_plan(rungs: &[Rung], zero: &str) -> Vec<Pairing> {
+    let a = rungs
+        .iter()
+        .position(|r| r.id == zero)
+        .unwrap_or_else(|| panic!("no rung {zero}"));
+    let ladder = plan(LADDER, ANCHOR, MID);
+    (0..rungs.len())
+        .filter(|&b| b != a)
+        .map(|b| {
+            let reused = ladder.iter().any(|p| {
+                (LADDER[p.a].spec, LADDER[p.b].spec) == (rungs[a].spec, rungs[b].spec)
+                    && p.games == LONG_MATCH
+                    && p.name(LADDER) == format!("{}_vs_{}", rungs[a].id, rungs[b].id)
+            });
+            Pairing {
+                a,
+                b,
+                roles: vec![Role::Ablation],
+                games: LONG_MATCH,
+                reused,
+            }
+        })
+        .collect()
+}
+
+/// A set of rungs rated together: the ladder or the ablation.
+#[derive(Clone, Copy, Debug)]
+pub struct Set {
+    /// `ladder`, `ablation`: the name `dama ladder --set` takes.
+    pub name: &'static str,
+    pub rungs: &'static [Rung],
+    /// The rung at Elo 0.
+    pub zero: &'static str,
+    pub mid: Option<&'static str>,
+    pub footnotes: &'static [(&'static str, &'static str, &'static str)],
+    /// Where its games and its JSON file go, and the file's name.
+    pub dir: &'static str,
+    pub json: &'static str,
+}
+
+pub const LADDER_SET: Set = Set {
+    name: "ladder",
+    rungs: LADDER,
+    zero: ANCHOR,
+    mid: Some(MID),
+    footnotes: FOOTNOTES,
+    dir: "results/ladder",
+    json: "ladder.json",
+};
+
+pub const ABLATION_SET: Set = Set {
+    name: "ablation",
+    rungs: ABLATION,
+    zero: "V10",
+    mid: None,
+    footnotes: ABLATION_FOOTNOTES,
+    dir: "results/ablation",
+    json: "ablation.json",
+};
+
+impl Set {
+    /// The sets `dama ladder --set` knows.
+    pub const ALL: [Set; 2] = [LADDER_SET, ABLATION_SET];
+
+    /// Its pairings, in the order they are played.
+    pub fn plan(&self) -> Vec<Pairing> {
+        match self.mid {
+            Some(mid) => plan(self.rungs, self.zero, mid),
+            None => ablation_plan(self.rungs, self.zero),
+        }
+    }
+
+    /// The index of the rung at Elo 0.
+    pub fn zero_index(&self) -> usize {
+        (self.rungs.iter().position(|r| r.id == self.zero)).expect("the zero is a rung")
+    }
 }
 
 /// A side's thinking in one game, per move.
@@ -699,8 +876,12 @@ impl Json {
 }
 
 impl Report {
-    /// ladder.json: meta, versions and pairings (docs/ladder.md describes the fields).
-    pub fn json(&self, meta: &Meta, rungs: &[Rung], mid: &str) -> String {
+    /// ladder.json or ablation.json: meta, versions and pairings (docs/ladder.md describes the
+    /// fields). The ablation's versions also say what each lacks (`removed`), and its pairings
+    /// whether their games are the ladder's (`reused`).
+    pub fn json(&self, meta: &Meta, set: &Set) -> String {
+        let rungs = set.rungs;
+        let ablation = rungs.iter().any(|r| r.removed.is_some());
         let ci = |c: [f64; 2]| Json::Arr(vec![Json::num(c[0], 1), Json::num(c[1], 1)]);
         let settings = Json::Obj(vec![
             ("schedule", Json::str("paired")),
@@ -749,7 +930,7 @@ impl Report {
                 ),
             ),
             ("elo_zero", Json::str(rungs[self.zero].id)),
-            ("mid_opponent", Json::str(mid)),
+            ("mid_opponent", set.mid.map_or(Json::Null, Json::str)),
             ("bootstrap", bootstrap),
             ("diverged", Json::Arr(diverged)),
             ("wall_s", Json::opt(meta.wall_s, 1)),
@@ -758,19 +939,25 @@ impl Report {
             .versions
             .iter()
             .map(|v| {
-                Json::Obj(vec![
+                let mut fields = vec![
                     ("id", Json::str(v.rung.id)),
                     ("tag", Json::str(v.rung.tag)),
                     ("spec", Json::str(v.rung.spec)),
                     ("label", Json::str(v.rung.label)),
                     ("adds", Json::str(v.rung.adds)),
                     ("side", Json::Bool(v.rung.beside.is_some())),
+                ];
+                if ablation {
+                    fields.push(("removed", v.rung.removed.map_or(Json::Null, Json::str)));
+                }
+                fields.extend([
                     ("elo", Json::opt(v.elo, 1)),
                     ("ci", ci(v.ci)),
                     ("avg_nodes_per_move", Json::opt(v.nodes_per_move, 1)),
                     ("avg_depth", Json::opt(v.depth_per_move, 3)),
                     ("ms_per_move", Json::opt(v.ms_per_move, 3)),
-                ])
+                ]);
+                Json::Obj(fields)
             })
             .collect();
         let pairings = self
@@ -778,10 +965,15 @@ impl Report {
             .iter()
             .map(|p| {
                 let roles = p.pairing.roles.iter().map(|r| Json::Str(r.to_string()));
-                Json::Obj(vec![
+                let mut fields = vec![
                     ("a", Json::str(rungs[p.pairing.a].id)),
                     ("b", Json::str(rungs[p.pairing.b].id)),
                     ("roles", Json::Arr(roles.collect())),
+                ];
+                if ablation {
+                    fields.push(("reused", Json::Bool(p.pairing.reused)));
+                }
+                fields.extend([
                     ("games", Json::Num(f64::from(p.games))),
                     ("w", Json::Num(f64::from(p.wins))),
                     ("d", Json::Num(f64::from(p.draws))),
@@ -800,10 +992,12 @@ impl Report {
                     ),
                     ("no_move", Json::Num(f64::from(p.no_move))),
                     ("avg_plies", Json::num(p.mean_plies, 1)),
-                ])
+                ]);
+                Json::Obj(fields)
             })
             .collect();
-        let footnotes = FOOTNOTES
+        let footnotes = set
+            .footnotes
             .iter()
             .map(|(id, tag, note)| {
                 Json::Obj(vec![

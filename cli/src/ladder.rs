@@ -1,5 +1,5 @@
-//! `dama ladder`: plays the matches of the Elo ladder (`engine::plan`) and rates the versions from
-//! their games (`engine::rate`). This file reads and writes the files; the ladder itself, its
+//! `dama ladder`: plays the matches of the Elo ladder (`engine::plan`) or of the ablation
+//! (`engine::ablation_plan`) and rates the versions from their games (`engine::rate`). This file reads and writes the files; the ladder itself, its
 //! pairings and its ratings live in engine/src/ladder.rs and engine/src/elo.rs.
 
 use std::error::Error;
@@ -10,19 +10,20 @@ use std::process::ExitCode;
 use std::time::Instant;
 
 use engine::{
-    ANCHOR, AgentSpec, GAMES_HEADER, GameRow, LADDER, MID, MatchPlan, Meta, Pairing, SEED,
-    Schedule, plan, play_match, rate, rows_of,
+    AgentSpec, GAMES_HEADER, GameRow, LADDER_SET, MatchPlan, Meta, Pairing, Rung, SEED, Schedule,
+    Set, play_match, rate, rows_of,
 };
 
 use crate::arena::{self, Args};
 
 const HELP: &str = "\
-usage: dama ladder run [--estimate] [--threads T] [--dir DIR] [--csv PATH]
-       dama ladder rate [--dir DIR] [--csv PATH] [--samples N] [--seed S]
+usage: dama ladder run [--set S] [--estimate] [--threads T] [--dir DIR] [--csv PATH]
+       dama ladder rate [--set S] [--dir DIR] [--csv PATH] [--samples N] [--seed S]
 
 The Elo ladder of the tagged versions (docs/ladder.md): every version against the one before it,
 against v1-minimax (the zero) and against the one two steps back, the upper versions against the
-mid-ladder opponent (v6-repetition), all paired matches with seed 1.
+mid-ladder opponent (v6-repetition), all paired matches with seed 1. The ablation plays
+v10-transposition-table against itself with one part turned off and against the baseline.
 
 run         plays every pairing whose file DIR/games/<A>_vs_<B>.csv is missing, writes that file
             when the pairing is over, appends one row to the arena CSV and one line to
@@ -30,12 +31,15 @@ run         plays every pairing whose file DIR/games/<A>_vs_<B>.csv is missing, 
             skipped
   --estimate  plays the first 12 games of every pairing, prints the time the whole run would
               take, and writes nothing
-rate        reads the games and writes DIR/ladder.json: one Bradley-Terry fit of all games,
-            bootstrap intervals over the colour-swapped pairs of each pairing
+            A pairing the ladder has played already (the ablation's V10_vs_V9) is not played
+            again: its games are read from results/ladder/games
+rate        reads the games and writes DIR/ladder.json (DIR/ablation.json): one Bradley-Terry
+            fit of all games, bootstrap intervals over the colour-swapped pairs of each pairing
 
 options:
+  --set S       ladder (default) or ablation
   --threads T   games played at the same time (default 6)
-  --dir DIR     the ladder's directory (default results/ladder)
+  --dir DIR     the set's directory (default results/ladder, results/ablation)
   --csv PATH    the arena CSV (default results/arena.csv); rate takes the time and threads of
                 each match from it
   --samples N   bootstrap samples (default 1000)
@@ -47,6 +51,7 @@ const ESTIMATE_GAMES: u32 = 12;
 
 struct Options {
     command: String,
+    set: Set,
     estimate: bool,
     threads: usize,
     dir: PathBuf,
@@ -91,13 +96,15 @@ fn parse_args(args: impl IntoIterator<Item = String>) -> Result<Option<Options>,
     };
     let mut options = Options {
         command: command.to_string(),
+        set: LADDER_SET,
         estimate: false,
         threads: 6,
-        dir: PathBuf::from("results/ladder"),
+        dir: PathBuf::new(),
         csv: PathBuf::from("results/arena.csv"),
         samples: 1000,
         seed: 1,
     };
+    let mut dir = None;
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "-h" | "--help" => return Ok(None),
@@ -124,17 +131,29 @@ fn parse_args(args: impl IntoIterator<Item = String>) -> Result<Option<Options>,
                     .parse()
                     .map_err(|_| format!("--seed {value}: expected 0 to 4294967295"))?;
             }
-            (_, "--dir") => options.dir = PathBuf::from(value),
+            (_, "--dir") => dir = Some(PathBuf::from(value)),
+            (_, "--set") => {
+                options.set = Set::ALL
+                    .into_iter()
+                    .find(|s| s.name == value)
+                    .ok_or(format!("--set {value}: expected ladder or ablation"))?;
+            }
             _ => return Err(format!("unknown option {arg} for {command}")),
         }
     }
+    options.dir = dir.unwrap_or_else(|| PathBuf::from(options.set.dir));
     Ok(Some(options))
 }
 
-/// The file of a pairing's games.
-fn games_path(dir: &Path, pairing: &Pairing) -> PathBuf {
+/// The file of a pairing's games: in the ladder's directory if the pairing is reused from it.
+fn games_path(options: &Options, pairing: &Pairing) -> PathBuf {
+    let dir = if pairing.reused {
+        Path::new(LADDER_SET.dir)
+    } else {
+        &options.dir
+    };
     dir.join("games")
-        .join(format!("{}.csv", pairing.name(LADDER)))
+        .join(format!("{}.csv", pairing.name(options.set.rungs)))
 }
 
 /// The games of a finished pairing, or `None` if its file is missing.
@@ -160,11 +179,12 @@ fn read_games(path: &Path) -> Result<Option<Vec<GameRow>>, Box<dyn Error>> {
 /// Checks that `rows` are the games `pairing` asks for, played by `version` if given.
 fn check_games(
     path: &Path,
+    rungs: &[Rung],
     pairing: &Pairing,
     rows: &[GameRow],
     version: Option<&str>,
 ) -> Result<(), String> {
-    let (a, b) = (LADDER[pairing.a].spec, LADDER[pairing.b].spec);
+    let (a, b) = (rungs[pairing.a].spec, rungs[pairing.b].spec);
     let fail = |what: String| {
         Err(format!(
             "{}: {what}; move the file away to play it again",
@@ -196,22 +216,35 @@ fn run(options: &Options) -> Result<(), Box<dyn Error>> {
     if version.ends_with("-dirty") && !options.estimate {
         eprintln!("dama ladder: warning: version {version}: the results will not name a commit");
     }
-    let pairings = plan(LADDER, ANCHOR, MID);
-    let total_games: u32 = pairings.iter().map(|p| p.games).sum();
+    let rungs = options.set.rungs;
+    let pairings = options.set.plan();
+    let total_games: u32 = pairings.iter().filter(|p| !p.reused).map(|p| p.games).sum();
     println!(
-        "ladder: {} pairings, {total_games} games, version {version}, {} threads",
+        "{}: {} pairings, {total_games} games to play, version {version}, {} threads",
+        options.set.name,
         pairings.len(),
         options.threads
     );
     let started = Instant::now();
     let mut estimated = 0.0;
     for (k, pairing) in pairings.iter().enumerate() {
-        let name = pairing.name(LADDER);
-        let path = games_path(&options.dir, pairing);
+        let name = pairing.name(rungs);
+        let path = games_path(options, pairing);
+        if pairing.reused {
+            let rows = read_games(&path)?.ok_or(format!("{}: missing", path.display()))?;
+            check_games(&path, rungs, pairing, &rows, None)?;
+            println!(
+                "[{:>2}/{}] {name}: the ladder's games ({})",
+                k + 1,
+                pairings.len(),
+                path.display()
+            );
+            continue;
+        }
         if !options.estimate
             && let Some(rows) = read_games(&path)?
         {
-            check_games(&path, pairing, &rows, Some(&version))?;
+            check_games(&path, rungs, pairing, &rows, Some(&version))?;
             println!("[{:>2}/{}] {name}: done already", k + 1, pairings.len());
             continue;
         }
@@ -221,8 +254,8 @@ fn run(options: &Options) -> Result<(), Box<dyn Error>> {
             pairing.games
         };
         let args = Args {
-            a: LADDER[pairing.a].spec.parse::<AgentSpec>()?,
-            b: LADDER[pairing.b].spec.parse::<AgentSpec>()?,
+            a: rungs[pairing.a].spec.parse::<AgentSpec>()?,
+            b: rungs[pairing.b].spec.parse::<AgentSpec>()?,
             games,
             seed: SEED,
             schedule: Schedule::Paired,
@@ -252,8 +285,8 @@ fn run(options: &Options) -> Result<(), Box<dyn Error>> {
         }
         let rows = rows_of(
             &record,
-            LADDER[pairing.a].spec,
-            LADDER[pairing.b].spec,
+            rungs[pairing.a].spec,
+            rungs[pairing.b].spec,
             SEED,
             &version,
         );
@@ -310,29 +343,37 @@ fn write_games(path: &Path, rows: &[GameRow]) -> std::io::Result<()> {
 }
 
 fn rate_command(options: &Options) -> Result<(), Box<dyn Error>> {
-    let pairings = plan(LADDER, ANCHOR, MID);
+    let rungs = options.set.rungs;
+    let pairings = options.set.plan();
     let mut rows = Vec::with_capacity(pairings.len());
     let mut versions: Vec<String> = Vec::new();
     let mut wall = Some(0.0);
     let mut threads: Vec<usize> = Vec::new();
     let arena_rows = fs::read_to_string(&options.csv).unwrap_or_default();
     for pairing in &pairings {
-        let path = games_path(&options.dir, pairing);
+        let path = games_path(options, pairing);
         let games = match read_games(&path)? {
             Some(games) => {
-                check_games(&path, pairing, &games, None)?;
+                check_games(&path, rungs, pairing, &games, None)?;
                 games
             }
             None => {
                 eprintln!(
                     "dama ladder: warning: {} not played yet",
-                    pairing.name(LADDER)
+                    pairing.name(rungs)
                 );
                 Vec::new()
             }
         };
         if let Some(first) = games.first() {
-            for row in &games {
+            if pairing.reused {
+                println!(
+                    "{}: the ladder's games, version {}",
+                    pairing.name(rungs),
+                    first.version
+                );
+            }
+            for row in games.iter().filter(|_| !pairing.reused) {
                 if !versions.contains(&row.version) {
                     versions.push(row.version.clone());
                 }
@@ -340,8 +381,8 @@ fn rate_command(options: &Options) -> Result<(), Box<dyn Error>> {
             let found = match_row(
                 &arena_rows,
                 &first.version,
-                LADDER[pairing.a].spec,
-                LADDER[pairing.b].spec,
+                rungs[pairing.a].spec,
+                rungs[pairing.b].spec,
                 games.len(),
             );
             if let Some((_, t)) = found
@@ -353,21 +394,11 @@ fn rate_command(options: &Options) -> Result<(), Box<dyn Error>> {
         }
         rows.push(games);
     }
-    let zero = LADDER
-        .iter()
-        .position(|r| r.id == ANCHOR)
-        .expect("the anchor is a rung");
-    let report = rate(
-        LADDER,
-        &pairings,
-        &rows,
-        zero,
-        options.samples,
-        options.seed,
-    );
-    print!("{}", report.tables(LADDER));
+    let zero = options.set.zero_index();
+    let report = rate(rungs, &pairings, &rows, zero, options.samples, options.seed);
+    print!("{}", report.tables(rungs));
     if !report.fit.diverged.is_empty() {
-        let ids: Vec<&str> = report.fit.diverged.iter().map(|&i| LADDER[i].id).collect();
+        let ids: Vec<&str> = report.fit.diverged.iter().map(|&i| rungs[i].id).collect();
         eprintln!(
             "dama ladder: warning: no finite Elo for {}: they won or lost every point against the \
              rest",
@@ -399,9 +430,9 @@ fn rate_command(options: &Options) -> Result<(), Box<dyn Error>> {
         },
         wall_s: wall,
     };
-    let path = options.dir.join("ladder.json");
+    let path = options.dir.join(options.set.json);
     fs::create_dir_all(&options.dir)?;
-    fs::write(&path, report.json(&meta, LADDER, MID))?;
+    fs::write(&path, report.json(&meta, &options.set))?;
     println!("written to {}", path.display());
     Ok(())
 }
