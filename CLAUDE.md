@@ -57,9 +57,9 @@ match kish 1.1.2, and every number in our Assignment 3 talk came from it.
 - Ablation (docs/ladder.md): `ladder run --set ablation` (and `--estimate`, `rate --set ablation`): V10 against
   itself with one part off (`ABLATION`: q, r, o, t, the Texel weights) and against V0, 400 games each, into
   `results/ablation/` and `ablation.json`; V10–V9 (no table) is the ladder's pairing, read from `results/ladder/games/`
-- Web API: `wasm-pack build web --target no-modules --release --out-dir ../site/pkg --out-name dama_web` builds
-  `site/pkg/`; `target/release/dama api < requests.jsonl` answers the same calls natively, one JSON request per line
-  (`{"call": "think", "args": ["white", "{}"]}`). Tracing must never change a search: the searches take a generic
+- Web API: `scripts/build-web.sh` builds `site/pkg/` (wasm-pack, keeping only `dama_web.js` and
+  `dama_web_bg.wasm`); `target/release/dama api < requests.jsonl` answers the same calls natively, one JSON
+  request per line (`{"call": "think", "args": ["white", "{}"]}`). Tracing must never change a search: the searches take a generic
   `Tracer` (`*_traced` in search.rs; the old functions pass `NoTrace`), and `tests/api.rs` checks traced against
   untraced searches and a session's games against the arena's
 - Regenerate testdata (only when I ask): `node reference/js/make_testdata.js`
@@ -93,6 +93,14 @@ Never change an expected value to make a test pass: find the bug and explain whi
   (`--games`, the SPRT maximum) times the time per game from earlier `wall_s` rows of `results/arena.csv`. If that is
   more than 15 minutes, ask me first.
 - Ask before adding a crate. `kish` may be used only as a dev-dependency, in tests.
+- Every commit that changes engine code (`engine/`, `web/`) rebuilds `site/pkg/` with `scripts/build-web.sh` and
+  commits `dama_web.js` and `dama_web_bg.wasm` with it. The site's top bar shows `version()`, so a stale pkg shows
+  there. `version()` is `src.` and the git tree of the WebAssembly sources (`SOURCES` in `web/build.rs`: the
+  `src/` folders and `Cargo.toml`s of engine and web, `web/build.rs`, the root `Cargo.toml` and `Cargo.lock`), and
+  `web/tests/fresh.rs` fails with "site/pkg is stale" until the pkg holds the source's version.
+- The repository is the single source: everything the talk and the submission zip use (code, results, docs, the
+  site, the deck) is in git. Not `target/`, `results/ladder/progress.log`, or intermediate data over 50 MB; if such
+  data comes up, ask me first.
 - Keep the binaries thin; logic lives in `engine/`.
 - Search lives in its own module: one ply for the baseline (`tuned`), depth-limited minimax for `mmN`,
   alpha-beta for `abN` (the same decisions as `mmN` at the same depth, from fewer nodes; legal move order unless
