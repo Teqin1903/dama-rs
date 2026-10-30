@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Turkish Draughts · Eight Bits</title>
+<link rel="stylesheet" href="css/site.css">
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="brand">
+      <img src="img/logo_on_light.png" alt="Eight Bits logo">
+      <div>
+        <h1>Turkish draughts</h1>
+        <div class="sub">Team Eight Bits · pair 42 · Assignment 4</div>
+      </div>
+    </div>
+    <div class="spacer"></div>
+    <span class="engine-chip" id="engineChip">Engine loading</span>
+    <div class="seg" role="group" aria-label="View">
+      <button id="modeUser" aria-pressed="true">User</button>
+      <button id="modeDev" aria-pressed="false">Developer</button>
+    </div>
+  </header>
+
+  <div class="matchbar">
+    <label class="player" title="White"><span class="dot w"></span><span class="sr">White player</span><select id="whiteSel"></select></label>
+    <span class="vs">vs</span>
+    <label class="player" title="Black"><span class="dot b"></span><span class="sr">Black player</span><select id="blackSel"></select></label>
+    <div class="spacer"></div>
+    <div class="btns">
+      <button class="btn" id="newBtn" title="New game (N)">New game</button>
+      <button class="btn" id="undoBtn" title="Undo (U)">Undo</button>
+      <button class="btn primary" id="autoBtn" title="Play or pause agent against agent (Space)">Play</button>
+      <button class="btn" id="stepBtn" title="One agent move (→)">Step</button>
+      <label class="sr" for="speedSel">Speed</label>
+      <select class="btn" id="speedSel" title="Pause between agent moves">
+        <option value="1800">Slow</option>
+        <option value="1000" selected>Normal</option>
+        <option value="400">Fast</option>
+        <option value="60">Instant</option>
+      </select>
+      <button class="btn" id="flipBtn" title="Flip the board (F)">Flip</button>
+    </div>
+  </div>
+
+  <main class="stage">
+    <section class="board-col" aria-label="Board">
+      <div class="board-wrap" id="boardWrap">
+        <div class="preview-banner" id="previewBanner" hidden>Search tree preview</div>
+      </div>
+      <div class="status" id="status"></div>
+    </section>
+
+    <section class="side-col" aria-label="What the agent thinks">
+      <div id="userView">
+        <div class="card" id="decisionCard">
+          <div class="decision-head">
+            <div class="who"><span class="dot" id="whoDot"></span><div><div class="name" id="whoName">Waiting for the first move</div><div class="meta" id="whoMeta"></div></div></div>
+            <div class="spacer"></div>
+            <span class="thinking" id="thinking" hidden>Thinking</span>
+            <span class="badge" id="eloBadge" hidden></span>
+          </div>
+          <div class="evalrow" title="How the agent judges the position after its search, from White's side">
+            <span class="lab">Black</span>
+            <div class="evalbar"><div class="w" id="evalW" style="width:50%"></div><div class="mid"></div></div>
+            <span class="lab">White</span>
+          </div>
+          <div class="hint" id="evalText" style="margin:6px 0 0"></div>
+        </div>
+        <div class="card">
+          <h2>Moves it considered</h2>
+          <div class="cands" id="cands"></div>
+          <div class="cands-note" id="candsNote"></div>
+        </div>
+        <div class="card why">
+          <h2>Why this move</h2>
+          <div id="why"><p class="muted">The explanation appears after an agent moves.</p></div>
+        </div>
+        <div class="card">
+          <h2>Game record</h2>
+          <div class="record" id="record"></div>
+        </div>
+      </div>
+
+      <div id="devView" hidden>
+        <div class="card">
+          <div class="decision-head" style="margin-bottom:10px">
+            <div class="who"><span class="dot" id="devDot"></span><div><div class="name" id="devName">No decision yet</div><div class="meta" id="devMeta"></div></div></div>
+            <div class="spacer"></div>
+            <span class="thinking" id="devThinking" hidden>Thinking</span>
+          </div>
+          <div class="tabs" role="tablist" aria-label="Developer views">
+            <button role="tab" data-tab="search" aria-selected="true">Search</button>
+            <button role="tab" data-tab="tree" aria-selected="false">Tree</button>
+            <button role="tab" data-tab="eval" aria-selected="false">Evaluation</button>
+            <button role="tab" data-tab="whatif" aria-selected="false">What if</button>
+          </div>
+          <div data-panel="search"></div>
+          <div data-panel="tree" hidden></div>
+          <div data-panel="eval" hidden></div>
+          <div data-panel="whatif" hidden></div>
+        </div>
+        <div class="card">
+          <h2>Game record</h2>
+          <div class="record" id="devRecord"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+<script src="data/results.js"></script>
+<script src="pkg/dama_web.js"></script>
+<script src="js/board.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
