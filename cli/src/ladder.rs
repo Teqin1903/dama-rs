@@ -378,11 +378,13 @@ fn rate_command(options: &Options) -> Result<(), Box<dyn Error>> {
                     versions.push(row.version.clone());
                 }
             }
+            // The arena CSV names agents as `AgentSpec` writes them (`w=tuned` left out).
+            let name = |i: usize| rungs[i].spec.parse::<AgentSpec>().map(|s| s.to_string());
             let found = match_row(
                 &arena_rows,
                 &first.version,
-                rungs[pairing.a].spec,
-                rungs[pairing.b].spec,
+                &name(pairing.a)?,
+                &name(pairing.b)?,
                 games.len(),
             );
             if let Some((_, t)) = found
