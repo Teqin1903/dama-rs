@@ -1,0 +1,268 @@
+{
+  "meta": {
+    "commit": "ladder-1-1-g11a369d",
+    "date": "2026-10-30T07:29:16Z",
+    "settings": {
+      "schedule": "paired",
+      "opening_plies": 4,
+      "max_plies": 400,
+      "seed": 1,
+      "threads": 6,
+      "draws": "third repetition, 50 plies without a capture, one piece each, ply 400",
+      "ms_per_move": "measured with several games at once: not a measurement of speed"
+    },
+    "elo_model": "Bradley-Terry, maximum likelihood over all games (draws count as half a win), E = 1 / (1 + 10^(-(Ra - Rb) / 400)); self-play left out",
+    "elo_zero": "V10",
+    "mid_opponent": null,
+    "bootstrap": {
+      "samples": 1000,
+      "seed": 1,
+      "rng": "mulberry32",
+      "unit": "colour-swapped pairs of games, drawn again within each pairing",
+      "percentiles": [2.5, 97.5],
+      "diverged": 0
+    },
+    "diverged": [],
+    "wall_s": 1871.6
+  },
+  "versions": [
+    {
+      "id": "V10",
+      "tag": "v10-transposition-table",
+      "spec": "idqrot:n20000:w=texel1",
+      "label": "V10_TranspositionTable",
+      "adds": "the full agent",
+      "side": false,
+      "removed": null,
+      "elo": 0,
+      "ci": [0, 0],
+      "avg_nodes_per_move": 19651.3,
+      "avg_depth": 5.676,
+      "ms_per_move": 52.696
+    },
+    {
+      "id": "V10-q",
+      "tag": "v10-transposition-table",
+      "spec": "idrot:n20000:w=texel1",
+      "label": "V10_NoQuiescence",
+      "adds": "",
+      "side": false,
+      "removed": "quiescence",
+      "elo": -264.9,
+      "ci": [-301.3, -230.2],
+      "avg_nodes_per_move": 19557.6,
+      "avg_depth": 5.994,
+      "ms_per_move": 52.511
+    },
+    {
+      "id": "V10-r",
+      "tag": "v10-transposition-table",
+      "spec": "idqot:n20000:w=texel1",
+      "label": "V10_NoRepetition",
+      "adds": "",
+      "side": false,
+      "removed": "repetitions in the search",
+      "elo": -6.9,
+      "ci": [-28.8, 14.8],
+      "avg_nodes_per_move": 19695.6,
+      "avg_depth": 5.882,
+      "ms_per_move": 51.273
+    },
+    {
+      "id": "V10-o",
+      "tag": "v10-transposition-table",
+      "spec": "idqrt:n20000:w=texel1",
+      "label": "V10_NoOrdering",
+      "adds": "",
+      "side": false,
+      "removed": "move ordering (the table's move is still searched first)",
+      "elo": -79.5,
+      "ci": [-108.5, -51.6],
+      "avg_nodes_per_move": 19666.5,
+      "avg_depth": 5.321,
+      "ms_per_move": 49.709
+    },
+    {
+      "id": "V9",
+      "tag": "v9-move-ordering",
+      "spec": "idqro:n20000:w=texel1",
+      "label": "V9_MoveOrdering",
+      "adds": "move ordering: previous best move, promotions, killers, history",
+      "side": false,
+      "removed": "transposition table",
+      "elo": -78.6,
+      "ci": [-106.6, -53.4],
+      "avg_nodes_per_move": 19676.1,
+      "avg_depth": 5.308,
+      "ms_per_move": 49.192
+    },
+    {
+      "id": "V10-w",
+      "tag": "v10-transposition-table",
+      "spec": "idqrot:n20000:w=tuned",
+      "label": "V10_TunedWeights",
+      "adds": "",
+      "side": false,
+      "removed": "Texel weights (the tuned U instead)",
+      "elo": -280.1,
+      "ci": [-322.7, -246.3],
+      "avg_nodes_per_move": 19694.9,
+      "avg_depth": 5.712,
+      "ms_per_move": 49.124
+    },
+    {
+      "id": "V0",
+      "tag": "baseline",
+      "spec": "tuned",
+      "label": "V0_Baseline",
+      "adds": "one ply, U = 1/2.5/-0.05",
+      "side": false,
+      "removed": "everything since A3: the one-ply baseline agent",
+      "elo": -365.4,
+      "ci": [-404.6, -332.2],
+      "avg_nodes_per_move": 8.7,
+      "avg_depth": 1,
+      "ms_per_move": 0.027
+    }
+  ],
+  "pairings": [
+    {
+      "a": "V10",
+      "b": "V10-q",
+      "roles": ["ablation"],
+      "reused": false,
+      "games": 400,
+      "w": 297,
+      "d": 63,
+      "l": 40,
+      "score": 0.8213,
+      "elo_diff": 264.9,
+      "ci": [230.2, 301.3],
+      "draws_by": {
+        "repetition": 6,
+        "fifty": 12,
+        "one_each": 45,
+        "ply_cap": 0
+      },
+      "no_move": 337,
+      "avg_plies": 88.4
+    },
+    {
+      "a": "V10",
+      "b": "V10-r",
+      "roles": ["ablation"],
+      "reused": false,
+      "games": 400,
+      "w": 134,
+      "d": 140,
+      "l": 126,
+      "score": 0.51,
+      "elo_diff": 6.9,
+      "ci": [-14.8, 28.8],
+      "draws_by": {
+        "repetition": 81,
+        "fifty": 20,
+        "one_each": 39,
+        "ply_cap": 0
+      },
+      "no_move": 260,
+      "avg_plies": 96
+    },
+    {
+      "a": "V10",
+      "b": "V10-o",
+      "roles": ["ablation"],
+      "reused": false,
+      "games": 400,
+      "w": 199,
+      "d": 92,
+      "l": 109,
+      "score": 0.6125,
+      "elo_diff": 79.5,
+      "ci": [51.6, 108.5],
+      "draws_by": {
+        "repetition": 11,
+        "fifty": 27,
+        "one_each": 54,
+        "ply_cap": 0
+      },
+      "no_move": 308,
+      "avg_plies": 105.7
+    },
+    {
+      "a": "V10",
+      "b": "V9",
+      "roles": ["ablation"],
+      "reused": true,
+      "games": 400,
+      "w": 196,
+      "d": 97,
+      "l": 107,
+      "score": 0.6113,
+      "elo_diff": 78.6,
+      "ci": [53.4, 106.6],
+      "draws_by": {
+        "repetition": 6,
+        "fifty": 35,
+        "one_each": 56,
+        "ply_cap": 0
+      },
+      "no_move": 303,
+      "avg_plies": 106
+    },
+    {
+      "a": "V10",
+      "b": "V10-w",
+      "roles": ["ablation"],
+      "reused": false,
+      "games": 400,
+      "w": 308,
+      "d": 51,
+      "l": 41,
+      "score": 0.8338,
+      "elo_diff": 280.1,
+      "ci": [246.3, 322.7],
+      "draws_by": {
+        "repetition": 2,
+        "fifty": 20,
+        "one_each": 29,
+        "ply_cap": 0
+      },
+      "no_move": 349,
+      "avg_plies": 124
+    },
+    {
+      "a": "V10",
+      "b": "V0",
+      "roles": ["ablation"],
+      "reused": false,
+      "games": 400,
+      "w": 313,
+      "d": 87,
+      "l": 0,
+      "score": 0.8913,
+      "elo_diff": 365.4,
+      "ci": [332.2, 404.6],
+      "draws_by": {
+        "repetition": 44,
+        "fifty": 43,
+        "one_each": 0,
+        "ply_cap": 0
+      },
+      "no_move": 313,
+      "avg_plies": 86
+    }
+  ],
+  "footnotes": [
+    {
+      "id": "V10-o",
+      "tag": "v10-transposition-table",
+      "note": "without `o` the search still tries the table's move first at every node; only the previous iteration's best move at the root, promotions, killers and history are off"
+    },
+    {
+      "id": "V9",
+      "tag": "v9-move-ordering",
+      "note": "V10 without its table; the games of V10_vs_V9 are the ladder's (results/ladder/games)"
+    }
+  ]
+}

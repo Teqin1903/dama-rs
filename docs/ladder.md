@@ -138,3 +138,46 @@ here.
 - Every pairing uses seed 1, so all pairings start from the same openings; the intervals cover the choice of
   openings within a pairing, not other seeds.
 - `ms_per_move` in ladder.json was taken with six games at once and is not a speed measurement.
+
+## Ablation
+
+What each part of V10 is worth now: V10 (`idqrot:n20000:w=texel1`) against itself with one part turned off, and
+against the A3 agent V0. Same settings as the ladder (paired, 4 opening plies, seed 1, `--threads 6`), 400 games
+each. Source: `results/ablation/games/`, `results/ablation/ablation.json` (`dama ladder run --set ablation`,
+`dama ladder rate --set ablation`), version `ladder-1-1-g11a369d`, 2000 new games in 1535 s. V10–V9 is V10 without
+its table; it is the ladder's pairing (version `v10-transposition-table-2-g2756964`, same code for the agents),
+read from `results/ladder/games/` and not played again.
+
+The fit has V10 at 0, and every pairing is against V10 (a star), so each rating is exactly its pairing's own Elo.
+"Lost" is V10's Elo over the version without the part.
+
+| part off | spec | + = − (V10's view) | score | lost | 95% | draws: rep / 50 / one each | nodes/move | depth/move |
+|---|---|---|---:|---:|---|---|---:|---:|
+| quiescence | `idrot:n20000:w=texel1` | +297 =63 −40 | 82.1% | **265** | [230, 301] | 6 / 12 / 45 | 19 558 | 5.99 |
+| repetitions | `idqot:n20000:w=texel1` | +134 =140 −126 | 51.0% | 7 | [−15, +29] | 81 / 20 / 39 | 19 696 | 5.88 |
+| move ordering¹ | `idqrt:n20000:w=texel1` | +199 =92 −109 | 61.3% | 80 | [52, 108] | 11 / 27 / 54 | 19 667 | 5.32 |
+| transposition table (V9) | `idqro:n20000:w=texel1` | +196 =97 −107 | 61.1% | 79 | [53, 107] | 6 / 35 / 56 | 19 676 | 5.31 |
+| Texel weights | `idqrot:n20000:w=tuned` | +308 =51 −41 | 83.4% | **280** | [246, 323] | 2 / 20 / 29 | 19 695 | 5.71 |
+| everything since A3 (V0) | `tuned` | +313 =87 −0 | 89.1% | 365 | [332, 405] | 44 / 43 / 0 | 9 | 1.00 |
+
+V10 itself: 19 651 nodes and 5.68 plies per move over these games. Nodes and depth above are the weaker side's.
+
+¹ Without `o` the search still tries the table's move first at every node (`bounded_value` in
+engine/src/search.rs); only the previous iteration's best move at the root, promotions, killers and history are off.
+So this row measures the ordering the table does not already give.
+
+- **Quiescence and the weights are worth the most** (265 and 280). Without quiescence V10 completes more plies
+  (5.99 against 5.68), since no node goes into captures past the limit, and plays far worse: depth that ends in the
+  middle of a capture sequence misjudges it.
+- **Repetitions are worth nothing measurable at the top** (+7, interval across 0). In the ladder they were worth
+  +45 (V6–V4, tuned weights). Without them V10's games end by repetition far more often (81 draws against 6–11 in
+  the other rows), but it loses about as often as it wins (126 against 134). Why repetitions stopped mattering is not measured
+  here; texel1 already avoids most of them (see Kinds of draws).
+- **Ordering and the table are worth the same** (80 and 79), and each about what it was worth as a rung (V9–V8
+  +107, V10–V9 +79). Both buy depth within the same 20 000 nodes: 5.32 and 5.31 plies against V10's 5.68.
+- **V0: +365 here, +664 on the ladder's scale** (V10 +672, V0 +8). V10 never loses to the baseline, but 87 of 400
+  games are drawn, by repetition and 50 quiet plies. The same as V2–V0 in the ladder: the one-ply baseline holds
+  draws against much stronger agents, so it rates higher head to head than through the chain. Since A3 the agent is
+  +365 against V0 directly; on the ladder's scale +664.
+- Each part is measured with all the others on. Their losses do not add up to V0's 365, and need not: the parts
+  depend on each other (ordering needs iterative deepening, the weights need depth to matter).
