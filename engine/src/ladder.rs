@@ -13,6 +13,7 @@ use std::str::FromStr;
 use crate::arena::{EndReason, MatchRecord, Thinking, paired_opening_seed};
 use crate::board::Color;
 use crate::elo::{self, Bootstrap, Fit, PairedMatch, Score};
+use crate::json::Json;
 
 /// One version of the agent on the ladder.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -790,91 +791,6 @@ pub struct Meta {
     pub wall_s: Option<f64>,
 }
 
-/// A JSON value, written by `Json::write`. Numbers that are not finite become `null`.
-#[derive(Clone, Debug, PartialEq)]
-pub enum Json {
-    Null,
-    Bool(bool),
-    Num(f64),
-    Str(String),
-    Arr(Vec<Json>),
-    Obj(Vec<(&'static str, Json)>),
-}
-
-impl Json {
-    fn num(x: f64, decimals: i32) -> Json {
-        let scale = 10f64.powi(decimals);
-        Json::Num((x * scale).round() / scale)
-    }
-
-    fn opt(x: Option<f64>, decimals: i32) -> Json {
-        x.map_or(Json::Null, |x| Json::num(x, decimals))
-    }
-
-    fn str(s: &str) -> Json {
-        Json::Str(s.to_string())
-    }
-
-    /// The value with two spaces of indentation per level.
-    pub fn write(&self, out: &mut String, indent: usize) {
-        let pad = |n: usize| "  ".repeat(n);
-        match self {
-            Json::Null => out.push_str("null"),
-            Json::Bool(b) => out.push_str(if *b { "true" } else { "false" }),
-            Json::Num(x) if x.is_finite() => out.push_str(&format!("{x}")),
-            Json::Num(_) => out.push_str("null"),
-            Json::Str(s) => {
-                out.push('"');
-                for c in s.chars() {
-                    match c {
-                        '"' => out.push_str("\\\""),
-                        '\\' => out.push_str("\\\\"),
-                        '\n' => out.push_str("\\n"),
-                        c if (c as u32) < 0x20 => out.push_str(&format!("\\u{:04x}", c as u32)),
-                        c => out.push(c),
-                    }
-                }
-                out.push('"');
-            }
-            // Arrays of numbers stay on one line: [lo, hi].
-            Json::Arr(items)
-                if items
-                    .iter()
-                    .all(|i| !matches!(i, Json::Arr(_) | Json::Obj(_))) =>
-            {
-                out.push('[');
-                for (k, item) in items.iter().enumerate() {
-                    if k > 0 {
-                        out.push_str(", ");
-                    }
-                    item.write(out, indent);
-                }
-                out.push(']');
-            }
-            Json::Arr(items) => {
-                out.push_str("[\n");
-                for (k, item) in items.iter().enumerate() {
-                    out.push_str(&pad(indent + 1));
-                    item.write(out, indent + 1);
-                    out.push_str(if k + 1 < items.len() { ",\n" } else { "\n" });
-                }
-                out.push_str(&pad(indent));
-                out.push(']');
-            }
-            Json::Obj(fields) => {
-                out.push_str("{\n");
-                for (k, (key, value)) in fields.iter().enumerate() {
-                    out.push_str(&format!("{}\"{key}\": ", pad(indent + 1)));
-                    value.write(out, indent + 1);
-                    out.push_str(if k + 1 < fields.len() { ",\n" } else { "\n" });
-                }
-                out.push_str(&pad(indent));
-                out.push('}');
-            }
-        }
-    }
-}
-
 impl Report {
     /// ladder.json or ablation.json: meta, versions and pairings (docs/ladder.md describes the
     /// fields). The ablation's versions also say what each lacks (`removed`), and its pairings
@@ -883,7 +799,7 @@ impl Report {
         let rungs = set.rungs;
         let ablation = rungs.iter().any(|r| r.removed.is_some());
         let ci = |c: [f64; 2]| Json::Arr(vec![Json::num(c[0], 1), Json::num(c[1], 1)]);
-        let settings = Json::Obj(vec![
+        let settings = Json::obj(vec![
             ("schedule", Json::str("paired")),
             ("opening_plies", Json::Num(4.0)),
             ("max_plies", Json::Num(400.0)),
@@ -898,7 +814,7 @@ impl Report {
                 Json::str("measured with several games at once: not a measurement of speed"),
             ),
         ]);
-        let bootstrap = Json::Obj(vec![
+        let bootstrap = Json::obj(vec![
             ("samples", Json::Num(self.bootstrap.samples as f64)),
             ("seed", Json::Num(f64::from(self.bootstrap.seed))),
             ("rng", Json::str("mulberry32")),
@@ -918,7 +834,7 @@ impl Report {
             .iter()
             .map(|&i| Json::str(rungs[i].id))
             .collect();
-        let meta_json = Json::Obj(vec![
+        let meta_json = Json::obj(vec![
             ("commit", Json::str(&meta.commit)),
             ("date", Json::str(&meta.date)),
             ("settings", settings),
@@ -957,7 +873,7 @@ impl Report {
                     ("avg_depth", Json::opt(v.depth_per_move, 3)),
                     ("ms_per_move", Json::opt(v.ms_per_move, 3)),
                 ]);
-                Json::Obj(fields)
+                Json::obj(fields)
             })
             .collect();
         let pairings = self
@@ -983,7 +899,7 @@ impl Report {
                     ("ci", ci(p.ci)),
                     (
                         "draws_by",
-                        Json::Obj(vec![
+                        Json::obj(vec![
                             ("repetition", Json::Num(f64::from(p.draws_by[0]))),
                             ("fifty", Json::Num(f64::from(p.draws_by[1]))),
                             ("one_each", Json::Num(f64::from(p.draws_by[2]))),
@@ -993,14 +909,14 @@ impl Report {
                     ("no_move", Json::Num(f64::from(p.no_move))),
                     ("avg_plies", Json::num(p.mean_plies, 1)),
                 ]);
-                Json::Obj(fields)
+                Json::obj(fields)
             })
             .collect();
         let footnotes = set
             .footnotes
             .iter()
             .map(|(id, tag, note)| {
-                Json::Obj(vec![
+                Json::obj(vec![
                     ("id", Json::str(id)),
                     ("tag", Json::str(tag)),
                     ("note", Json::str(note)),
@@ -1008,7 +924,7 @@ impl Report {
             })
             .collect();
         let mut out = String::new();
-        Json::Obj(vec![
+        Json::obj(vec![
             ("meta", meta_json),
             ("versions", Json::Arr(versions)),
             ("pairings", Json::Arr(pairings)),

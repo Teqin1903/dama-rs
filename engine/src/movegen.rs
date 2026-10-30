@@ -114,7 +114,7 @@ impl Board {
     }
 
     /// A man steps one square forward or sideways; a king flies to any empty square in a line.
-    fn quiet_moves(&self, side: Color) -> Vec<Move> {
+    pub(crate) fn quiet_moves(&self, side: Color) -> Vec<Move> {
         let empty = self.empty_squares();
         let mut moves = Vec::new();
         for from in self.pieces(side) {

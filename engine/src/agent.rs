@@ -16,12 +16,13 @@ use crate::eval::Weights;
 use crate::movegen::Move;
 use crate::rng::Mulberry32;
 use crate::search::{
-    Decision, Limits, MAX_ID_DEPTH, SearchOptions, alpha_beta_with, decide,
-    iterative_deepening_with, minimax,
+    Decision, Limits, MAX_ID_DEPTH, SearchOptions, alpha_beta_traced, decide_traced,
+    iterative_deepening_traced, minimax_traced,
 };
 #[cfg(test)]
-use crate::search::{alpha_beta, iterative_deepening};
+use crate::search::{alpha_beta, decide, iterative_deepening, minimax};
 use crate::table::{Table, TableOptions};
+use crate::trace::{NoTrace, Recorder, Tracer};
 
 /// A player in the arena.
 ///
@@ -39,6 +40,11 @@ pub trait Agent {
     /// an agent that remembers the game can recognise a repetition. Most agents ignore it.
     fn observe(&mut self, _board: &Board, _side: Color) {}
 
+    /// Forgets the positions observed so far, and nothing else: the table, heuristics and random
+    /// numbers stay. A game that is taken back is observed again from its start after this, since
+    /// the history cannot drop a single position (it forgets everything before a capture).
+    fn forget_game(&mut self) {}
+
     /// The move to play on `board` with `side` to move. `legal` is `board.legal_moves(side)` and
     /// is never empty; the move returned is one of its elements.
     fn choose<'m>(
@@ -47,6 +53,32 @@ pub trait Agent {
         side: Color,
         legal: &'m [Move],
     ) -> Result<&'m Move, AgentError>;
+
+    /// `choose`, with the search reported to `recorder` and, with `only`, limited to those root
+    /// moves (indices into `legal`, at least one). Without `only` it is `choose`: the same move,
+    /// and the same change to the agent's memory (table, heuristics, random numbers). The default,
+    /// for an agent without a search, calls `choose` and refuses `only`.
+    fn think(
+        &mut self,
+        board: &Board,
+        side: Color,
+        legal: &[Move],
+        _recorder: &mut Recorder,
+        only: Option<&[usize]>,
+    ) -> Result<Thought, AgentError> {
+        if only.is_some() {
+            return Err(AgentError(
+                "this agent does not search, so it cannot be limited to some moves".to_string(),
+            ));
+        }
+        let mv = self.choose(board, side, legal)?;
+        let index = (legal.iter().position(|m| m == mv)).expect("the move is one of `legal`");
+        Ok(Thought {
+            decision: None,
+            depth: 0,
+            index,
+        })
+    }
 
     /// The positions this agent's search has produced since it was built, for the arena's nodes
     /// per move. 0 for an agent that does not search.
@@ -60,6 +92,17 @@ pub trait Agent {
     fn depths(&self) -> u64 {
         0
     }
+}
+
+/// What `Agent::think` decided.
+#[derive(Clone, Debug)]
+pub struct Thought {
+    /// The search's decision; `None` for an agent that does not search.
+    pub decision: Option<Decision>,
+    /// The completed depth of the search that decided (0 without a search).
+    pub depth: u32,
+    /// The index in the legal moves of the move played.
+    pub index: usize,
 }
 
 /// Why an agent could not play, in words.
@@ -151,12 +194,41 @@ impl UAgent {
     }
 }
 
-/// The legal move that `decision` picks with `rng`. The candidates are the legal moves in the
-/// order of `legal_moves`, so the index of the chosen candidate is its index in `legal` too.
-fn play<'m>(decision: &Decision, rng: &mut Mulberry32, legal: &'m [Move]) -> &'m Move {
+/// The index in the legal moves of the move that `decision` picks with `rng`.
+fn pick(decision: &Decision, rng: &mut Mulberry32) -> usize {
     let i = decision.pick(Some(rng)).expect("`legal` is not empty");
-    debug_assert_eq!(legal[i], decision.candidates[i].mv);
-    &legal[i]
+    decision.candidates[i].index
+}
+
+/// The legal move that `decision` picks with `rng`.
+fn play<'m>(decision: &Decision, rng: &mut Mulberry32, legal: &'m [Move]) -> &'m Move {
+    &legal[pick(decision, rng)]
+}
+
+/// The `Thought` of an agent whose search gave `decision` at `depth`, picking with `rng`.
+fn thought(decision: Decision, depth: u32, rng: &mut Mulberry32) -> Thought {
+    let index = pick(&decision, rng);
+    Thought {
+        decision: Some(decision),
+        depth,
+        index,
+    }
+}
+
+impl UAgent {
+    /// The search of `choose` and `think`, counted in `nodes` and `depths`.
+    fn search<T: Tracer>(
+        &mut self,
+        board: &Board,
+        side: Color,
+        only: Option<&[usize]>,
+        tracer: T,
+    ) -> (Decision, u32) {
+        let decision = decide_traced(board, side, self.weights, only, tracer);
+        self.nodes += decision.nodes;
+        self.depths += 1;
+        (decision, 1)
+    }
 }
 
 impl Agent for UAgent {
@@ -171,10 +243,20 @@ impl Agent for UAgent {
         side: Color,
         legal: &'m [Move],
     ) -> Result<&'m Move, AgentError> {
-        let decision = decide(board, side, self.weights);
-        self.nodes += decision.nodes;
-        self.depths += 1;
+        let (decision, _) = self.search(board, side, None, NoTrace);
         Ok(play(&decision, &mut self.rng, legal))
+    }
+
+    fn think(
+        &mut self,
+        board: &Board,
+        side: Color,
+        _legal: &[Move],
+        recorder: &mut Recorder,
+        only: Option<&[usize]>,
+    ) -> Result<Thought, AgentError> {
+        let (decision, depth) = self.search(board, side, only, recorder);
+        Ok(thought(decision, depth, &mut self.rng))
     }
 
     fn nodes(&self) -> u64 {
@@ -210,6 +292,22 @@ impl MinimaxAgent {
     }
 }
 
+impl MinimaxAgent {
+    /// The search of `choose` and `think`, counted in `nodes` and `depths`.
+    fn search<T: Tracer>(
+        &mut self,
+        board: &Board,
+        side: Color,
+        only: Option<&[usize]>,
+        tracer: T,
+    ) -> (Decision, u32) {
+        let decision = minimax_traced(board, side, self.weights, self.depth, false, only, tracer);
+        self.nodes += decision.nodes;
+        self.depths += u64::from(self.depth);
+        (decision, self.depth)
+    }
+}
+
 impl Agent for MinimaxAgent {
     fn new_game(&mut self, seed: u32) -> Result<(), AgentError> {
         self.rng = Mulberry32::new(seed);
@@ -222,10 +320,20 @@ impl Agent for MinimaxAgent {
         side: Color,
         legal: &'m [Move],
     ) -> Result<&'m Move, AgentError> {
-        let decision = minimax(board, side, self.weights, self.depth);
-        self.nodes += decision.nodes;
-        self.depths += u64::from(self.depth);
+        let (decision, _) = self.search(board, side, None, NoTrace);
         Ok(play(&decision, &mut self.rng, legal))
+    }
+
+    fn think(
+        &mut self,
+        board: &Board,
+        side: Color,
+        _legal: &[Move],
+        recorder: &mut Recorder,
+        only: Option<&[usize]>,
+    ) -> Result<Thought, AgentError> {
+        let (decision, depth) = self.search(board, side, only, recorder);
+        Ok(thought(decision, depth, &mut self.rng))
     }
 
     fn nodes(&self) -> u64 {
@@ -293,6 +401,37 @@ impl AlphaBetaAgent {
     }
 }
 
+impl AlphaBetaAgent {
+    /// The search of `choose` and `think`, counted in `nodes` and `depths`.
+    fn search<T: Tracer>(
+        &mut self,
+        board: &Board,
+        side: Color,
+        only: Option<&[usize]>,
+        tracer: T,
+    ) -> (Decision, u32) {
+        let options = SearchOptions {
+            quiescence: self.quiescence,
+            order: self.order,
+        };
+        let history = self.history.as_ref().map(|h| h.positions.as_slice());
+        let decision = alpha_beta_traced(
+            board,
+            side,
+            self.weights,
+            self.depth,
+            options,
+            history,
+            self.table.as_mut(),
+            only,
+            tracer,
+        );
+        self.nodes += decision.nodes;
+        self.depths += u64::from(self.depth);
+        (decision, self.depth)
+    }
+}
+
 impl Agent for AlphaBetaAgent {
     fn new_game(&mut self, seed: u32) -> Result<(), AgentError> {
         self.rng = Mulberry32::new(seed);
@@ -311,28 +450,31 @@ impl Agent for AlphaBetaAgent {
         side: Color,
         legal: &'m [Move],
     ) -> Result<&'m Move, AgentError> {
-        let options = SearchOptions {
-            quiescence: self.quiescence,
-            order: self.order,
-        };
-        let history = self.history.as_ref().map(|h| h.positions.as_slice());
-        let decision = alpha_beta_with(
-            board,
-            side,
-            self.weights,
-            self.depth,
-            options,
-            history,
-            self.table.as_mut(),
-        );
-        self.nodes += decision.nodes;
-        self.depths += u64::from(self.depth);
+        let (decision, _) = self.search(board, side, None, NoTrace);
         Ok(play(&decision, &mut self.rng, legal))
+    }
+
+    fn think(
+        &mut self,
+        board: &Board,
+        side: Color,
+        _legal: &[Move],
+        recorder: &mut Recorder,
+        only: Option<&[usize]>,
+    ) -> Result<Thought, AgentError> {
+        let (decision, depth) = self.search(board, side, only, recorder);
+        Ok(thought(decision, depth, &mut self.rng))
     }
 
     fn observe(&mut self, board: &Board, side: Color) {
         if let Some(history) = &mut self.history {
             history.push(board, side);
+        }
+    }
+
+    fn forget_game(&mut self) {
+        if let Some(history) = &mut self.history {
+            history.clear();
         }
     }
 
@@ -402,6 +544,37 @@ impl DeepeningAgent {
     }
 }
 
+impl DeepeningAgent {
+    /// The search of `choose` and `think`, counted in `nodes` and `depths`.
+    fn search<T: Tracer>(
+        &mut self,
+        board: &Board,
+        side: Color,
+        only: Option<&[usize]>,
+        tracer: T,
+    ) -> (Decision, u32) {
+        let options = SearchOptions {
+            quiescence: self.quiescence,
+            order: self.order,
+        };
+        let history = self.history.as_ref().map(|h| h.positions.as_slice());
+        let deepening = iterative_deepening_traced(
+            board,
+            side,
+            self.weights,
+            self.limits,
+            options,
+            history,
+            self.table.as_mut(),
+            only,
+            tracer,
+        );
+        self.nodes += deepening.decision.nodes;
+        self.depths += u64::from(deepening.depth);
+        (deepening.decision, deepening.depth)
+    }
+}
+
 impl Agent for DeepeningAgent {
     fn new_game(&mut self, seed: u32) -> Result<(), AgentError> {
         self.rng = Mulberry32::new(seed);
@@ -420,28 +593,31 @@ impl Agent for DeepeningAgent {
         side: Color,
         legal: &'m [Move],
     ) -> Result<&'m Move, AgentError> {
-        let options = SearchOptions {
-            quiescence: self.quiescence,
-            order: self.order,
-        };
-        let history = self.history.as_ref().map(|h| h.positions.as_slice());
-        let deepening = iterative_deepening_with(
-            board,
-            side,
-            self.weights,
-            self.limits,
-            options,
-            history,
-            self.table.as_mut(),
-        );
-        self.nodes += deepening.decision.nodes;
-        self.depths += u64::from(deepening.depth);
-        Ok(play(&deepening.decision, &mut self.rng, legal))
+        let (decision, _) = self.search(board, side, None, NoTrace);
+        Ok(play(&decision, &mut self.rng, legal))
+    }
+
+    fn think(
+        &mut self,
+        board: &Board,
+        side: Color,
+        _legal: &[Move],
+        recorder: &mut Recorder,
+        only: Option<&[usize]>,
+    ) -> Result<Thought, AgentError> {
+        let (decision, depth) = self.search(board, side, only, recorder);
+        Ok(thought(decision, depth, &mut self.rng))
     }
 
     fn observe(&mut self, board: &Board, side: Color) {
         if let Some(history) = &mut self.history {
             history.push(board, side);
+        }
+    }
+
+    fn forget_game(&mut self) {
+        if let Some(history) = &mut self.history {
+            history.clear();
         }
     }
 

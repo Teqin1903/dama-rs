@@ -8,8 +8,11 @@ match kish 1.1.2, and every number in our Assignment 3 talk came from it.
 - `engine/`: library crate with the board, move generation, evaluation (U and its positional features, `eval.rs`),
   search, Zobrist keys (`zobrist.rs`) and the transposition table (`table.rs`), the arena and its SPRT (`sprt.rs`),
   Texel tuning of the weights (`texel.rs`), and the Elo ladder (`ladder.rs`: rungs, pairings, game rows) with its
-  Bradley-Terry fit and bootstrap (`elo.rs`)
+  Bradley-Terry fit and bootstrap (`elo.rs`), and the web API (`api.rs`: `Session`, JSON in and out, docs/web-api.md)
+  with its search tracer (`trace.rs`: `Tracer`, `NoTrace`, `Recorder`) and a small JSON reader and writer (`json.rs`)
 - `cli/`: binary crate that speaks the text protocol (position / go / bestmove)
+- `web/`: the engine for the site in WebAssembly (`wasm-bindgen`, `console_error_panic_hook`: used only here); a thin
+  wrapper of `engine::Session`. `site/` is written by someone else: we only produce `site/pkg/`
 - `reference/js/`: the JS prototype. Read it; never edit it.
 - `testdata/`: perft counts, rule cases, move lists of sampled positions, decisions of the baseline agent
 - `docs/reference.md`: board and move formats, the baseline agent's U, our match settings
@@ -54,6 +57,11 @@ match kish 1.1.2, and every number in our Assignment 3 talk came from it.
 - Ablation (docs/ladder.md): `ladder run --set ablation` (and `--estimate`, `rate --set ablation`): V10 against
   itself with one part off (`ABLATION`: q, r, o, t, the Texel weights) and against V0, 400 games each, into
   `results/ablation/` and `ablation.json`; V10–V9 (no table) is the ladder's pairing, read from `results/ladder/games/`
+- Web API: `wasm-pack build web --target no-modules --release --out-dir ../site/pkg --out-name dama_web` builds
+  `site/pkg/`; `target/release/dama api < requests.jsonl` answers the same calls natively, one JSON request per line
+  (`{"call": "think", "args": ["white", "{}"]}`). Tracing must never change a search: the searches take a generic
+  `Tracer` (`*_traced` in search.rs; the old functions pass `NoTrace`), and `tests/api.rs` checks traced against
+  untraced searches and a session's games against the arena's
 - Regenerate testdata (only when I ask): `node reference/js/make_testdata.js`
 
 ## Rules (TÜDAF): the parts that are easy to get wrong

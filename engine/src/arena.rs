@@ -125,8 +125,8 @@ impl Schedule {
             Schedule::Paired => (0..games)
                 .map(|g| GameSeeds {
                     opening: paired_opening_seed(seed, g),
-                    a: derive_seed(seed, AGENT_A, g),
-                    b: derive_seed(seed, AGENT_B, g),
+                    a: paired_agent_seeds(seed, g).0,
+                    b: paired_agent_seeds(seed, g).1,
                     a_white: g % 2 == 0,
                 })
                 .collect(),
@@ -138,6 +138,14 @@ impl Schedule {
 /// same for games 2p and 2p + 1.
 pub fn paired_opening_seed(seed: u32, game: u32) -> u32 {
     derive_seed(seed, OPENING, game / 2)
+}
+
+/// The seeds of agents A and B in game `game` of a paired match with seed `seed`.
+pub fn paired_agent_seeds(seed: u32, game: u32) -> (u32, u32) {
+    (
+        derive_seed(seed, AGENT_A, game),
+        derive_seed(seed, AGENT_B, game),
+    )
 }
 
 impl fmt::Display for Schedule {
@@ -226,6 +234,46 @@ impl GameRecord {
     }
 }
 
+/// A position of a game, with what the draw rules need to know about it.
+#[derive(Clone, Copy, Debug)]
+pub struct GamePosition<'a> {
+    pub board: &'a Board,
+    pub side: Color,
+    /// `board.legal_moves(side)`.
+    pub legal: &'a [Move],
+    /// How often this position, with this side to move, has occurred in the game, this time
+    /// included.
+    pub occurrences: u32,
+    /// Plies in a row without a capture before it.
+    pub quiet: u32,
+    /// Plies played before it.
+    pub ply: u32,
+}
+
+/// How the game ends at `position`, if it does, checked in the order of `playGame`: the third
+/// occurrence of a position is a draw; a side without a legal move loses; one piece each is a
+/// draw; 50 quiet plies are a draw; reaching `max_plies` is a draw. The winner is `None` for a
+/// draw.
+pub fn game_end(position: &GamePosition, max_plies: u32) -> Option<(Option<Color>, EndReason)> {
+    let board = position.board;
+    if position.occurrences >= REPETITIONS {
+        return Some((None, EndReason::Repetition));
+    }
+    if position.legal.is_empty() {
+        return Some((Some(position.side.opponent()), EndReason::NoMove));
+    }
+    if board.pieces(Color::White).len() == 1 && board.pieces(Color::Black).len() == 1 {
+        return Some((None, EndReason::OnePieceEach));
+    }
+    if position.quiet >= QUIET_PLIES {
+        return Some((None, EndReason::QuietPlies));
+    }
+    if position.ply >= max_plies {
+        return Some((None, EndReason::Cap));
+    }
+    None
+}
+
 /// Plays a game from `start` with `side` to move: the port of `playGame`.
 ///
 /// Both agents observe every position (`Agent::observe`) as it is reached. Then, before every
@@ -252,21 +300,17 @@ pub fn play_game(
         black.observe(&board, side);
         let occurrences = seen.entry((board, side)).or_insert(0);
         *occurrences += 1;
-        if *occurrences >= REPETITIONS {
-            break (None, EndReason::Repetition);
-        }
         let legal = board.legal_moves(side);
-        if legal.is_empty() {
-            break (Some(side.opponent()), EndReason::NoMove);
-        }
-        if board.pieces(Color::White).len() == 1 && board.pieces(Color::Black).len() == 1 {
-            break (None, EndReason::OnePieceEach);
-        }
-        if quiet >= QUIET_PLIES {
-            break (None, EndReason::QuietPlies);
-        }
-        if ply >= settings.max_plies {
-            break (None, EndReason::Cap);
+        let position = GamePosition {
+            board: &board,
+            side,
+            legal: &legal,
+            occurrences: *occurrences,
+            quiet,
+            ply,
+        };
+        if let Some(end) = game_end(&position, settings.max_plies) {
+            break end;
         }
         let mv = if ply < settings.opening_plies {
             &legal[opening.next_index(legal.len())]
@@ -354,6 +398,10 @@ impl Agent for Timed<'_> {
 
     fn observe(&mut self, board: &Board, side: Color) {
         self.agent.observe(board, side);
+    }
+
+    fn forget_game(&mut self) {
+        self.agent.forget_game();
     }
 
     fn choose<'m>(

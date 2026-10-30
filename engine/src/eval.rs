@@ -22,7 +22,8 @@
 use std::fmt;
 
 use crate::bitboard::Bitboard;
-use crate::board::{Board, Color, Kind};
+use crate::board::{Board, Color, Kind, Piece};
+use crate::square::Square;
 
 /// U of a move after which the opponent has no legal move: a win.
 pub const WIN: f64 = 1000.0;
@@ -357,7 +358,7 @@ impl Positional {
     }
 
     /// The counts of `color` alone.
-    fn counts(board: &Board, color: Color) -> Positional {
+    pub(crate) fn counts(board: &Board, color: Color) -> Positional {
         let pieces = board.pieces(color);
         let men = (pieces & !board.kings()).bits();
         // Rank 2 to rank 7 are ranks 1 to 6 counted from 0; a man on the home row has advanced 0.
@@ -384,6 +385,168 @@ impl Positional {
             + w.cen * f64::from(self.cen)
             + w.edge * f64::from(self.edge)
             + w.qmob * f64::from(self.qmob)
+    }
+}
+
+/// One feature of `Breakdown`: each colour's count, the weight, and weight × (ours − theirs).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FeatureTerm {
+    /// The weight's name in `Weights::KEYS`: `man`, `king`, `mob`, `adv`, ...
+    pub key: &'static str,
+    /// The feature's name for people: `men`, `kings`, `mobility`, `advancement`, ...
+    pub name: &'static str,
+    pub white: i32,
+    pub black: i32,
+    pub weight: f64,
+    pub contribution: f64,
+}
+
+/// One piece's share of `Breakdown`: what it adds through the features that are sums over pieces.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct SquareTerm {
+    pub square: Square,
+    pub piece: Piece,
+    pub contribution: f64,
+}
+
+/// A position's static evaluation, broken into its features and its pieces, from `side`'s view
+/// (ours minus theirs), which need not be the side to move.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Breakdown {
+    pub side: Color,
+    /// The value the search gives the position at a leaf with `side` as the root side
+    /// (`search::static_value`): `WIN` or `-WIN` one ply deep when the side to move has no move.
+    pub total: f64,
+    /// The winner when the side to move has no legal move.
+    pub win: Option<Color>,
+    /// The features whose weight is not 0, in the engine's order (`Weights::KEYS`).
+    pub features: Vec<FeatureTerm>,
+    /// Every piece, from a1 up to h8. Mobility (`mob`) belongs to no single piece; each piece
+    /// carries its own quiet moves for `qmob`.
+    pub squares: Vec<SquareTerm>,
+}
+
+/// The evaluation of `board` with `to_move` to move and weights `w`, from `side`'s view, broken
+/// down (`Breakdown`). `total` is computed as the search computes it; the contributions add up to
+/// it up to rounding.
+pub fn breakdown(board: &Board, to_move: Color, side: Color, w: Weights) -> Breakdown {
+    let moves = |c: Color| board.legal_moves(c).len() as i32;
+    let (white, black) = (
+        Positional::counts(board, Color::White),
+        Positional::counts(board, Color::Black),
+    );
+    let count = |c: Color, kind| board.count(c, kind) as i32;
+    let by_colour = |f: fn(&Positional) -> i32| (f(&white), f(&black));
+    let rows: [((i32, i32), f64); 8] = [
+        (
+            (
+                count(Color::White, Kind::Man),
+                count(Color::Black, Kind::Man),
+            ),
+            w.man,
+        ),
+        (
+            (
+                count(Color::White, Kind::King),
+                count(Color::Black, Kind::King),
+            ),
+            w.king,
+        ),
+        ((moves(Color::White), moves(Color::Black)), w.mob),
+        (by_colour(|p| p.adv), w.adv),
+        (by_colour(|p| p.back), w.back),
+        (by_colour(|p| p.cen), w.cen),
+        (by_colour(|p| p.edge), w.edge),
+        (by_colour(|p| p.qmob), w.qmob),
+    ];
+    const NAMES: [&str; 8] = [
+        "men",
+        "kings",
+        "mobility",
+        "advancement",
+        "back row",
+        "centre",
+        "edge",
+        "quiet mobility",
+    ];
+    let features = (rows.iter().zip(Weights::KEYS).zip(NAMES))
+        .filter(|((row, _), _)| row.1 != 0.0)
+        .map(|((&((white, black), weight), key), name)| {
+            let difference = match side {
+                Color::White => white - black,
+                Color::Black => black - white,
+            };
+            FeatureTerm {
+                key,
+                name,
+                white,
+                black,
+                weight,
+                contribution: weight * f64::from(difference),
+            }
+        })
+        .collect();
+    let mut quiet = [0u32; 64];
+    for c in [Color::White, Color::Black] {
+        for mv in board.quiet_moves(c) {
+            quiet[mv.from().index()] += 1;
+        }
+    }
+    let squares = (0..64)
+        .filter_map(|i| {
+            let square = Square::new((i % 8) as u8, (i / 8) as u8);
+            let piece = board.piece_at(square)?;
+            let bit = Bitboard::from(square);
+            let mut share = match piece.kind {
+                Kind::Man => w.man,
+                Kind::King => w.king,
+            };
+            if piece.kind == Kind::Man {
+                let rank = u32::from(square.rank());
+                let (home, rows_up) = match piece.color {
+                    Color::White => (1, rank.saturating_sub(1)),
+                    Color::Black => (6, 6u32.saturating_sub(rank)),
+                };
+                share += w.adv * f64::from(rows_up);
+                if rank == home {
+                    share += w.back;
+                }
+            }
+            if !(bit & CENTER).is_empty() {
+                share += w.cen;
+            }
+            if !(bit & FILES_A_H).is_empty() {
+                share += w.edge;
+            }
+            share += w.qmob * f64::from(quiet[square.index()]);
+            let sign = if piece.color == side { 1.0 } else { -1.0 };
+            Some(SquareTerm {
+                square,
+                piece,
+                contribution: sign * share,
+            })
+        })
+        .collect();
+    let to_move_moves = board.legal_moves(to_move).len();
+    let (total, win) = if to_move_moves == 0 {
+        let win = if side == to_move { -WIN } else { WIN };
+        (win, Some(to_move.opponent()))
+    } else {
+        let other = board.legal_moves(to_move.opponent()).len();
+        let (ours, theirs) = if side == to_move {
+            (to_move_moves, other)
+        } else {
+            (other, to_move_moves)
+        };
+        let features = Features::leaf(board, side, ours, theirs);
+        (evaluate(board, side, &features, w), None)
+    };
+    Breakdown {
+        side,
+        total,
+        win,
+        features,
+        squares,
     }
 }
 

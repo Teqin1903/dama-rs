@@ -8,52 +8,11 @@
 
 mod common;
 
+use common::positions;
 use engine::{
     Board, Color, Decision, Limits, Move, SearchOptions, U_EPSILON, Weights, alpha_beta_with,
     iterative_deepening_with,
 };
-use serde::Deserialize;
-
-/// A position of decisions.json or movegen.json. Only decisions.json has `name` and `weights`.
-#[derive(Deserialize)]
-struct Position {
-    name: Option<String>,
-    board: String,
-    side: String,
-    weights: Option<JsWeights>,
-}
-
-#[derive(Deserialize)]
-struct JsWeights {
-    man: f64,
-    king: f64,
-    mob: f64,
-}
-
-/// Every position of both files, with a label for messages, the side to move and its weights.
-fn positions() -> Vec<(String, Board, Color, Weights)> {
-    let mut all = Vec::new();
-    for file in ["decisions.json", "movegen.json"] {
-        let entries: Vec<Position> = serde_json::from_str(&common::read_testdata(file)).unwrap();
-        for (i, p) in entries.into_iter().enumerate() {
-            let weights = p.weights.map_or(Weights::TUNED, |w| Weights {
-                man: w.man,
-                king: w.king,
-                mob: w.mob,
-                ..Weights::ZERO
-            });
-            let label = format!("{file} #{i} {}", p.name.unwrap_or_default());
-            all.push((
-                label,
-                p.board.parse().unwrap(),
-                common::side(&p.side),
-                weights,
-            ));
-        }
-    }
-    assert_eq!(all.len(), 541);
-    all
-}
 
 /// The differences between `ordered` and `plain`, the decision of alpha-beta in legal order.
 fn compare(label: &str, plain: &Decision, ordered: &Decision) -> Vec<String> {
