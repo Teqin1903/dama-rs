@@ -9,7 +9,8 @@ strings, so the same calls can be tested natively.
 
 - New crate `web/` (`crate-type = ["cdylib", "rlib"]`), depending on `engine` and `wasm-bindgen`.
   The logic lives in `engine` (for example `engine::api`); `web/` only wraps it.
-- Build: `wasm-pack build web --target no-modules --release --out-dir ../site/pkg --out-name dama_web`
+- Build: `scripts/build-web.sh`, which runs `wasm-pack build web --target no-modules --release --out-dir
+  ../site/pkg --out-name dama_web --no-typescript --no-pack` and keeps only the two files below
   (`rustup target add wasm32-unknown-unknown` once). This writes `site/pkg/dama_web.js`, which defines the
   global `wasm_bindgen`, and `site/pkg/dama_web_bg.wasm`. `--target no-modules` matters: the site is also
   packed into one offline HTML file that works from `file://`.
@@ -22,7 +23,7 @@ strings, so the same calls can be tested natively.
 ## Exports
 
 ```
-version() -> {"engine": "<git describe at build time>", "specs": ["tuned", "mm3", "ab5", "id[q][r][o][t]:nN[:w=W]", ...]}
+version() -> {"engine": "src.<7 hex digits: git tree of the WebAssembly sources, web/build.rs>", "specs": ["tuned", "mm3", "ab5", "id[q][r][o][t]:nN[:w=W]", ...]}
 
 class Session
   new()                                  start position, White to move, no agents
