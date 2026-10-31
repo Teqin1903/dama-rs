@@ -76,3 +76,65 @@ depth	leaves	ns_per_run	k	samples
 7	10782382	3495450120	1	3
 8	123290300	39503205019	1	3
 ```
+
+## Search for one minute
+
+How far the current engine, V10 (`idqrot:w=texel1`, 16 MB table), gets in one search of 60 seconds:
+ten positions of `testdata/decisions.json`, each searched once on an empty game with an empty table,
+as a first move would be. Measured on 2026-11-01 with commit c25cf42 (`mcts-1-4-gc25cf42`); the
+numbers are in `results/minute/minute.json`, which the site and the deck read.
+
+| Position | Phase | Pieces (kings) | Nodes | Depth | Nodes/s |
+|---|---|---:|---:|---:|---:|
+| agent_g12_ply0 | start | 32 (0) | 27,776,525 | 11 | 462,942 |
+| agent_g0_ply4 | opening | 32 (0) | 27,610,813 | 10 | 460,180 |
+| agent_g3_ply9 | opening | 28 (1) | 28,144,314 | 11 | 469,072 |
+| agent_g16_ply18 | middlegame | 24 (1) | 26,407,526 | 10 | 440,125 |
+| agent_g12_ply40 | middlegame | 23 (1) | 27,692,542 | 10 | 461,542 |
+| agent_g36_ply28 | middlegame | 21 (1) | 28,519,748 | 10 | 475,329 |
+| agent_g8_ply52 | endgame | 15 (1) | 48,164,269 | 13 | 802,738 |
+| agent_g17_ply89 | endgame | 13 (0) | 44,427,922 | 12 | 740,465 |
+| agent_g41_ply101 | endgame | 9 (2) | 33,810,819 | 10 | 563,514 |
+| agent_g57_ply49 | endgame | 7 (1) | 55,440,248 | 16 | 924,004 |
+| **median** | | | **28,332,031** | **10.5** | **472,201** |
+
+With a 256 MB table (`:hash=256`) on three of them:
+
+| Position | Nodes (16 MB → 256 MB) | Depth | Nodes/s |
+|---|---:|---:|---:|
+| agent_g12_ply0 | 27,776,525 → 26,934,459 | 11 → 12 | 462,942 → 448,908 |
+| agent_g12_ply40 | 27,692,542 → 25,743,941 | 10 → 10 | 461,542 → 429,066 |
+| agent_g41_ply101 | 33,810,819 → 37,475,539 | 10 → 11 | 563,514 → 624,592 |
+
+- Every search used its full minute (60.0 s); none reached the deepest iteration, `MAX_ID_DEPTH` = 64
+  (`depth_limit_hit` is false everywhere). Depth is the deepest completed iteration; the interrupted one is
+  thrown away, but its nodes are counted.
+- In the opening and the middlegame the engine makes about 0.46 M nodes per second and completes 10 to
+  11 plies. With fewer pieces a node is cheaper (fewer moves to generate, fewer captures for quiescence):
+  up to 0.92 M nodes per second and 12 to 16 plies with 7 to 15 pieces. The ending with two kings
+  (agent_g41_ply101) is the exception: flying kings give many moves, and it gets only 10 plies.
+- The larger table gives one more ply at the start and in the king ending, not in the middlegame. Its
+  nodes per second are about 3 to 7 % lower in the two positions with many pieces (more cache misses
+  in a table of 256 MB) and 11 % higher in the ending, where the table cuts more of the search. Three
+  single runs are not enough to tell a ply apart from noise. An SPRT match would decide whether
+  256 MB is worth it in games.
+- A time budget depends on the machine and the clock: a second run gives other node counts and here and
+  there another depth. Node budgets are the ones we compare agents with.
+
+### Machine and method
+
+- CPU: Intel Core i7-9750H @ 2.60GHz (laptop), pinned to CPU 2 with `taskset -c 2`; frequency governor
+  `powersave` (intel_pstate); load average about 1.1 to 2.0 during the run. One search at a time.
+- OS: CachyOS, Linux 7.2.9-1-cachyos. Rust: rustc 1.99.1, `cargo build --release`.
+- The thirteen searches ran one after the other from 00:06 to 00:19, UTC+3 (about 13 minutes).
+- `engine/examples/minute.rs` runs `iterative_deepening_with` with the agent's own limits, options,
+  weights and table (built new for each search), with an empty game history, and times it with `Instant`.
+
+### Reproduce
+
+```
+cargo build --release --example minute
+taskset -c 2 target/release/examples/minute
+```
+
+`--seconds S` changes the time per search; `--out PATH` writes the JSON elsewhere.
