@@ -30,6 +30,7 @@
     return (v > 0.004 ? '+' : v < -0.004 ? '−' : '') + s;
   }
   const fmtElo = (e) => (e === null || e === undefined ? '—' : (e >= 0.5 ? '+' : e <= -0.5 ? '−' : '') + Math.round(Math.abs(e)));
+  const fmtD = (d) => (d === null || d === undefined || Number.isNaN(d) ? '—' : Math.abs(d).toFixed(2)); // a difference: no sign
   const boundSym = (b) => (b === 'upper' ? '≤ ' : b === 'lower' ? '≥ ' : '');
   const fmtInt = (n) => (n === null || n === undefined ? '—' : Math.round(n).toLocaleString('en-US'));
   const pct = (a, b) => (b ? `${((100 * a) / b).toFixed(a / b < 0.1 ? 1 : 0)}%` : '—');
@@ -73,8 +74,9 @@
     thinkingSide: null, decisions: [], sel: null, routes: null,
     showAll: false, tree: { path: [0], legalCache: new Map() }, heat: false,
     wi: { q: true, r: true, o: true, t: true, w: 'texel1', n: 20000, result: null, busy: false, feat: { mob: true, adv: true, back: true, cen: true, edge: true, qmob: true } },
-    evalWeights: null, previewNode: null,
+    evalWeights: null, previewNode: null, scene: null, linePreview: null,
   };
+  const WI_DEFAULT = JSON.stringify(app.wi);
   const last = () => app.decisions[app.decisions.length - 1] || null;
   const isAgent = (side) => app.players[side] !== 'human';
   const over = () => app.st && app.st.status !== 'playing';
@@ -104,15 +106,63 @@
     if (!l) return;
     app.eng.call('set_agent', side, l.spec, app.seed * 2 + (side === 'black' ? 1 : 0));
   }
-  function newGame() {
-    app.auto = false; app.seed++;
-    app.st = app.eng.call('reset', START, 'white');
-    app.decisions = []; app.sel = null; app.routes = null; app.previewNode = null; app.tree.path = [0];
+  function clearGameState() {
+    app.decisions = []; app.sel = null; app.routes = null; app.previewNode = null; app.linePreview = null; app.tree.path = [0];
     app.wi.result = null;
+  }
+  function newGame() {
+    app.auto = false; app.seed++; app.scene = null;
+    app.st = app.eng.call('reset', START, 'white');
+    clearGameState();
     for (const s of ['white', 'black']) if (isAgent(s)) setAgent(s);
     refresh();
     render();
     kick();
+  }
+
+  // ---------- scenes: positions from our own games, prepared for the live demo (data/scenes.js) ----------
+  const SCENES = window.SCENES || [];
+  function loadScene(sc) {
+    if (!sc || app.busy) return;
+    app.auto = false; app.scene = sc;
+    app.players.white = sc.white; app.players.black = sc.black;
+    $('whiteSel').value = sc.white; $('blackSel').value = sc.black;
+    app.st = app.eng.call('reset', START, 'white');
+    for (const m of sc.moves) app.eng.call('play', m);
+    clearGameState();
+    // Agents join after the moves, as in the scene check: they see the game so far, with fresh tables.
+    for (const s of ['white', 'black']) {
+      const l = levelOf(app.players[s]);
+      if (l) app.eng.call('set_agent', s, l.spec, sc.seeds[s]);
+    }
+    app.wi = JSON.parse(WI_DEFAULT);
+    if (sc.whatif) Object.assign(app.wi, sc.whatif);
+    if (sc.mode) app.mode = sc.mode;
+    if (sc.tab) app.tab = sc.tab;
+    if (sc.speed) { app.speed = sc.speed; $('speedSel').value = String(sc.speed); }
+    $('sceneSel').value = sc.id;
+    refresh();
+    render();
+  }
+  function fillScenes() {
+    const sel = $('sceneSel');
+    for (const sc of SCENES) {
+      const o = document.createElement('option');
+      o.value = sc.id; o.textContent = `${sc.key} · ${sc.title}`;
+      sel.appendChild(o);
+    }
+    sel.hidden = !SCENES.length;
+    sel.addEventListener('change', () => { const sc = SCENES.find((x) => x.id === sel.value); if (sc) loadScene(sc); sel.blur(); });
+  }
+  function renderScene() {
+    const card = $('sceneCard');
+    const sc = app.scene;
+    card.hidden = !sc;
+    document.querySelector('.board-col').classList.toggle('has-scene', !!sc);
+    if (!sc) { $('sceneSel').value = ''; return; }
+    card.innerHTML = `<div class="scene-head"><span class="badge">Scene ${esc(sc.key)}</span><b>${esc(sc.title)}</b><button class="scene-x" id="sceneX" title="Leave the scene" aria-label="Leave the scene">×</button></div>
+      <div class="scene-note">${esc(sc.note)}</div><div class="scene-src">${esc(sc.source)}</div>`;
+    $('sceneX').addEventListener('click', () => { app.scene = null; render(); });
   }
   function refresh() { app.st = app.eng.call('state'); app.legal = app.st.status === 'playing' ? app.eng.call('legal') : []; }
 
@@ -152,6 +202,7 @@
       showError(e);
     }
     app.busy = false;
+    if (over()) app.auto = false;
     render();
     if (!over()) {
       if (app.auto && isAgent(app.st.turn) && isAgent(other(app.st.turn))) { await sleep(app.speed); kick(); }
@@ -225,6 +276,7 @@
     renderThinking();
     if (app.mode === 'user') renderUser(); else renderDev();
     renderRecord();
+    renderScene();
   }
   function renderControls() {
     const both = isAgent('white') && isAgent('black');
@@ -272,9 +324,11 @@
       b.setLabels([]);
       banner.hidden = false;
       banner.textContent = p.title;
+      $('status').hidden = true;
       return;
     }
     banner.hidden = true;
+    $('status').hidden = false;
     b.setBoard(app.st.board);
     const d = last();
     let marks = [];
@@ -446,7 +500,7 @@
     if (rest.length) {
       const x = rest[0];
       if (x.bound === 'upper') out.push(`<p style="margin-top:10px">The next candidate, <span class="line">${esc(x.move)}</span>, is at most ${fmtV(x.value)}: once the search proved it could not beat ${esc(r.best)}, it stopped looking for its exact value.</p>`);
-      else out.push(`<p style="margin-top:10px">The next candidate, <span class="line">${esc(x.move)}</span>, scores ${fmtV(x.value)}, ${fmtV(r.value - x.value)} below the move it played.</p>`);
+      else out.push(`<p style="margin-top:10px">The next candidate, <span class="line">${esc(x.move)}</span>, scores ${fmtV(x.value)}, ${fmtD(r.value - x.value)} below the move it played.</p>`);
     }
     return out.join('');
   }
@@ -677,10 +731,42 @@
           pair = await app.eng.slow('analyze', fullSpec, JSON.stringify({ back, seed: 1, only: [alt.best, full.best] }));
           line = await app.eng.slow('analyze', fullSpec, JSON.stringify({ back, seed: 1, only: [alt.best] }));
         }
-        wi.result = { alt, full, pair, line, fullSpec };
+        wi.result = { alt, full, pair, line, fullSpec, ply: app.st.ply - back };
+        wi.lineK = 0; app.previewNode = null;
       } catch (e) { showError(e); }
-      wi.busy = false; renderDev();
+      wi.busy = false; render();
     });
+    const lp = $('lpNext');
+    if (lp) {
+      lp.addEventListener('click', () => stepLine(1));
+      $('lpPrev').addEventListener('click', () => stepLine(-1));
+    }
+  }
+
+  // Walks the line the full engine expects after the alternative, on the board.
+  function stepLine(delta) {
+    const R = app.wi.result;
+    if (!R || !R.line || !R.line.pv) return;
+    app.wi.lineK = Math.max(0, Math.min(R.line.pv.length, (app.wi.lineK || 0) + delta));
+    showLine();
+    renderDev();
+  }
+  function showLine() {
+    const R = app.wi.result, k = app.wi.lineK || 0;
+    if (!R || !R.line || !k) { app.previewNode = null; renderBoard(); return; }
+    const back = app.st.ply - R.ply, line = R.line.pv.slice(0, k);
+    try {
+      const pos = app.eng.call('position', JSON.stringify({ back, line }));
+      const prev = app.eng.call('position', JSON.stringify({ back, line: line.slice(0, -1) }));
+      const m = prev.legal.find((x) => x.move === line[k - 1]);
+      const tone = prev.turn === R.alt.side ? 'turq' : 'coral';
+      app.previewNode = {
+        key: 'line:' + k, board: pos.board, marks: m ? moveMarks(m, 'last') : [],
+        arrows: m ? [{ path: m.path, tone, width: 12, opacity: 0.85 }] : [],
+        title: `Line after ${R.alt.best} · move ${k} of ${R.line.pv.length}: ${line[k - 1]}`,
+      };
+    } catch (e) { app.previewNode = null; }
+    renderBoard();
   }
 
   // What switching each part off cost V10 over 400 games (results/ablation/ablation.json).
@@ -698,12 +784,15 @@
   function verdict(R) {
     const a = R.pair && R.pair.root.find((x) => x.move === R.alt.best);
     const f = R.pair && R.pair.root.find((x) => x.move === R.full.best);
-    const punish = R.line && R.line.pv && R.line.pv.length > 1 ? ` The line it expects after it: <span class="mono">${esc(R.line.pv.slice(0, 6).join(' '))}</span>.` : '';
+    const k = app.wi.lineK || 0;
+    const punish = R.line && R.line.pv && R.line.pv.length > 1
+      ? ` The line it expects after it:<div class="lineplay"><button class="btn" id="lpPrev" aria-label="Previous move of the line"${k ? '' : ' disabled'}>◀</button><button class="btn" id="lpNext" aria-label="Next move of the line"${k < R.line.pv.length ? '' : ' disabled'}>▶</button><span class="lp-moves">${R.line.pv.map((m, i) => `<span class="${i < k ? 'done' : ''}${i === k - 1 ? ' cur' : ''}">${esc(m)}</span>`).join(' ')}</span></div>`
+      : '';
     if (!a || !f || a.value === null || f.value === null) return `<div class="verdict bad">The settings above would play <b class="mono">${esc(R.alt.best)}</b> instead.${punish}</div>`;
     const depth = `searching only these two moves, to depth ${R.pair.depth}`;
     if (f.value > a.value + 1e-9) {
       const atMost = a.bound === 'upper';
-      return `<div class="verdict bad">The settings above would play <b class="mono">${esc(R.alt.best)}</b>. The full engine, ${depth}, scores it <b class="mono">${boundSym(a.bound)}${fmtV(a.value)}</b> against <b class="mono">${fmtV(f.value)}</b> for its own choice: ${atMost ? 'at least ' : ''}<b class="mono">${fmtV(f.value - a.value)}</b> worse by its judgement.${punish}</div>`;
+      return `<div class="verdict bad">The settings above would play <b class="mono">${esc(R.alt.best)}</b>. The full engine, ${depth}, scores it <b class="mono">${boundSym(a.bound)}${fmtV(a.value)}</b> against <b class="mono">${fmtV(f.value)}</b> for its own choice: ${atMost ? 'at least ' : ''}<b class="mono">${fmtD(f.value - a.value)}</b> worse by its judgement.${punish}</div>`;
     }
     return `<div class="verdict same">The settings above would play <b class="mono">${esc(R.alt.best)}</b>. The full engine, ${depth}, rates it <b class="mono">${fmtV(a.value)}</b> against <b class="mono">${fmtV(f.value)}</b> for its own choice: the choice changes, the value hardly does.</div>`;
   }
@@ -725,6 +814,7 @@
     chip.title = 'Our Rust engine compiled to WebAssembly, running in this page. Every move, value and tree on this page comes from it. The version names the engine source it was built from.';
     fillSelect($('whiteSel'), 'white');
     fillSelect($('blackSel'), 'black');
+    fillScenes();
     $('newBtn').addEventListener('click', newGame);
     $('undoBtn').addEventListener('click', undo);
     $('autoBtn').addEventListener('click', () => { app.auto = !app.auto; renderControls(); if (app.auto) kick(); });
@@ -733,7 +823,7 @@
     $('flipBtn').addEventListener('click', () => { app.board.setFlip(!app.board.flip); renderBoard(); });
     $('modeUser').addEventListener('click', () => { app.mode = 'user'; app.previewNode = null; render(); });
     $('modeDev').addEventListener('click', () => { app.mode = 'dev'; render(); });
-    for (const b of document.querySelectorAll('.tabs button')) b.addEventListener('click', () => { app.tab = b.dataset.tab; app.previewNode = null; render(); });
+    for (const b of document.querySelectorAll('.tabs button')) b.addEventListener('click', () => { app.tab = b.dataset.tab; app.previewNode = null; app.wi.lineK = 0; render(); });
     document.addEventListener('keydown', (e) => {
       if (e.target.closest('select, input, textarea')) return;
       if (e.key === ' ') { e.preventDefault(); $('autoBtn').click(); }
@@ -742,7 +832,8 @@
       else if (e.key === 'u' || e.key === 'U') undo();
       else if (e.key === 'f' || e.key === 'F') $('flipBtn').click();
       else if (e.key === 'n' || e.key === 'N') newGame();
-      else if (e.key === 'Escape') { app.sel = null; app.routes = null; app.previewNode = null; renderRoutes(); render(); }
+      else if (e.key === 'Escape') { app.sel = null; app.routes = null; app.previewNode = null; app.wi.lineK = 0; renderRoutes(); render(); }
+      else if (/^[1-9]$/.test(e.key)) loadScene(SCENES.find((x) => x.key === e.key));
     });
     newGame();
   }

@@ -17,6 +17,8 @@
       </div>
     </div>
     <div class="spacer"></div>
+    <label class="sr" for="sceneSel">Scene</label>
+    <select class="btn scene-sel" id="sceneSel" title="Load a prepared position from our games (keys 1 to 3)" hidden><option value="">Scenes</option></select>
     <span class="engine-chip" id="engineChip">Engine loading</span>
     <div class="seg" role="group" aria-label="View">
       <button id="modeUser" aria-pressed="true">User</button>
@@ -47,10 +49,10 @@
 
   <main class="stage">
     <section class="board-col" aria-label="Board">
-      <div class="board-wrap" id="boardWrap">
-        <div class="preview-banner" id="previewBanner" hidden>Search tree preview</div>
-      </div>
+      <div class="board-wrap" id="boardWrap"></div>
+      <div class="preview-banner" id="previewBanner" hidden>Search tree preview</div>
       <div class="status" id="status"></div>
+      <div class="scene-card" id="sceneCard" hidden></div>
     </section>
 
     <section class="side-col" aria-label="What the agent thinks">
@@ -111,6 +113,7 @@
   </main>
 </div>
 <script src="data/results.js"></script>
+<script src="data/scenes.js"></script>
 <script src="pkg/dama_web.js"></script>
 <script src="js/board.js"></script>
 <script src="js/app.js"></script>
