@@ -13,6 +13,7 @@ use std::time::Duration;
 
 use crate::board::{Board, Color};
 use crate::eval::Weights;
+use crate::mcts::{Clock, MctsKind, mcts};
 use crate::movegen::Move;
 use crate::rng::Mulberry32;
 use crate::search::{
@@ -630,6 +631,99 @@ impl Agent for DeepeningAgent {
     }
 }
 
+/// Monte Carlo tree search (`mcts::mcts`) within `limits`: flat Monte Carlo or UCT, the new
+/// positions scored with a random game, with U or with quiescence. It learns the game's ply and
+/// quiet plies from `Agent::observe`, for the draw rules of its random games.
+#[derive(Clone, Debug)]
+pub struct MctsAgent {
+    kind: MctsKind,
+    limits: Limits,
+    weights: Weights,
+    /// The last position observed, and the game's clock there.
+    last: Option<Board>,
+    clock: Clock,
+    rng: Mulberry32,
+    nodes: u64,
+    depths: u64,
+}
+
+impl MctsAgent {
+    pub fn new(kind: MctsKind, limits: Limits, weights: Weights, seed: u32) -> MctsAgent {
+        MctsAgent {
+            kind,
+            limits,
+            weights,
+            last: None,
+            clock: Clock::default(),
+            rng: Mulberry32::new(seed),
+            nodes: 0,
+            depths: 0,
+        }
+    }
+}
+
+impl Agent for MctsAgent {
+    fn new_game(&mut self, seed: u32) -> Result<(), AgentError> {
+        self.rng = Mulberry32::new(seed);
+        self.forget_game();
+        Ok(())
+    }
+
+    /// With one legal move it plays it without a search.
+    fn choose<'m>(
+        &mut self,
+        board: &Board,
+        side: Color,
+        legal: &'m [Move],
+    ) -> Result<&'m Move, AgentError> {
+        if legal.len() == 1 {
+            return Ok(&legal[0]);
+        }
+        let result = mcts(
+            self.kind,
+            board,
+            side,
+            legal,
+            self.clock,
+            self.limits,
+            self.weights,
+            &mut self.rng,
+        );
+        self.nodes += result.nodes;
+        self.depths += u64::from(result.depth);
+        Ok(&legal[result.best])
+    }
+
+    fn observe(&mut self, board: &Board, _side: Color) {
+        let pieces = |b: &Board| b.pieces(Color::White).len() + b.pieces(Color::Black).len();
+        if let Some(last) = &self.last {
+            self.clock = Clock {
+                ply: self.clock.ply + 1,
+                quiet: if pieces(board) < pieces(last) {
+                    0
+                } else {
+                    self.clock.quiet + 1
+                },
+            };
+        }
+        self.last = Some(*board);
+    }
+
+    fn forget_game(&mut self) {
+        self.last = None;
+        self.clock = Clock::default();
+    }
+
+    fn nodes(&self) -> u64 {
+        self.nodes
+    }
+
+    /// The deepest ply of each tree (1 for flat Monte Carlo), added up.
+    fn depths(&self) -> u64 {
+        self.depths
+    }
+}
+
 /// An agent as the command line names it: `random`, a preset name (`material`, `first`,
 /// `tuned`, `texel1`, `texel2`, `texel2s`), `u:MAN/KING/MOB` for the baseline agent with any weights, `mmN` for minimax N
 /// plies deep, `abN` for alpha-beta N plies deep, or `id:LIMITS` for iterative deepening, the
@@ -639,7 +733,9 @@ impl Agent for DeepeningAgent {
 /// the search, each at most once and in this order: `q` quiescence (`abNq`, `idq:LIMITS`), `r`
 /// repetitions (`abNr`, `abNqr`, `idqr:LIMITS`), `o` move ordering (`abNo`, `idqro:LIMITS`), `t` a
 /// transposition table (`abNot`, `idqrot:LIMITS`) of 16 MB unless a part `:hash=MB` says
-/// otherwise, in the referee's strict mode with a part `:tt=strict`.
+/// otherwise, in the referee's strict mode with a part `:tt=strict`. Monte Carlo tree search
+/// (`mcts.rs`) is `mc:LIMITS`, `uct:LIMITS`, `ucte:LIMITS` or `uctq:LIMITS`, its limits `nK` and
+/// `tMS` only; only `ucte` and `uctq` take weights.
 ///
 /// Any name but `random` may end in `:KEY=VALUE` parts that set weights (`Weights::KEYS`), on top
 /// of the tuned weights for a search and of the named weights for the baseline agent:
@@ -673,6 +769,13 @@ pub enum AgentSpec {
         table: Option<TableOptions>,
         weights: Weights,
     },
+    /// Monte Carlo tree search of `kind` within `limits` (nodes and/or time, no depth); `weights`
+    /// score the new positions of `ucte` and `uctq`, and are the tuned ones, unused, otherwise.
+    Mcts {
+        kind: MctsKind,
+        limits: Limits,
+        weights: Weights,
+    },
 }
 
 impl AgentSpec {
@@ -689,7 +792,8 @@ impl AgentSpec {
             AgentSpec::Random
             | AgentSpec::Minimax { .. }
             | AgentSpec::AlphaBeta { .. }
-            | AgentSpec::Deepening { .. } => None,
+            | AgentSpec::Deepening { .. }
+            | AgentSpec::Mcts { .. } => None,
             AgentSpec::U(weights) => AgentSpec::PRESETS
                 .iter()
                 .find(|(_, w)| w == weights)
@@ -697,10 +801,11 @@ impl AgentSpec {
         }
     }
 
-    /// The weights of U this agent plays with; none for `random`.
+    /// The weights of U this agent plays with; none for `random`, `mc` and `uct`.
     pub fn weights(&self) -> Option<Weights> {
         match *self {
             AgentSpec::Random => None,
+            AgentSpec::Mcts { kind, weights, .. } => kind.evaluates().then_some(weights),
             AgentSpec::U(weights)
             | AgentSpec::Minimax { weights, .. }
             | AgentSpec::AlphaBeta { weights, .. }
@@ -718,10 +823,11 @@ impl AgentSpec {
         }
     }
 
-    /// The weights, to change them; none for `random`.
+    /// The weights, to change them; none for `random`, `mc` and `uct`.
     fn weights_mut(&mut self) -> Option<&mut Weights> {
         match self {
             AgentSpec::Random => None,
+            AgentSpec::Mcts { kind, weights, .. } => kind.evaluates().then_some(weights),
             AgentSpec::U(weights)
             | AgentSpec::Minimax { weights, .. }
             | AgentSpec::AlphaBeta { weights, .. }
@@ -761,6 +867,11 @@ impl AgentSpec {
                     .with_ordering(order)
                     .with_table(table),
             ),
+            AgentSpec::Mcts {
+                kind,
+                limits,
+                weights,
+            } => Box::new(MctsAgent::new(kind, limits, weights, 0)),
         }
     }
 }
@@ -833,6 +944,26 @@ impl fmt::Display for AgentSpec {
                     write!(f, ":t{}", time.as_millis())?;
                 }
                 write!(f, "{}{}", weights.suffix(), table_suffix(table))
+            }
+            (
+                AgentSpec::Mcts {
+                    kind,
+                    limits,
+                    weights,
+                },
+                _,
+            ) => {
+                write!(f, "{}", kind.name())?;
+                if let Some(nodes) = limits.nodes {
+                    write!(f, ":n{nodes}")?;
+                }
+                if let Some(time) = limits.time {
+                    write!(f, ":t{}", time.as_millis())?;
+                }
+                if kind.evaluates() {
+                    write!(f, "{}", weights.suffix())?;
+                }
+                Ok(())
             }
         }
     }
@@ -913,7 +1044,8 @@ impl fmt::Display for ParseAgentError {
                  u:MAN/KING/MOB, \
                  mmN, abN, id:LIMITS, the last two with letters q (quiescence), r (repetitions) \
                  o (move ordering) and t (transposition table) in that order: abNqrot, \
-                 idqrot:LIMITS"
+                 idqrot:LIMITS, or Monte Carlo tree search mc:LIMITS, uct:LIMITS, ucte:LIMITS, \
+                 uctq:LIMITS"
             ),
             ParseAgentError::Depth(name) => write!(
                 f,
@@ -930,7 +1062,8 @@ impl fmt::Display for ParseAgentError {
                 f,
                 "agent {name:?}: expected limits after id (or idq, idqro, ...), separated by ':': dN (plies, 1 to \
                  {MAX_ID_DEPTH}), nK (nodes per move), tMS (milliseconds per move), \
-                 for example id:n20000 or id:d5:t50"
+                 for example id:n20000 or id:d5:t50; mc, uct, ucte and uctq take nK and tMS only, \
+                 for example uct:n20000"
             ),
             ParseAgentError::Weight(name, why) => write!(
                 f,
@@ -1008,9 +1141,12 @@ impl FromStr for AgentSpec {
         }
         if !weight_parts.is_empty() {
             let weight_error = |why: String| ParseAgentError::Weight(s.to_string(), why);
-            let weights = spec
-                .weights_mut()
-                .ok_or_else(|| weight_error("random has no weights".to_string()))?;
+            let weights = spec.weights_mut().ok_or_else(|| {
+                weight_error(format!(
+                    "{} has no weights",
+                    parts[..first_weight].join(":")
+                ))
+            })?;
             *weights = weights
                 .with_overrides(&weight_parts.join(":"))
                 .map_err(weight_error)?;
@@ -1026,6 +1162,19 @@ fn parse_base(s: &str) -> Result<AgentSpec, ParseAgentError> {
     }
     if let Some((_, weights)) = AgentSpec::PRESETS.iter().find(|(name, _)| *name == s) {
         return Ok(AgentSpec::U(*weights));
+    }
+    // "mc", "uct", "ucte" or "uctq", then nodes and/or time.
+    if let Some((name, limits)) = s.split_once(':')
+        && let Some(&(_, kind)) = MctsKind::NAMES.iter().find(|(n, _)| *n == name)
+    {
+        return parse_limits(&format!(":{limits}"))
+            .filter(|limits| limits.depth.is_none())
+            .map(|limits| AgentSpec::Mcts {
+                kind,
+                limits,
+                weights: Weights::TUNED,
+            })
+            .ok_or_else(|| ParseAgentError::Limits(s.to_string()));
     }
     // "id", its letters up to the first ':', then the limits.
     let deepening = s.strip_prefix("id").and_then(|rest| {

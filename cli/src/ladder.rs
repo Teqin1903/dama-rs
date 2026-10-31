@@ -1,5 +1,5 @@
-//! `dama ladder`: plays the matches of the Elo ladder (`engine::plan`) or of the ablation
-//! (`engine::ablation_plan`) and rates the versions from their games (`engine::rate`). This file reads and writes the files; the ladder itself, its
+//! `dama ladder`: plays the matches of the Elo ladder (`engine::plan`), of the ablation
+//! (`engine::ablation_plan`) or of Monte Carlo tree search (`engine::against_plan`) and rates the versions from their games (`engine::rate`). This file reads and writes the files; the ladder itself, its
 //! pairings and its ratings live in engine/src/ladder.rs and engine/src/elo.rs.
 
 use std::error::Error;
@@ -24,6 +24,7 @@ The Elo ladder of the tagged versions (docs/ladder.md): every version against th
 against v1-minimax (the zero) and against the one two steps back, the upper versions against the
 mid-ladder opponent (v6-repetition), all paired matches with seed 1. The ablation plays
 v10-transposition-table against itself with one part turned off and against the baseline.
+The mcts set plays four forms of Monte Carlo tree search against V0, V2 and V10, 200 games each.
 
 run         plays every pairing whose file DIR/games/<A>_vs_<B>.csv is missing, writes that file
             when the pairing is over, appends one row to the arena CSV and one line to
@@ -33,13 +34,13 @@ run         plays every pairing whose file DIR/games/<A>_vs_<B>.csv is missing, 
               take, and writes nothing
             A pairing the ladder has played already (the ablation's V10_vs_V9) is not played
             again: its games are read from results/ladder/games
-rate        reads the games and writes DIR/ladder.json (DIR/ablation.json): one Bradley-Terry
+rate        reads the games and writes DIR/ladder.json (ablation.json, mcts.json): one Bradley-Terry
             fit of all games, bootstrap intervals over the colour-swapped pairs of each pairing
 
 options:
-  --set S       ladder (default) or ablation
+  --set S       ladder (default), ablation or mcts
   --threads T   games played at the same time (default 6)
-  --dir DIR     the set's directory (default results/ladder, results/ablation)
+  --dir DIR     the set's directory (default results/ladder, results/ablation, results/mcts)
   --csv PATH    the arena CSV (default results/arena.csv); rate takes the time and threads of
                 each match from it
   --samples N   bootstrap samples (default 1000)
@@ -136,7 +137,7 @@ fn parse_args(args: impl IntoIterator<Item = String>) -> Result<Option<Options>,
                 options.set = Set::ALL
                     .into_iter()
                     .find(|s| s.name == value)
-                    .ok_or(format!("--set {value}: expected ladder or ablation"))?;
+                    .ok_or(format!("--set {value}: expected ladder, ablation or mcts"))?;
             }
             _ => return Err(format!("unknown option {arg} for {command}")),
         }

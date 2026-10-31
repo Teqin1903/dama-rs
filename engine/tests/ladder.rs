@@ -277,3 +277,76 @@ fn in_the_ablation_each_rating_is_its_own_pairings_elo() {
     assert!(json.contains("\"mid_opponent\": null"));
     assert!(json.contains("\"roles\": [\"ablation\"]"));
 }
+
+/// The agents of the ladder and the ablation still play the games stored in results/: the first
+/// pair of games of every stored pairing, row for row but for the time per move and the version.
+#[test]
+#[ignore]
+fn the_stored_games_are_played_again() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+    let mut files = 0;
+    for dir in ["results/ladder/games", "results/ablation/games"] {
+        let mut paths: Vec<_> = std::fs::read_dir(root.join(dir))
+            .unwrap()
+            .map(|e| e.unwrap().path())
+            .filter(|p| p.extension().is_some_and(|x| x == "csv"))
+            .collect();
+        paths.sort();
+        for path in paths {
+            let text = std::fs::read_to_string(&path).unwrap();
+            let stored: Vec<GameRow> = (text.lines().skip(1).take(2))
+                .map(|line| line.parse().unwrap())
+                .collect();
+            // A is White in game 0.
+            let (a, b) = (&stored[0].white, &stored[0].black);
+            let (sa, sb): (AgentSpec, AgentSpec) = (a.parse().unwrap(), b.parse().unwrap());
+            let plan = MatchPlan {
+                games: 2,
+                seed: SEED,
+                schedule: Schedule::Paired,
+                threads: 2,
+                sprt: None,
+            };
+            let record = play_match(&|| sa.build(), &|| sb.build(), &plan).unwrap();
+            let played = rows_of(&record, a, b, SEED, "");
+            for (mut new, old) in played.into_iter().zip(&stored) {
+                new.white_stats.ms_per_move = old.white_stats.ms_per_move;
+                new.black_stats.ms_per_move = old.black_stats.ms_per_move;
+                new.version = old.version.clone();
+                assert_eq!(new.to_string(), old.to_string(), "{}", path.display());
+            }
+            files += 1;
+        }
+    }
+    assert!(files >= 30, "{files} files of games");
+}
+
+#[test]
+fn the_mcts_set_plays_each_form_against_v0_v2_and_v10() {
+    let set = engine::MCTS_SET;
+    let ids: Vec<&str> = set.rungs.iter().map(|r| r.id).collect();
+    assert_eq!(ids, ["V0", "V2", "V10", "MC", "UCT", "UCTe", "UCTq"]);
+    // The opponents are the ladder's rungs, unchanged.
+    for id in ["V0", "V2", "V10"] {
+        let rung = set.rungs.iter().find(|r| r.id == id).unwrap();
+        assert_eq!(Some(rung), LADDER.iter().find(|r| r.id == id));
+    }
+    let named: Vec<(&str, &str, u32)> = (set.plan().iter())
+        .map(|p| (set.rungs[p.a].id, set.rungs[p.b].id, p.games))
+        .collect();
+    let mut want = Vec::new();
+    for a in ["MC", "UCT", "UCTe", "UCTq"] {
+        for b in ["V0", "V2", "V10"] {
+            want.push((a, b, 200));
+        }
+    }
+    assert_eq!(named, want);
+    assert!(
+        set.plan()
+            .iter()
+            .all(|p| p.roles == [Role::Against] && !p.reused)
+    );
+    for rung in set.rungs {
+        assert!(rung.spec.parse::<AgentSpec>().is_ok(), "{}", rung.spec);
+    }
+}

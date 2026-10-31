@@ -119,7 +119,7 @@ fn parse_side(side: &str) -> Result<Color, String> {
 /// An agent name the session accepts: one `AgentSpec` knows, without a time budget.
 fn parse_spec(spec: &str) -> Result<AgentSpec, String> {
     let parsed: AgentSpec = spec.parse().map_err(|e| format!("{e}"))?;
-    if let AgentSpec::Deepening { limits, .. } = parsed
+    if let AgentSpec::Deepening { limits, .. } | AgentSpec::Mcts { limits, .. } = parsed
         && limits.time.is_some()
     {
         return Err(format!(

@@ -227,6 +227,45 @@ pub const ABLATION_FOOTNOTES: &[(&str, &str, &str)] = &[
     ),
 ];
 
+/// Monte Carlo tree search, in four forms that add one thing each (engine/src/mcts.rs), and
+/// three rungs of the ladder they play against (`MCTS_OPPONENTS`).
+pub const MCTS: &[Rung] = &[
+    LADDER[0],
+    LADDER[2],
+    LADDER[9],
+    rung(
+        "MC",
+        "mcts-1",
+        "mc:n20000",
+        "MC_Flat",
+        "flat Monte Carlo: random games after each root move",
+    ),
+    rung(
+        "UCT",
+        "mcts-1",
+        "uct:n20000",
+        "UCT_RandomGames",
+        "UCT, a random game from each new position",
+    ),
+    rung(
+        "UCTe",
+        "mcts-1",
+        "ucte:n20000:w=texel1",
+        "UCT_Eval",
+        "UCT, each new position scored with sigmoid(K U), texel1",
+    ),
+    rung(
+        "UCTq",
+        "mcts-1",
+        "uctq:n20000:w=texel1",
+        "UCT_Quiescence",
+        "UCT, each new position scored with sigmoid(K quiescence), texel1",
+    ),
+];
+
+/// The rungs of the ladder every form of `MCTS` plays.
+pub const MCTS_OPPONENTS: &[&str] = &["V0", "V2", "V10"];
+
 /// The reference opponent, whose Elo is 0.
 pub const ANCHOR: &str = "V1";
 /// The mid-ladder opponent of the upper rungs.
@@ -248,6 +287,8 @@ pub enum Role {
     Side,
     /// The full agent against a version with one part turned off.
     Ablation,
+    /// Another kind of agent against a rung of the ladder.
+    Against,
 }
 
 impl fmt::Display for Role {
@@ -260,6 +301,7 @@ impl fmt::Display for Role {
             Role::SelfPlay => "self",
             Role::Side => "side",
             Role::Ablation => "ablation",
+            Role::Against => "against",
         })
     }
 }
@@ -367,7 +409,34 @@ pub fn ablation_plan(rungs: &[Rung], zero: &str) -> Vec<Pairing> {
         .collect()
 }
 
-/// A set of rungs rated together: the ladder or the ablation.
+/// The pairings of every rung of `rungs` that is not one of `opponents` (as `a`) against each of
+/// them (as `b`), `SHORT_MATCH` games each, in the order of `rungs` and then of `opponents`.
+///
+/// # Panics
+/// If an opponent is not one of `rungs`.
+pub fn against_plan(rungs: &[Rung], opponents: &[&str]) -> Vec<Pairing> {
+    let index = |id: &str| {
+        rungs
+            .iter()
+            .position(|r| r.id == id)
+            .unwrap_or_else(|| panic!("no rung {id}"))
+    };
+    let opponents: Vec<usize> = opponents.iter().map(|id| index(id)).collect();
+    (0..rungs.len())
+        .filter(|a| !opponents.contains(a))
+        .flat_map(|a| {
+            opponents.iter().map(move |&b| Pairing {
+                a,
+                b,
+                roles: vec![Role::Against],
+                games: SHORT_MATCH,
+                reused: false,
+            })
+        })
+        .collect()
+}
+
+/// A set of rungs rated together: the ladder, the ablation or Monte Carlo tree search.
 #[derive(Clone, Copy, Debug)]
 pub struct Set {
     /// `ladder`, `ablation`: the name `dama ladder --set` takes.
@@ -376,6 +445,8 @@ pub struct Set {
     /// The rung at Elo 0.
     pub zero: &'static str,
     pub mid: Option<&'static str>,
+    /// When not empty, every other rung plays each of these (`against_plan`).
+    pub opponents: &'static [&'static str],
     pub footnotes: &'static [(&'static str, &'static str, &'static str)],
     /// Where its games and its JSON file go, and the file's name.
     pub dir: &'static str,
@@ -387,6 +458,7 @@ pub const LADDER_SET: Set = Set {
     rungs: LADDER,
     zero: ANCHOR,
     mid: Some(MID),
+    opponents: &[],
     footnotes: FOOTNOTES,
     dir: "results/ladder",
     json: "ladder.json",
@@ -397,18 +469,31 @@ pub const ABLATION_SET: Set = Set {
     rungs: ABLATION,
     zero: "V10",
     mid: None,
+    opponents: &[],
     footnotes: ABLATION_FOOTNOTES,
     dir: "results/ablation",
     json: "ablation.json",
 };
 
+pub const MCTS_SET: Set = Set {
+    name: "mcts",
+    rungs: MCTS,
+    zero: "V10",
+    mid: None,
+    opponents: MCTS_OPPONENTS,
+    footnotes: &[],
+    dir: "results/mcts",
+    json: "mcts.json",
+};
+
 impl Set {
     /// The sets `dama ladder --set` knows.
-    pub const ALL: [Set; 2] = [LADDER_SET, ABLATION_SET];
+    pub const ALL: [Set; 3] = [LADDER_SET, ABLATION_SET, MCTS_SET];
 
     /// Its pairings, in the order they are played.
     pub fn plan(&self) -> Vec<Pairing> {
         match self.mid {
+            _ if !self.opponents.is_empty() => against_plan(self.rungs, self.opponents),
             Some(mid) => plan(self.rungs, self.zero, mid),
             None => ablation_plan(self.rungs, self.zero),
         }

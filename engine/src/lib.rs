@@ -15,6 +15,7 @@ mod elo;
 mod eval;
 mod json;
 mod ladder;
+mod mcts;
 mod movegen;
 mod perft;
 mod rng;
@@ -27,8 +28,8 @@ mod trace;
 mod zobrist;
 
 pub use agent::{
-    Agent, AgentError, AgentSpec, AlphaBetaAgent, DeepeningAgent, MinimaxAgent, ParseAgentError,
-    RandomAgent, Thought, UAgent,
+    Agent, AgentError, AgentSpec, AlphaBetaAgent, DeepeningAgent, MctsAgent, MinimaxAgent,
+    ParseAgentError, RandomAgent, Thought, UAgent,
 };
 pub use api::{Session, native_clock, version};
 pub use arena::{
@@ -46,9 +47,11 @@ pub use eval::{
 pub use json::Json;
 pub use ladder::{
     ABLATION, ABLATION_FOOTNOTES, ABLATION_SET, ANCHOR, FOOTNOTES, GAMES_HEADER, GameRow, LADDER,
-    LADDER_SET, LONG_MATCH, MID, Meta, Pairing, PairingSummary, Report, Role, Rung, SEED,
-    SHORT_MATCH, Set, SideStats, VersionSummary, ablation_plan, plan, rate, rows_of,
+    LADDER_SET, LONG_MATCH, MCTS, MCTS_OPPONENTS, MCTS_SET, MID, Meta, Pairing, PairingSummary,
+    Report, Role, Rung, SEED, SHORT_MATCH, Set, SideStats, VersionSummary, ablation_plan,
+    against_plan, plan, rate, rows_of,
 };
+pub use mcts::{Clock, EXPLORATION, MctsKind, MctsResult, TEXEL1_K, mcts};
 pub use movegen::Move;
 pub use perft::perft;
 pub use rng::{Mulberry32, derive_seed};
@@ -56,7 +59,7 @@ pub use search::{
     Candidate, Decision, Deepening, Limits, MAX_ID_DEPTH, SearchOptions, alpha_beta, alpha_beta_q,
     alpha_beta_rep, alpha_beta_traced, alpha_beta_with, decide, decide_traced, iterative_deepening,
     iterative_deepening_rep, iterative_deepening_traced, iterative_deepening_with, minimax,
-    minimax_q, minimax_traced, static_value,
+    minimax_q, minimax_traced, quiescence_value, static_value,
 };
 pub use sprt::{Pentanomial, Sprt, SprtResult, Verdict, elo_of, expected_score};
 pub use square::Square;

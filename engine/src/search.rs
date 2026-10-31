@@ -236,6 +236,31 @@ pub fn static_value(board: &Board, to_move: Color, side: Color, weights: Weights
     context.leaf_value(board, to_move, &moves)
 }
 
+/// The value quiescence gives `board` with `to_move` to move, from `side`'s view, and the
+/// positions it produced below `board`: U if `to_move` has no capture, else every capture searched
+/// until the position is quiet, as at the depth limit of `alpha_beta_q` (alpha-beta in an open
+/// window, so the minimax value of the captures). `to_move` must have a legal move. `None` if more
+/// than `max_nodes` positions would be needed.
+pub fn quiescence_value(
+    board: &Board,
+    to_move: Color,
+    side: Color,
+    weights: Weights,
+    max_nodes: u64,
+) -> Option<(f64, u64)> {
+    let context = Context {
+        root: side,
+        weights,
+        depth: 0,
+        quiescence: true,
+    };
+    let mut search = Search::new(SearchOptions::default(), None, None, NoTrace);
+    // The counter counts `board` itself, which the caller has already counted.
+    search.counter.max_nodes = Some(max_nodes + 1);
+    let v = bounded_value((board, 0), to_move, 0, OPEN, &context, &mut search)?;
+    Some((v, search.counter.nodes - 1))
+}
+
 /// Values every legal move of `side` on `board` with minimax `depth` plies deep (at least 1), the
 /// leaves scored with U and `weights`. A candidate's `features` are those one ply deep, as in
 /// `decide`; its `u` is the minimax value.

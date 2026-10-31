@@ -10,8 +10,8 @@ use std::process::{Command, ExitCode};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use engine::{
-    AgentSpec, Color, MatchPlan, MatchRecord, Schedule, Sprt, TableOptions, Thinking, Weights,
-    play_match,
+    AgentSpec, Color, MatchPlan, MatchRecord, MctsKind, Schedule, Sprt, TableOptions, Thinking,
+    Weights, play_match,
 };
 
 const HELP: &str = "\
@@ -343,6 +343,17 @@ fn describe(spec: &AgentSpec) -> String {
             extras(*quiescence, *repetition, *order, table),
             weights_text(weights)
         ),
+        (AgentSpec::Mcts { kind, weights, .. }, _) => {
+            let leaf = match kind {
+                MctsKind::Flat => "flat Monte Carlo, random games".to_string(),
+                MctsKind::Uct => "UCT, random games".to_string(),
+                MctsKind::UctEval => format!("UCT, sigmoid(K U), {}", weights_text(weights)),
+                MctsKind::UctQuiescence => {
+                    format!("UCT, sigmoid(K quiescence), {}", weights_text(weights))
+                }
+            };
+            format!("{spec} ({leaf})")
+        }
         _ => spec.to_string(),
     }
 }

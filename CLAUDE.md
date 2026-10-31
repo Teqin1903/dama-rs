@@ -6,13 +6,14 @@ match kish 1.1.2, and every number in our Assignment 3 talk came from it.
 
 ## Layout
 - `engine/`: library crate with the board, move generation, evaluation (U and its positional features, `eval.rs`),
-  search, Zobrist keys (`zobrist.rs`) and the transposition table (`table.rs`), the arena and its SPRT (`sprt.rs`),
+  search, Monte Carlo tree search (`mcts.rs`), Zobrist keys (`zobrist.rs`) and the transposition table (`table.rs`), the arena and its SPRT (`sprt.rs`),
   Texel tuning of the weights (`texel.rs`), and the Elo ladder (`ladder.rs`: rungs, pairings, game rows) with its
   Bradley-Terry fit and bootstrap (`elo.rs`), and the web API (`api.rs`: `Session`, JSON in and out, docs/web-api.md)
   with its search tracer (`trace.rs`: `Tracer`, `NoTrace`, `Recorder`) and a small JSON reader and writer (`json.rs`)
 - `cli/`: binary crate that speaks the text protocol (position / go / bestmove)
 - `web/`: the engine for the site in WebAssembly (`wasm-bindgen`, `console_error_panic_hook`: used only here); a thin
-  wrapper of `engine::Session`. `site/` is written by someone else: we only produce `site/pkg/`
+  wrapper of `engine::Session`
+- `site/` and `deck/` (the talk's slide deck) are written by someone else: we only produce `site/pkg/`
 - `reference/js/`: the JS prototype. Read it; never edit it.
 - `testdata/`: perft counts, rule cases, move lists of sampled positions, decisions of the baseline agent
 - `docs/reference.md`: board and move formats, the baseline agent's U, our match settings
@@ -57,6 +58,9 @@ match kish 1.1.2, and every number in our Assignment 3 talk came from it.
 - Ablation (docs/ladder.md): `ladder run --set ablation` (and `--estimate`, `rate --set ablation`): V10 against
   itself with one part off (`ABLATION`: q, r, o, t, the Texel weights) and against V0, 400 games each, into
   `results/ablation/` and `ablation.json`; V10–V9 (no table) is the ladder's pairing, read from `results/ladder/games/`
+- Monte Carlo tree search (docs/ladder.md): `ladder run --set mcts` (and `--estimate`, `rate --set mcts`): the four
+  forms (`MCTS`: `mc`, `uct`, `ucte`, `uctq`, 20000 nodes per move) against V0, V2 and V10 (`MCTS_OPPONENTS`), 200
+  games each, into `results/mcts/` and `mcts.json`
 - Web API: `scripts/build-web.sh` builds `site/pkg/` (wasm-pack, keeping only `dama_web.js` and
   `dama_web_bg.wasm`); `target/release/dama api < requests.jsonl` answers the same calls natively, one JSON
   request per line (`{"call": "think", "args": ["white", "{}"]}`). Tracing must never change a search: the searches take a generic
@@ -116,7 +120,10 @@ history; the same decisions at a fixed depth, so deeper within a budget), and a 
 every game, is 16 MB unless `:hash=MB`, and does not keep a value that scored a repetition below it; `:tt=strict` is
 the referee's mode (same draft only and, with repetitions, only where the value cannot depend on the path), whose
 games equal those without a table: check new table ideas against it. Keep new search ideas there, behind the
-`Agent` trait.
+`Agent` trait. Monte Carlo tree search is its own module, `mcts.rs`: `mc:nK` (flat), `uct:nK` (random games),
+`ucte:nK` (sigmoid(K U)) and `uctq:nK` (sigmoid(K quiescence)), budgets in nodes and/or time but not depth, counted
+as alpha-beta counts them (every position made with `apply`, in random games and quiescence too). Random games end
+by the arena's rules without the third repetition; the game's ply and quiet plies come from `Agent::observe`.
 - Evaluation lives in `eval.rs`: U (`man`, `king`, `mob`) plus the positional features `adv`, `back`, `cen`, `edge`,
   `qmob` (defined there), whose weights are 0 unless set. Any agent name but `random` may end in `:KEY=VALUE` parts
   (`idqr:n2000:adv=0.1:king=3`, `tuned:cen=0.05`) on top of the tuned or named weights; a first part `w=NAME`
