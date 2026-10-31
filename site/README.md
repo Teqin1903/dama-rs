@@ -24,8 +24,11 @@ Keys: Space play or pause, Right arrow one move, D switch view, U undo, F flip, 
 The Budget menu sets how long levels 3 to 5 (iterative deepening) search each move: positions (2,000, 20,000 as
 in the ladder, 200,000), time (0.1 to 3 s) or depth (4, 6 or 8 plies; a depth search also stops at 1,000,000
 positions, since the page waits for the engine). The Elo in the menus was measured at 20,000 positions; with
-another budget the badge says so. Time budgets need an engine that accepts them: until then the menu greys
-them out. What if offers the same budgets. Scenes always use the ladder's budget, the one they were checked with.
+another budget the badge says so. Time budgets are offered when the engine accepts them (checked at start).
+What if offers the same budgets. Scenes always use the ladder's budget, the one they were checked with.
+
+The Speed tab (developer view) shows how far V10 gets in one minute natively (results/minute/minute.json) and
+measures this browser for one second on the current position.
 
 ## Scenes for the demo
 
@@ -48,7 +51,7 @@ same way every time. `tools/scenes.js` rebuilds `data/scenes.js` from replayed g
 | `js/board.js` | the SVG board: pieces, highlights, arrows, labels, move animation, clicks |
 | `js/app.js` | game flow, the user view and the developer view; every number comes from the engine calls |
 | `pkg/` | the engine (`dama_web.js`, `dama_web_bg.wasm`), built from `web/` by `scripts/build-web.sh`; never edit |
-| `data/results.js` | the Elo ladder and the ablation (`results/*/…json`); written by `node site/tools/data.js` |
+| `data/results.js` | the Elo ladder, the ablation and one minute of search (`results/*/…json`); written by `node site/tools/data.js` |
 | `tools/data.js` | writes `data/results.js`; run it after every `ladder rate` |
 | `tools/bundle.js` | packs everything, the engine included, into `dist/dama.html` |
 | `data/scenes.js`, `tools/scenes.js` | the demo scenes, and the script that finds and checks them |

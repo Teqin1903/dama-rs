@@ -566,6 +566,7 @@
     if (app.tab === 'tree') treePanel(panel, d);
     if (app.tab === 'eval') evalPanel(panel, d);
     if (app.tab === 'whatif') whatIfPanel(panel, d);
+    if (app.tab === 'speed') speedPanel(panel);
   }
   const stat = (k, v, title) => `<div class="stat"${title ? ` title="${esc(title)}"` : ''}><div class="k">${esc(k)}</div><div class="v">${v}</div></div>`;
   function searchPanel(d) {
@@ -809,6 +810,44 @@
       };
     } catch (e) { app.previewNode = null; }
     renderBoard();
+  }
+
+  // ---------- speed: one minute of search on the laptop (results/minute/minute.json), and this browser ----------
+  const MINUTE = window.MINUTE || null;
+  function speedPanel(panel) {
+    const M = MINUTE;
+    if (!M) { panel.innerHTML = '<p class="hint">No measurement found (results/minute/minute.json).</p>'; return; }
+    const S = M.summary, P = M.positions;
+    const depths = P.map((x) => x.depth);
+    const v10 = VER.V10;
+    // positions per extra ply, from the ladder's budget (20,000 positions, V10's average depth) to one minute
+    const perPly = v10 ? Math.pow(S.median_nodes / 20000, 1 / (S.median_depth - v10.avg_depth)) : null;
+    const mega = (n) => `${(n / 1e6).toFixed(1)} M`;
+    const rows = P.map((x) => `<tr><td>${esc(x.phase)}</td><td class="mono">${esc(x.name)}</td><td class="r num">${x.pieces}${x.kings ? ` (${x.kings})` : ''}</td><td class="r num">${mega(x.nodes)}</td><td class="r num">${x.depth}${x.depth_limit_hit ? '*' : ''}</td><td class="r num">${fmtInt(x.nps)}</td></tr>`).join('');
+    const big = (M.hash256 || []).map((h) => {
+      const base = P.find((x) => x.name === h.name);
+      return base ? `${esc(h.phase)} (${esc(h.name)}): depth ${base.depth} → ${h.depth}, ${fmtInt(base.nps)} → ${fmtInt(h.nps)} positions/s` : '';
+    }).filter(Boolean).join('; ');
+    const live = app.speedLive;
+    panel.innerHTML = `<p class="hint">How far the full engine (V10) gets in one whole minute: one search per position, 60 s each, one core of ${esc(M.machine)}, natively (not in the browser), with its 16 MB table.</p>
+      <div class="stats">
+        ${stat('Positions in a minute', mega(S.median_nodes), 'Median over the 10 positions')}
+        ${stat('Depth reached', `${S.median_depth}`, `Median; ${Math.min(...depths)} to ${Math.max(...depths)} plies over the positions`)}
+        ${stat('Positions a second', fmtInt(S.median_nps), 'Median')}
+        ${stat('Per extra ply', perPly ? `×${perPly.toFixed(1)}` : '—', 'Positions each extra ply costs, from the ladder\'s 20,000 positions (V10: ' + (v10 ? v10.avg_depth.toFixed(1) : '?') + ' plies) to one minute')}
+      </div>
+      <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Phase</th><th>Position</th><th class="r">Pieces (kings)</th><th class="r">Positions</th><th class="r">Depth</th><th class="r">Per second</th></tr></thead><tbody>${rows}</tbody></table></div>
+      <p class="hint" style="margin-top:8px">Fewer pieces, faster positions: endgames reach 12 to 16 plies. A 256 MB table instead of 16 MB: ${big}. One search each cannot tell one ply from noise. Source: results/minute/minute.json (${esc(M.version)}), docs/benchmarks.md.</p>
+      <div class="section-h"><h3>This browser</h3><span class="hint">the same engine in WebAssembly, on this computer, for one second on the current position</span></div>
+      <div class="wi-controls"><button class="btn primary" id="speedGo"${app.busy ? ' disabled' : ''}>Measure for 1 second</button>${live ? `<span class="mono">${fmtInt(live.nodes)} positions · depth ${live.depth} · ${fmtInt(live.nps)} positions/s</span><span class="hint" style="margin:0">${(live.nps / S.median_nps).toFixed(2)} × the native median</span>` : ''}</div>`;
+    $('speedGo').addEventListener('click', async () => {
+      $('speedGo').disabled = true;
+      try {
+        const r = await app.eng.slow('analyze', 'idqrot:t1000:w=texel1', JSON.stringify({ back: 0, seed: 1 }));
+        app.speedLive = { nodes: r.nodes, depth: r.depth, nps: (r.nodes * 1000) / Math.max(1, r.ms) };
+      } catch (e) { showError(e); }
+      renderDev();
+    });
   }
 
   // What switching each part off cost V10 over 400 games (results/ablation/ablation.json).
