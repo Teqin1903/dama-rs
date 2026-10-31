@@ -10,9 +10,10 @@ const VER = Object.fromEntries(LADDER.versions.map((v) => [v.id, v]));
 const ABV = Object.fromEntries(ABLATION.versions.map((v) => [v.id, v]));
 const ABP = Object.fromEntries(ABLATION.pairings.map((p) => [p.b, p]));
 const signed = (x, d = 0) => (x >= 0 ? '+' : '−') + Math.abs(x).toFixed(d);
-const eloTxt = (x) => signed(Math.round(x));
-const r0 = (x) => String(Math.round(x));
-const ciTxt = (ci) => `[${ci.map((x) => (x < 0 ? '−' : '') + Math.abs(Math.round(x))).join(', ')}]`;
+const roundAway = (x) => Math.sign(x) * Math.round(Math.abs(x)); // halves away from zero, as docs/ladder.md
+const eloTxt = (x) => signed(roundAway(x));
+const r0 = (x) => String(roundAway(x));
+const ciTxt = (ci) => `[${ci.map((x) => (x < 0 ? '−' : '') + Math.round(Math.abs(x))).join(', ')}]`;
 const FACT = (i) => FACTS.sets[i];
 const legalLo = Math.min(FACT(0).legal_per_position, FACT(1).legal_per_position);
 const legalHi = Math.max(FACT(0).legal_per_position, FACT(1).legal_per_position);
@@ -72,7 +73,7 @@ const S1 = {
   ],
   right: [
     { y: 214, h: 390, label: 'Weeks 09–10 · Assignment 4 · Ch 6', topic: 'Adversarial search and games',
-      items: ['Minimax, then alpha–beta, then iterative deepening', 'Quiescence: captures past the depth limit', 'Repetitions, move ordering, transposition table', 'Rust: 20,000 positions a move, 5.7 plies deep'] },
+      items: ['Minimax, then alpha–beta, then iterative deepening', 'Quiescence: captures past the depth limit', 'Repetitions, move ordering, transposition table', 'Rust: 20,000 positions a move, 5.7 plies deep', 'Monte Carlo tree search tried: below alpha–beta'] },
     { y: 624, h: 340, label: 'Weeks 11–13 · Assignment 4 · Ch 19, 22, 23', topic: 'Learning',
       items: ['Weights fitted to the results of 3,000 games', 'A better fit is not better play: games decide', 'Next: a network of our own, TD self-play'] },
   ],
@@ -304,40 +305,74 @@ SCENES.push({
 });
 
 // =====================================================================
-// 5. Why alpha-beta, not Monte Carlo tree search?
+// 5. Why alpha-beta, not Monte Carlo tree search? (A3 feedback; measured: results/mcts)
 // =====================================================================
+const S5 = {
+  forms: [['MC', 'Flat Monte Carlo', 'random games'], ['UCT', 'UCT', 'random games'], ['UCTe', 'UCT', 'texel1 at the leaves'], ['UCTq', 'UCT', 'texel1 + quiescence']],
+  opp: ['V0', 'V2', 'V10'],
+};
+const mctsPair = (a, b) => MCTS.pairings.find((p) => p.a === a && p.b === b);
+// Score in % to one decimal, halves to even, as docs/ladder.md prints it (Rust's {:.1}).
+const scorePct = (p) => { const tenths = ((p.w + p.d / 2) * 1000) / p.games; const f = Math.floor(tenths); const r = Math.abs(tenths - f - 0.5) < 1e-9 ? (f % 2 ? f + 1 : f) : Math.round(tenths); return `${(r / 10).toFixed(1)}%`; };
+const scoreFill = (s) => (s >= 0.5 ? `rgba(23,152,143,${0.10 + 0.5 * (s - 0.5)})` : `rgba(201,58,43,${0.10 + 0.5 * (0.5 - s)})`);
 SCENES.push({
-  beats: [22, 18],
+  beats: [18, 22, 18],
   notes: [
-    'You asked last time whether we tried other approaches, like Monte Carlo tree search. The book gives the test: Monte Carlo pays off when moves are many and a good evaluation is hard to write. Our positions have 13 to 16 moves, and material already judges them well.',
-    'And our game is tactical: captures are compulsory, and one missed reply loses pieces, which is where sampling is weak. Draughts programs like Scan search with alpha–beta for this reason. So we stayed in the alpha–beta family and measured every step; Monte Carlo against V10 is our next measurement.',
+    'You asked last time whether we tried other approaches, like Monte Carlo tree search. The book\'s test first: Monte Carlo pays off when moves are many and a good evaluation is hard to write. Our positions have 13 to 16 moves, material judges them well, and captures are compulsory.',
+    'So we tried it: four forms of Monte Carlo tree search, from flat random games to UCT with our evaluation and quiescence, 200 games each against V0, V2 and V10, at the same 20,000 positions a move. Every form beats our A3 agent without losing a game, and every form loses to plain alpha–beta at five plies.',
+    'The best form scores 10.5 percent against V10. And quiescence, worth 265 to alpha–beta, is worth nothing to Monte Carlo: alpha–beta drops a move after one refutation, while UCT needs many visits to lower an average. That is why we chose alpha–beta.',
   ],
   render(beat, t) {
     const A = mkA(beat, t);
-    chrome(5, 'Why alpha–beta, and not Monte Carlo tree search?', A, `Moves and captures: counted over ${fmt(FACT(0).positions + FACT(1).positions)} positions of ${FACT(0).games + FACT(1).games} replayed ablation games (deck/facts.json). AIMA 4th ed., §6.4; Ramanujan, Sabharwal & Selman, ICAPS 2010; Scan: lidraughts.org blog.`);
+    const games = MCTS.pairings.reduce((n, p) => n + p.games, 0);
+    chrome(5, 'Why alpha–beta, and not Monte Carlo tree search?', A, `Monte Carlo: four forms, 20,000 positions a move, ${MCTS.pairings[0].games} games a pairing, paired openings; results/mcts/mcts.json (${MCTS.meta.commit}), docs/ladder.md. Moves, captures: deck/facts.json. AIMA 4th ed. §6.4.`);
+    // the book's test, against our game
     const pa = A(0, 0.1, 0.6);
-    T('Monte Carlo search pays off when…', 120, 220, { size: 24, w: 600, c: C.ink2, a: pa });
+    T('Monte Carlo search pays off when…', 120, 220, { size: 22, w: 600, c: C.ink2, a: pa });
     const rows = [
       ['moves are many', `${legalLo.toFixed(0)}–${legalHi.toFixed(0)}`, 'legal moves a position in our games; Go starts at 361'],
-      ['a good evaluation is hard to write', 'material', 'already judges most positions; Texel weights add the rest'],
+      ['a good evaluation is hard to write', 'material', 'judges most positions; Texel weights add the rest'],
       ['no single move decides', `${Math.round(capLo * 100)}–${Math.round(capHi * 100)}%`, 'of positions force a capture; one missed reply loses men'],
     ];
     rows.forEach(([cond, big, note], k) => {
-      const p = A(0, 0.2 + 0.15 * k, 0.6), y = 250 + k * 190;
-      card(120, y, 1000, 166, { a: p });
-      T(`…${cond}`, 156, y + 50, { size: 24, w: 600, a: p });
-      cross(1060, y + 42, 26, C.coral, p, 5);
-      T(big, 156, y + 122, { f: 'serif', size: 52, c: C.cobalt, a: p });
-      TW(note, 156 + measure(big, { f: 'serif', size: 52 }) + 26, y + 112, 1000 - 220 - measure(big, { f: 'serif', size: 52 }), 26, { size: 20, c: C.ink2, a: p });
+      const p = A(0, 0.2 + 0.15 * k, 0.6), y = 246 + k * 166;
+      card(120, y, 860, 146, { a: p });
+      T(`…${cond}`, 152, y + 44, { size: 22, w: 600, a: p });
+      cross(930, y + 38, 22, C.coral, p, 4.5);
+      T(big, 152, y + 110, { f: 'serif', size: 46, c: C.cobalt, a: p });
+      const wb = measure(big, { f: 'serif', size: 46 });
+      TW(note, 152 + wb + 22, y + 100, 860 - 90 - wb, 25, { size: 19, c: C.ink2, a: p });
     });
-    TW('AIMA §6.4: Monte Carlo search has the edge when the branching factor is high or a good evaluation function is hard to define, and a weakness when a single move can change the course of the game, since sampling may never try it.', 120, 864, 1000, 28, { size: 20, c: C.ink2, a: A(0, 0.7, 0.6) });
-    const pr = A(1, 0, 0.6);
-    card(1200, 250, 620, 546, { a: pr, stroke: C.cobalt, lw: 2.5 });
-    T('So we chose alpha–beta', 1236, 300, { f: 'serif', size: 32, a: pr });
-    dotItem(1236, 360, 'Sampling misses shallow traps that minimax finds: Ramanujan et al., chess, 2010.', { a: pr, wrap: 540, size: 21 });
-    dotItem(1236, 460, 'Draughts engines search with alpha–beta: Scan, “for calculation and tactics”.', { a: pr, wrap: 540, size: 21 });
-    dotItem(1236, 560, 'Within that family we measured every step: ten versions, one ablation.', { a: pr, wrap: 540, size: 21 });
-    dotItem(1236, 660, 'Not yet measured: Monte Carlo tree search against V10 at the same budget. It is our next experiment.', { a: pr, wrap: 540, size: 21, dot: C.coral });
+    TW('AIMA §6.4: Monte Carlo search has the edge when the branching factor is high or a good evaluation function is hard to define, and a weakness when a single move can change the course of the game.', 120, 778, 860, 27, { size: 19, c: C.ink2, a: A(0, 0.7, 0.6) });
+    // what we measured
+    const pg = A(1, 0, 0.6);
+    card(1040, 214, 780, 540, { a: pg, stroke: C.cobalt, lw: 2.5 });
+    T(`We tried it: ${games.toLocaleString('en-US')} games`, 1072, 262, { f: 'serif', size: 30, a: pg });
+    T('score of the Monte Carlo form against', 1452, 304, { size: 16, w: 600, c: C.ink3, al: 'center', a: pg });
+    const cx = (j) => 1388 + j * 136;
+    S5.opp.forEach((o, j) => {
+      T(o, cx(j) + 60, 338, { size: 20, w: 600, al: 'center', a: pg });
+      T(`ladder ${eloTxt(VER[o].elo)}`, cx(j) + 60, 360, { size: 15, c: C.ink3, al: 'center', a: pg });
+    });
+    S5.forms.forEach(([id, name, sub], i) => {
+      const y = 384 + i * 76, p = A(1, 0.15 + 0.1 * i, 0.5);
+      T(name, 1072, y + 32, { size: 20, w: 600, a: p });
+      T(sub, 1072, y + 56, { size: 16, c: C.ink3, a: p });
+      S5.opp.forEach((o, j) => {
+        const q = mctsPair(id, o);
+        ctx.save(); ctx.globalAlpha = p; rr(cx(j), y + 6, 120, 62, 10); ctx.fillStyle = scoreFill(q.score); ctx.fill(); ctx.restore();
+        T(scorePct(q), cx(j) + 60, y + 38, { size: 22, w: 600, al: 'center', a: p });
+        T(`${eloTxt(q.elo_diff)} Elo`, cx(j) + 60, y + 60, { size: 14, c: C.ink2, al: 'center', a: p });
+      });
+    });
+    TW('Every form beats our A3 agent without losing a game, and loses to plain alpha–beta at 5 plies (V2).', 1072, 696, 720, 24, { size: 18, c: C.ink2, a: A(1, 0.6, 0.6) });
+    // why
+    const pw = A(2, 0, 0.6);
+    const qUctq = mctsPair('UCTq', 'V10'), qUcte = mctsPair('UCTe', 'V10');
+    card(1040, 774, 780, 190, { a: pw });
+    T('What quiescence is worth', 1072, 814, { size: 21, w: 600, a: pw });
+    T(`to alpha–beta: ${r0(-ABV['V10-q'].elo)} Elo;  to Monte Carlo: ${scorePct(qUcte)} → ${scorePct(qUctq)} against V10, within the intervals`, 1072, 848, { size: 18, c: C.ink2, a: pw });
+    TW('Alpha–beta drops a move after one refutation; UCT needs many visits to lower a mean.', 1072, 892, 720, 26, { size: 20, w: 500, a: pw });
   },
 });
 
@@ -449,7 +484,7 @@ SCENES.push({
 SCENES.push({
   beats: [18, 6],
   notes: [
-    'Next steps. The search does not apply the 50-ply rule, which ended 43 of V10\'s 87 draws against our Assignment 3 agent: that was scene 3. Repetitions are worth nothing measurable now, and we want to know why. Then Monte Carlo against V10, our own network, TD self-play, and play on the clock.',
+    'Next steps. The search does not apply the 50-ply rule, which ended 43 of V10\'s 87 draws against our Assignment 3 agent: that was scene 3. Repetitions are worth nothing measurable now, and we want to know why. Then Monte Carlo with what the plain forms lacked, our own network, TD self-play, and play on the clock.',
     'Thank you. We are happy to take questions.',
   ],
   render(beat, t) {
@@ -458,7 +493,7 @@ SCENES.push({
     const items = [
       ['The 50-ply rule in the search', `It ended ${V10V0.draws_by.fifty} of V10's ${V10V0.d} draws against V0 (scene 3); the other ${V10V0.draws_by.repetition} were repetitions.`],
       ['Why repetitions stopped mattering', `${eloTxt(VER.V6.elo - VER.V4.elo)} Elo when added (V4 → V6), ${r0(-ABV['V10-r'].elo)} now, not significant.`],
-      ['Monte Carlo tree search, measured', 'Against V10 at the same budget of positions.'],
+      ['Monte Carlo, given what it lacked', 'Repetitions, a table, more iterations, a tuned exploration constant.'],
       ['A network of our own, and TD self-play', 'Ch 22 and 23, trained on the positions we already have.'],
       ['Play on the clock', 'A time limit instead of 20,000 positions a move.'],
     ];
