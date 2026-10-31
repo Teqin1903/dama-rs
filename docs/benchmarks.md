@@ -121,6 +121,19 @@ With a 256 MB table (`:hash=256`) on three of them:
 - A time budget depends on the machine and the clock: a second run gives other node counts and here and
   there another depth. Node budgets are the ones we compare agents with.
 
+What one more ply costs. On the ladder's budget, 20,000 nodes a move, V10 completes 5.68 plies on average
+(`avg_depth` of V10 in `results/ladder/ladder.json`). In one minute it completes a median of 10.5 plies
+from a median of 28.3 M nodes. So the nodes grow by 28,332,031 / 20,000 = 1416 times while the depth
+grows by 10.5 − 5.68 = 4.8 plies, and each extra ply costs about 1416^(1/4.82) = e^(ln 1416 / 4.82) =
+e^(7.256 / 4.82) ≈ 4.5 times the nodes. A position has 13 to 16 legal moves (13.4 and 16.0 in
+`deck/facts.json`, two sets of replayed ablation games), so plain minimax would pay b ≈ 13–16 times per
+ply. Alpha-beta with perfect move ordering pays about √b ≈ 3.7–4.0 (AIMA 6.2: O(b^(m/2)) nodes instead of
+O(b^m)). Our 4.5 sits just above that bound: with ordering, killers, history and the table, the search
+is close to the best case, much closer than to minimax. Two caveats. The two numbers come from different
+positions (5.68 is the mean over every searched move of the ladder's games, 10.5 the median of the ten
+fixed positions here), so the ratio is an estimate, not a measurement on one set. And quiescence nodes
+are in both counts, so b here is not exactly the b of the formula.
+
 ### Machine and method
 
 - CPU: Intel Core i7-9750H @ 2.60GHz (laptop), pinned to CPU 2 with `taskset -c 2`; frequency governor
