@@ -19,6 +19,14 @@ Every move, value and tree on the page comes from our Rust engine, compiled to W
 
 Keys: Space play or pause, Right arrow one move, D switch view, U undo, F flip, N new game, Esc cancel.
 
+## Search budget
+
+The Budget menu sets how long levels 3 to 5 (iterative deepening) search each move: positions (2,000, 20,000 as
+in the ladder, 200,000), time (0.1 to 3 s) or depth (4, 6 or 8 plies; a depth search also stops at 1,000,000
+positions, since the page waits for the engine). The Elo in the menus was measured at 20,000 positions; with
+another budget the badge says so. Time budgets need an engine that accepts them: until then the menu greys
+them out. What if offers the same budgets. Scenes always use the ladder's budget, the one they were checked with.
+
 ## Scenes for the demo
 
 Keys 1 to 3 (or the Scenes menu) load three positions from our own games, each checked with the engine:

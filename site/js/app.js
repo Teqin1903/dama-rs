@@ -16,6 +16,30 @@
     { key: 'L4', level: 4, ver: 'V8', title: 'Level 4', what: 'Texel-tuned evaluation', spec: 'idqr:n20000:w=texel1' },
     { key: 'L5', level: 5, ver: 'V10', title: 'Level 5', what: 'full engine', spec: 'idqrot:n20000:w=texel1' },
   ];
+  // Search budget of the iterative-deepening levels (3 to 5): positions, time or depth. The ladder measured
+  // every level at 20,000 positions a move. A depth budget also stops at DEPTH_CAP positions, since the page
+  // waits for the engine while it searches.
+  const LADDER_BUDGET = 'n20000';
+  const DEPTH_CAP = 1000000;
+  const BUDGETS = [
+    { code: 'n2000', group: 'Positions', label: '2,000 positions' },
+    { code: 'n20000', group: 'Positions', label: '20,000 positions (ladder)' },
+    { code: 'n200000', group: 'Positions', label: '200,000 positions' },
+    { code: 't100', group: 'Time', label: '0.1 s a move' },
+    { code: 't500', group: 'Time', label: '0.5 s a move' },
+    { code: 't1000', group: 'Time', label: '1 s a move' },
+    { code: 't3000', group: 'Time', label: '3 s a move' },
+    { code: 'd4', group: 'Depth', label: '4 plies' },
+    { code: 'd6', group: 'Depth', label: '6 plies' },
+    { code: 'd8', group: 'Depth', label: '8 plies' },
+  ];
+  const budgetPart = (code) => (code[0] === 'd' ? `:${code}:n${DEPTH_CAP}` : `:${code}`);
+  const withBudget = (spec, code) => (/^id/.test(spec) ? spec.replace(/:n\d+/, budgetPart(code)) : spec);
+  const budgetOptions = (current) => ['Positions', 'Time', 'Depth'].map((g) => {
+    const off = g === 'Time' && !app.timeOk;
+    return `<optgroup label="${g}${off ? ' (needs the engine update)' : ''}">` + BUDGETS.filter((b) => b.group === g)
+      .map((b) => `<option value="${b.code}"${b.code === current ? ' selected' : ''}${off ? ' disabled' : ''}>${b.label}</option>`).join('') + '</optgroup>';
+  }).join('');
   const LADDER = window.LADDER || { versions: [], meta: {} };
   const VER = {};
   for (const v of LADDER.versions || []) VER[v.id] = v;
@@ -73,7 +97,8 @@
     auto: false, busy: false, speed: 1000, mode: 'user', tab: 'search',
     thinkingSide: null, decisions: [], sel: null, routes: null,
     showAll: false, tree: { path: [0], legalCache: new Map() }, heat: false,
-    wi: { q: true, r: true, o: true, t: true, w: 'texel1', n: 20000, result: null, busy: false, feat: { mob: true, adv: true, back: true, cen: true, edge: true, qmob: true } },
+    budget: LADDER_BUDGET, timeOk: true,
+    wi: { q: true, r: true, o: true, t: true, w: 'texel1', budget: LADDER_BUDGET, result: null, busy: false, feat: { mob: true, adv: true, back: true, cen: true, edge: true, qmob: true } },
     evalWeights: null, previewNode: null, scene: null, linePreview: null,
   };
   const WI_DEFAULT = JSON.stringify(app.wi);
@@ -104,7 +129,17 @@
   function setAgent(side) {
     const l = levelOf(app.players[side]);
     if (!l) return;
-    app.eng.call('set_agent', side, l.spec, app.seed * 2 + (side === 'black' ? 1 : 0));
+    app.eng.call('set_agent', side, withBudget(l.spec, app.budget), app.seed * 2 + (side === 'black' ? 1 : 0));
+  }
+  function fillBudget() {
+    const sel = $('budgetSel');
+    sel.innerHTML = budgetOptions(app.budget);
+    sel.addEventListener('change', () => {
+      app.budget = sel.value;
+      for (const s of ['white', 'black']) if (isAgent(s)) setAgent(s);
+      sel.blur();
+      render();
+    });
   }
   function clearGameState() {
     app.decisions = []; app.sel = null; app.routes = null; app.previewNode = null; app.linePreview = null; app.tree.path = [0];
@@ -125,6 +160,7 @@
   function loadScene(sc) {
     if (!sc || app.busy) return;
     app.auto = false; app.scene = sc;
+    app.budget = LADDER_BUDGET; $('budgetSel').value = LADDER_BUDGET;
     app.players.white = sc.white; app.players.black = sc.black;
     $('whiteSel').value = sc.white; $('blackSel').value = sc.black;
     app.st = app.eng.call('reset', START, 'white');
@@ -133,7 +169,7 @@
     // Agents join after the moves, as in the scene check: they see the game so far, with fresh tables.
     for (const s of ['white', 'black']) {
       const l = levelOf(app.players[s]);
-      if (l) app.eng.call('set_agent', s, l.spec, sc.seeds[s]);
+      if (l) app.eng.call('set_agent', s, withBudget(l.spec, LADDER_BUDGET), sc.seeds[s]);
     }
     app.wi = JSON.parse(WI_DEFAULT);
     if (sc.whatif) Object.assign(app.wi, sc.whatif);
@@ -188,7 +224,7 @@
       const endEval = line.length ? app.eng.call('eval', w, JSON.stringify({ line })) : null;
       const nowEval = app.eng.call('eval', w, JSON.stringify({ line: [] }));
       const mv = app.legal.find((m) => m.move === report.best);
-      d = { side, level: lvl, report, endEval, nowEval, move: mv, ply: app.st.ply, legal: app.legal.slice() };
+      d = { side, level: lvl, budget: /^id/.test(lvl.spec) ? app.budget : null, report, endEval, nowEval, move: mv, ply: app.st.ply, legal: app.legal.slice() };
       app.decisions.push(d);
       app.thinkingSide = null;
       app.tree.path = [0]; app.previewNode = null; app.wi.result = null;
@@ -391,7 +427,7 @@
   }
   function agentTitle(d) {
     const l = d.level, v = VER[l.ver];
-    return { name: `${sideWord(d.side)} · ${l.title} · ${v ? v.label : l.ver}`, meta: `${l.spec}` };
+    return { name: `${sideWord(d.side)} · ${l.title} · ${v ? v.label : l.ver}`, meta: `${d.report.spec || l.spec}` };
   }
 
   // ---------- user view ----------
@@ -414,11 +450,17 @@
     dot.className = 'dot ' + (d.side === 'white' ? 'w' : 'b');
     $('whoName').textContent = t.name;
     const r = d.report;
-    $('whoMeta').textContent = r.depth > 1 ? `searched ${r.depth} plies · ${fmtInt(r.nodes)} positions · ${Math.round(r.ms)} ms` : `looked one move ahead · ${r.root.length} moves`;
+    const wantDepth = d.budget && d.budget[0] === 'd' ? +d.budget.slice(1) : null;
+    const short = wantDepth && r.depth < wantDepth ? ` (stopped at ${fmtInt(DEPTH_CAP)} positions, before ${wantDepth})` : '';
+    $('whoMeta').textContent = r.depth > 1 ? `searched ${r.depth} plies${short} · ${fmtInt(r.nodes)} positions · ${Math.round(r.ms)} ms` : `looked one move ahead · ${r.root.length} moves`;
     const v = VER[d.level.ver];
     const eb = $('eloBadge');
     eb.hidden = !v;
-    if (v) { eb.textContent = `${fmtElo(v.elo)} Elo vs V1 [${Math.round(v.ci[0])}, ${Math.round(v.ci[1])}]`; eb.title = 'From our Elo ladder: 25 pairings, 6,800 games (results/ladder/ladder.json)'; }
+    if (v) {
+      const atLadder = !d.budget || d.budget === LADDER_BUDGET;
+      eb.textContent = atLadder ? `${fmtElo(v.elo)} Elo vs V1 [${Math.round(v.ci[0])}, ${Math.round(v.ci[1])}]` : `${fmtElo(v.elo)} Elo at 20,000 positions`;
+      eb.title = 'From our Elo ladder: 25 pairings, 6,800 games, every level at 20,000 positions a move (results/ladder/ladder.json)' + (atLadder ? '' : '. This search had another budget, so its strength differs.');
+    }
     // evaluation bar from White's side
     const wv = d.side === 'white' ? r.value : -r.value;
     const p = isWin(wv) ? (wv > 0 ? 0.98 : 0.02) : 1 / (1 + Math.exp(-0.9 * wv));
@@ -688,7 +730,7 @@
     const base = d && lettersOf(d.level.spec) ? d.level : levelOf('L5');
     const FEATS = wi.w === 'texel1' ? [['mob', 'mobility'], ['adv', 'advancement'], ['back', 'back row'], ['cen', 'centre'], ['edge', 'edge'], ['qmob', 'quiet mobility']] : [['mob', 'mobility']];
     const off = FEATS.filter(([k]) => !wi.feat[k]).map(([k]) => `:${k}=0`).join('');
-    const spec = `id${wi.q ? 'q' : ''}${wi.r ? 'r' : ''}${wi.o ? 'o' : ''}${wi.t ? 't' : ''}:n${wi.n}:w=${wi.w}${off}`;
+    const spec = `id${wi.q ? 'q' : ''}${wi.r ? 'r' : ''}${wi.o ? 'o' : ''}${wi.t ? 't' : ''}${budgetPart(wi.budget)}:w=${wi.w}${off}`;
     const back = d ? app.st.ply - d.ply : 0;
     const box = (k, label, title) => `<label class="toggle" title="${esc(title)}"><input type="checkbox" data-k="${k}"${wi[k] ? ' checked' : ''}> ${label} ${ablBadge(k)}</label>`;
     let res = '';
@@ -709,7 +751,7 @@
         ${box('o', 'Move ordering', 'Previous best move, promotions, killers and history first')}
         ${box('t', 'Table', 'Transposition table')}
         <label>Weights <select id="wiW">${['texel1', 'tuned'].map((x) => `<option${x === wi.w ? ' selected' : ''}>${x}</option>`).join('')}</select> ${ablBadge('w')}</label>
-        <label>Budget <select id="wiN">${[2000, 20000, 200000].map((x) => `<option value="${x}"${x === wi.n ? ' selected' : ''}>${fmtInt(x)} positions</option>`).join('')}</select></label>
+        <label>Budget <select id="wiN">${budgetOptions(wi.budget)}</select></label>
       </div>
       <div class="wi-controls"><span class="hint" style="margin:0">Evaluation features:</span>${FEATS.map(([k, label]) => `<label class="toggle"><input type="checkbox" data-f="${k}"${wi.feat[k] ? ' checked' : ''}> ${label}</label>`).join('')}</div>
       <div class="wi-controls"><span class="wi-spec">${esc(spec)}</span><button class="btn primary" id="wiGo"${wi.busy ? ' disabled' : ''}>${wi.busy ? 'Searching' : 'Search this position'}</button></div>
@@ -717,11 +759,11 @@
     for (const c of panel.querySelectorAll('input[data-k]')) c.addEventListener('change', () => { wi[c.dataset.k] = c.checked; wi.result = null; renderDev(); });
     for (const c of panel.querySelectorAll('input[data-f]')) c.addEventListener('change', () => { wi.feat[c.dataset.f] = c.checked; wi.result = null; renderDev(); });
     $('wiW').addEventListener('change', (e) => { wi.w = e.target.value; wi.result = null; renderDev(); });
-    $('wiN').addEventListener('change', (e) => { wi.n = +e.target.value; wi.result = null; renderDev(); });
+    $('wiN').addEventListener('change', (e) => { wi.budget = e.target.value; wi.result = null; renderDev(); });
     $('wiGo').addEventListener('click', async () => {
       wi.busy = true; renderDev();
       try {
-        const fullSpec = base.spec;
+        const fullSpec = withBudget(base.spec, wi.budget);
         const alt = await app.eng.slow('analyze', spec, JSON.stringify({ back, seed: 1 }));
         const full = await app.eng.slow('analyze', fullSpec, JSON.stringify({ back, seed: 1 }));
         let pair = null, line = null;
@@ -814,6 +856,8 @@
     chip.title = 'Our Rust engine compiled to WebAssembly, running in this page. Every move, value and tree on this page comes from it. The version names the engine source it was built from.';
     fillSelect($('whiteSel'), 'white');
     fillSelect($('blackSel'), 'black');
+    try { app.eng.call('analyze', 'idqrot:t5:w=texel1', '{}'); app.timeOk = true; } catch (e) { app.timeOk = false; }
+    fillBudget();
     fillScenes();
     $('newBtn').addEventListener('click', newGame);
     $('undoBtn').addEventListener('click', undo);
