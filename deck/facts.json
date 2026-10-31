@@ -1,0 +1,21 @@
+{
+ "source": "replayed ablation games (deck/tools/data.js)",
+ "sets": [
+  {
+   "name": "V10 against V0, games 0-159",
+   "games": 160,
+   "positions": 14041,
+   "legal_per_position": 16.035823659283526,
+   "capture_share": 0.15939035681219285,
+   "single_share": 0.11202905775941885
+  },
+  {
+   "name": "V10 against V10 without quiescence, games 0-99",
+   "games": 100,
+   "positions": 8658,
+   "legal_per_position": 13.436474936474937,
+   "capture_share": 0.20997920997921,
+   "single_share": 0.16493416493416493
+  }
+ ]
+}
