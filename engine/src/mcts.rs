@@ -24,8 +24,6 @@
 //! The move played is the root move visited most (AIMA's choice), and among those the first in
 //! legal order with the highest mean; for `mc` the first with the highest mean.
 
-use std::time::Instant;
-
 use crate::board::{Board, Color};
 use crate::eval::Weights;
 use crate::movegen::Move;
@@ -113,15 +111,18 @@ fn game_over(board: &Board, to_move: Color, moves: &[Move], clock: Clock) -> Opt
 struct Budget {
     nodes: u64,
     max_nodes: Option<u64>,
-    deadline: Option<Instant>,
+    /// In milliseconds of `now`.
+    deadline: Option<f64>,
+    now: fn() -> f64,
 }
 
 impl Budget {
-    fn new(limits: Limits) -> Budget {
+    fn new(limits: Limits, now: fn() -> f64) -> Budget {
         Budget {
             nodes: 0,
             max_nodes: limits.nodes,
-            deadline: limits.time.map(|t| Instant::now() + t),
+            deadline: limits.time.map(|t| now() + t.as_secs_f64() * 1e3),
+            now,
         }
     }
 
@@ -133,7 +134,7 @@ impl Budget {
     /// Counts `n` more positions, or `None` (counting none) if the budget does not have them.
     fn take(&mut self, n: u64) -> Option<()> {
         let out_of_nodes = self.max_nodes.is_some_and(|max| self.nodes + n > max);
-        let out_of_time = self.deadline.is_some_and(|d| Instant::now() >= d);
+        let out_of_time = self.deadline.is_some_and(|d| (self.now)() >= d);
         if out_of_nodes || out_of_time {
             return None;
         }
@@ -188,8 +189,8 @@ pub struct MctsResult {
 }
 
 /// The search of `kind` on `board`, `side` to move with `legal` (at least one move), within
-/// `limits` (nodes and/or time), the game at `clock`, scored with `weights` where `kind`
-/// evaluates.
+/// `limits` (nodes and/or time, the time measured by `now` in milliseconds), the game at
+/// `clock`, scored with `weights` where `kind` evaluates.
 #[allow(clippy::too_many_arguments)]
 pub fn mcts(
     kind: MctsKind,
@@ -198,6 +199,7 @@ pub fn mcts(
     legal: &[Move],
     clock: Clock,
     limits: Limits,
+    now: fn() -> f64,
     weights: Weights,
     rng: &mut Mulberry32,
 ) -> MctsResult {
@@ -206,7 +208,7 @@ pub fn mcts(
         limits.nodes.is_some() || limits.time.is_some(),
         "the search needs a node or time limit"
     );
-    let mut budget = Budget::new(limits);
+    let mut budget = Budget::new(limits, now);
     match kind {
         MctsKind::Flat => flat(board, side, legal, clock, &mut budget, rng),
         _ => uct(kind, board, side, legal, clock, weights, &mut budget, rng),

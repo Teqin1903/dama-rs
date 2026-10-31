@@ -8,7 +8,7 @@ use engine::{
     AgentSpec, Board, Color, Decision, Json, Limits, MatchPlan, Recorder, Schedule, SearchOptions,
     Session, Table, TableOptions, TraceRequest, Weights, alpha_beta_traced, alpha_beta_with,
     decide, decide_traced, iterative_deepening_traced, iterative_deepening_with, minimax,
-    minimax_traced, paired_agent_seeds, play_match, static_value,
+    minimax_traced, native_clock, paired_agent_seeds, play_match, static_value,
 };
 
 fn clock() -> f64 {
@@ -313,6 +313,7 @@ fn a_traced_search_is_the_untraced_search() {
                 tables.1.as_mut(),
                 None,
                 &mut r,
+                native_clock,
             );
             same(&label, &plain.decision, &traced.decision);
             assert_eq!(plain.depth, traced.depth, "{label}");
@@ -458,7 +459,6 @@ fn a_failed_call_is_an_error_and_changes_nothing() {
         ("bad board", s.reset("xyz", "white")),
         ("bad turn", s.reset(&start, "red")),
         ("bad spec", s.set_agent("white", "nonsense", 1)),
-        ("time budget", s.set_agent("white", "id:t50", 1)),
         ("not its turn", s.think("black", "{}")),
         ("options not an object", s.think("white", "[]")),
         ("bad options", s.think("white", "{")),
@@ -643,4 +643,18 @@ fn reports_and_traces_carry_the_fields_of_the_contract() {
     serde_json::from_str::<serde_json::Value>(&report.to_string()).unwrap();
     let position = s.position(r#"{"back": 1, "line": ["b6-b5"]}"#);
     assert_eq!(text(&position, "turn"), "white");
+}
+
+#[test]
+fn a_time_budget_thinks_for_about_its_time() {
+    let mut s = Session::new(native_clock);
+    field(&s.set_agent("white", "idqrot:t100:w=texel1", 1), "ok");
+    let report = s.think("white", "{}");
+    let ms = field(&report, "ms").as_f64().unwrap();
+    assert!(
+        (100.0..400.0).contains(&ms),
+        "thought {ms:.1} ms for a 100 ms budget"
+    );
+    // The site's probe for time budgets.
+    field(&s.analyze("idqrot:t5:w=texel1", "{}"), "ms");
 }

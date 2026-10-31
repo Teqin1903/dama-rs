@@ -13,7 +13,7 @@
 use std::path::Path;
 use std::time::{Duration, Instant};
 
-use engine::{AgentSpec, Board, Clock, Color, Mulberry32, derive_seed, mcts};
+use engine::{AgentSpec, Board, Clock, Color, Mulberry32, derive_seed, mcts, native_clock};
 use serde::Deserialize;
 
 #[derive(Deserialize)]
@@ -67,6 +67,7 @@ fn main() {
                     &legal,
                     Clock::default(),
                     limits,
+                    native_clock,
                     weights,
                     &mut rng,
                 );

@@ -18,7 +18,7 @@ use crate::movegen::Move;
 use crate::rng::Mulberry32;
 use crate::search::{
     Decision, Limits, MAX_ID_DEPTH, SearchOptions, alpha_beta_traced, decide_traced,
-    iterative_deepening_traced, minimax_traced,
+    iterative_deepening_traced, minimax_traced, native_clock,
 };
 #[cfg(test)]
 use crate::search::{alpha_beta, decide, iterative_deepening, minimax};
@@ -45,6 +45,11 @@ pub trait Agent {
     /// numbers stay. A game that is taken back is observed again from its start after this, since
     /// the history cannot drop a single position (it forgets everything before a capture).
     fn forget_game(&mut self) {}
+
+    /// Measures a time budget with `now` (milliseconds) from now on, instead of `Instant`
+    /// (`search::native_clock`): the WebAssembly build has no `Instant`. An agent without a time
+    /// budget has nothing to do.
+    fn set_clock(&mut self, _now: fn() -> f64) {}
 
     /// The move to play on `board` with `side` to move. `legal` is `board.legal_moves(side)` and
     /// is never empty; the move returned is one of its elements.
@@ -505,6 +510,8 @@ pub struct DeepeningAgent {
     /// `Some` when repetitions are recognised: the game so far.
     history: Option<GameHistory>,
     rng: Mulberry32,
+    /// The clock of a time limit.
+    now: fn() -> f64,
     nodes: u64,
     /// The sum of `Agent::depths`.
     depths: u64,
@@ -520,6 +527,7 @@ impl DeepeningAgent {
             table: None,
             history: None,
             rng: Mulberry32::new(seed),
+            now: native_clock,
             nodes: 0,
             depths: 0,
         }
@@ -569,6 +577,7 @@ impl DeepeningAgent {
             self.table.as_mut(),
             only,
             tracer,
+            self.now,
         );
         self.nodes += deepening.decision.nodes;
         self.depths += u64::from(deepening.depth);
@@ -622,6 +631,10 @@ impl Agent for DeepeningAgent {
         }
     }
 
+    fn set_clock(&mut self, now: fn() -> f64) {
+        self.now = now;
+    }
+
     fn nodes(&self) -> u64 {
         self.nodes
     }
@@ -643,6 +656,8 @@ pub struct MctsAgent {
     last: Option<Board>,
     clock: Clock,
     rng: Mulberry32,
+    /// The clock of a time limit.
+    now: fn() -> f64,
     nodes: u64,
     depths: u64,
 }
@@ -656,6 +671,7 @@ impl MctsAgent {
             last: None,
             clock: Clock::default(),
             rng: Mulberry32::new(seed),
+            now: native_clock,
             nodes: 0,
             depths: 0,
         }
@@ -686,6 +702,7 @@ impl Agent for MctsAgent {
             legal,
             self.clock,
             self.limits,
+            self.now,
             self.weights,
             &mut self.rng,
         );
@@ -712,6 +729,10 @@ impl Agent for MctsAgent {
     fn forget_game(&mut self) {
         self.last = None;
         self.clock = Clock::default();
+    }
+
+    fn set_clock(&mut self, now: fn() -> f64) {
+        self.now = now;
     }
 
     fn nodes(&self) -> u64 {

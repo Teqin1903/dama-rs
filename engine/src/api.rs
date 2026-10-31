@@ -11,11 +11,8 @@
 //! positions that remain once more.
 //!
 //! Every call that fails answers `{"error": "..."}` and leaves the session as it was: everything
-//! is checked before anything changes. Time budgets (`:tMS`) are refused, since the WebAssembly
-//! build has no clock to stop a search with.
-
-use std::sync::OnceLock;
-use std::time::Instant;
+//! is checked before anything changes. A time budget (`:tMS`) is measured with the session's
+//! clock (`Agent::set_clock`): `Instant` natively, `performance.now()` in WebAssembly.
 
 use crate::agent::{Agent, AgentSpec, Thought};
 use crate::arena::{EndReason, GamePosition, MatchSettings, game_end};
@@ -34,13 +31,6 @@ const DEFAULT_TRACE: TraceRequest = TraceRequest {
     max_nodes: 80_000,
 };
 
-/// Milliseconds since the first call, from `Instant`: the clock of a native session. The
-/// WebAssembly build has no `Instant` and passes its own clock to `Session::new`.
-pub fn native_clock() -> f64 {
-    static START: OnceLock<Instant> = OnceLock::new();
-    START.get_or_init(Instant::now).elapsed().as_secs_f64() * 1e3
-}
-
 /// The answer of `version()`: the engine's version and the agent names a session accepts.
 pub fn version(engine: &str) -> Json {
     let specs = [
@@ -54,7 +44,7 @@ pub fn version(engine: &str) -> Json {
         "u:MAN/KING/MOB",
         "mmN",
         "abN[q][r][o][t]",
-        "id[q][r][o][t]:nN[:dN]",
+        "id[q][r][o][t]:nN[:dN][:tMS]",
         "...[:w=NAME][:KEY=VALUE]",
     ];
     Json::obj(vec![
@@ -116,17 +106,9 @@ fn parse_side(side: &str) -> Result<Color, String> {
     }
 }
 
-/// An agent name the session accepts: one `AgentSpec` knows, without a time budget.
+/// An agent name the session accepts: any one `AgentSpec` knows.
 fn parse_spec(spec: &str) -> Result<AgentSpec, String> {
-    let parsed: AgentSpec = spec.parse().map_err(|e| format!("{e}"))?;
-    if let AgentSpec::Deepening { limits, .. } | AgentSpec::Mcts { limits, .. } = parsed
-        && limits.time.is_some()
-    {
-        return Err(format!(
-            "{spec}: time budgets are not available here; use a node budget such as n20000"
-        ));
-    }
-    Ok(parsed)
+    spec.parse().map_err(|e| format!("{e}"))
 }
 
 /// The options object of a call, given as JSON text.
@@ -270,9 +252,16 @@ impl Session {
         game_end(&position, MAX_PLIES)
     }
 
-    /// A new agent for `spec` and `seed` that has observed `positions`.
-    fn seat(spec: AgentSpec, seed: u32, positions: &[(Board, Color)]) -> Result<Seat, String> {
+    /// A new agent for `spec` and `seed`, timed by the session's clock, that has observed
+    /// `positions`.
+    fn seat(
+        &self,
+        spec: AgentSpec,
+        seed: u32,
+        positions: &[(Board, Color)],
+    ) -> Result<Seat, String> {
         let mut agent = spec.build();
+        agent.set_clock(self.clock);
         agent.new_game(seed).map_err(|e| e.to_string())?;
         for (board, side) in positions {
             agent.observe(board, *side);
@@ -284,7 +273,7 @@ impl Session {
     fn reseated(&self, positions: &[(Board, Color)]) -> Result<[Option<Seat>; 2], String> {
         let again = |seat: &Option<Seat>| {
             (seat.as_ref())
-                .map(|s| Session::seat(s.spec, s.seed, positions))
+                .map(|s| self.seat(s.spec, s.seed, positions))
                 .transpose()
         };
         Ok([again(&self.seats[0])?, again(&self.seats[1])?])
@@ -439,7 +428,7 @@ impl Session {
     fn try_set_agent(&mut self, side: &str, spec: &str, seed: u32) -> Answer {
         let side = parse_side(side)?;
         let spec = parse_spec(spec)?;
-        let seat = Session::seat(spec, seed, &self.positions)?;
+        let seat = self.seat(spec, seed, &self.positions)?;
         self.seats[seat_index(side)] = Some(seat);
         Ok(Json::obj(vec![
             ("ok", Json::Bool(true)),
@@ -511,7 +500,7 @@ impl Session {
                     .collect::<Result<Vec<_>, _>>()?,
             ),
         };
-        let mut seat = Session::seat(spec, seed, &self.positions[..=k])?;
+        let mut seat = self.seat(spec, seed, &self.positions[..=k])?;
         let mut recorder = Recorder::new(self.clock, request);
         let start = (self.clock)();
         let thought = (seat.agent)

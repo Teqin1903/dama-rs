@@ -9,12 +9,14 @@ use wasm_bindgen::prelude::*;
 #[cfg(target_arch = "wasm32")]
 #[wasm_bindgen]
 extern "C" {
-    /// `Date.now()`: WebAssembly has no `std::time::Instant`.
-    #[wasm_bindgen(js_namespace = Date)]
+    /// `performance.now()`: WebAssembly has no `std::time::Instant`. Unlike `Date.now()` it is
+    /// monotonic and finer than a millisecond, so it can stop a search with a time budget.
+    #[wasm_bindgen(js_namespace = performance)]
     fn now() -> f64;
 }
 
-/// Milliseconds, from the browser's clock in WebAssembly and from `Instant` natively.
+/// Milliseconds, from the browser's clock in WebAssembly and from `Instant` natively: the clock
+/// of the session's reports and of its agents' time budgets.
 fn clock() -> f64 {
     #[cfg(target_arch = "wasm32")]
     {

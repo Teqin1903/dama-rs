@@ -2,8 +2,8 @@
 //! games, quiescence at its leaves, and the agents' names.
 
 use engine::{
-    AgentSpec, Board, Clock, Color, Limits, MctsKind, Mulberry32, Weights, mcts, quiescence_value,
-    static_value,
+    AgentSpec, Board, Clock, Color, Limits, MctsKind, Mulberry32, Weights, mcts, native_clock,
+    quiescence_value, static_value,
 };
 
 const KINDS: [MctsKind; 4] = [
@@ -59,6 +59,7 @@ fn the_budget_holds_and_the_visits_add_up() {
                 &legal,
                 clock,
                 nodes(3000),
+                native_clock,
                 Weights::TEXEL1,
                 &mut rng,
             );
@@ -91,6 +92,7 @@ fn the_same_seed_gives_the_same_search() {
                     &legal,
                     clock,
                     nodes(2000),
+                    native_clock,
                     Weights::TEXEL1,
                     &mut rng,
                 )
@@ -122,6 +124,7 @@ fn random_games_keep_the_draw_rules_of_the_game() {
                 &legal,
                 clock,
                 nodes(500),
+                native_clock,
                 Weights::TUNED,
                 &mut rng,
             );
@@ -166,6 +169,7 @@ fn a_move_that_wins_at_once_is_played() {
                         &moves,
                         clock,
                         nodes(20000),
+                        native_clock,
                         Weights::TEXEL1,
                         &mut seed,
                     );

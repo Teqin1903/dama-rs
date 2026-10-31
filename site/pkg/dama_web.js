@@ -292,8 +292,8 @@ let wasm_bindgen = (function(exports) {
                 const ret = new Error();
                 return ret;
             },
-            __wbg_now_3b57bc9f03d35bf8: function() {
-                const ret = Date.now();
+            __wbg_now_e09d16344e76c4c6: function() {
+                const ret = performance.now();
                 return ret;
             },
             __wbg_stack_575c4e0918581b9c: function(arg0, arg1) {

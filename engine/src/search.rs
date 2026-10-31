@@ -69,6 +69,7 @@
 
 use std::cmp::Reverse;
 use std::ops::Range;
+use std::sync::OnceLock;
 use std::time::{Duration, Instant};
 
 use crate::board::{Board, Color};
@@ -430,6 +431,13 @@ pub fn alpha_beta_traced<T: Tracer>(
         .expect("a search without a budget is never interrupted")
 }
 
+/// Milliseconds since the first call, from `Instant`: the clock of a native search. The
+/// WebAssembly build has no `Instant` and passes its own clock (`performance.now()`).
+pub fn native_clock() -> f64 {
+    static START: OnceLock<Instant> = OnceLock::new();
+    START.get_or_init(Instant::now).elapsed().as_secs_f64() * 1e3
+}
+
 /// The deepest iteration `iterative_deepening` runs, whatever its limits.
 pub const MAX_ID_DEPTH: u32 = 64;
 
@@ -509,11 +517,21 @@ pub fn iterative_deepening_with(
     table: Option<&mut Table>,
 ) -> Deepening {
     iterative_deepening_traced(
-        board, side, weights, limits, options, history, table, None, NoTrace,
+        board,
+        side,
+        weights,
+        limits,
+        options,
+        history,
+        table,
+        None,
+        NoTrace,
+        native_clock,
     )
 }
 
-/// `iterative_deepening_with`, reporting to `tracer`, over the root moves `only` if given.
+/// `iterative_deepening_with`, reporting to `tracer`, over the root moves `only` if given, with
+/// a time limit measured by `now` (milliseconds; read only when `limits.time` is set).
 #[allow(clippy::too_many_arguments)]
 pub fn iterative_deepening_traced<T: Tracer>(
     board: &Board,
@@ -525,6 +543,7 @@ pub fn iterative_deepening_traced<T: Tracer>(
     table: Option<&mut Table>,
     only: Option<&[usize]>,
     tracer: T,
+    now: fn() -> f64,
 ) -> Deepening {
     assert!(
         limits != Limits::default(),
@@ -535,7 +554,7 @@ pub fn iterative_deepening_traced<T: Tracer>(
         (1..=MAX_ID_DEPTH).contains(&max_depth),
         "iterative deepening needs a depth from 1 to {MAX_ID_DEPTH}"
     );
-    let deadline = limits.time.map(|time| Instant::now() + time);
+    let deadline = limits.time.map(|time| now() + time.as_secs_f64() * 1e3);
     let mut context = Context {
         root: side,
         weights,
@@ -547,6 +566,7 @@ pub fn iterative_deepening_traced<T: Tracer>(
         .expect("a search without a budget is never interrupted");
     search.counter.max_nodes = limits.nodes;
     search.counter.deadline = deadline;
+    search.counter.now = now;
     while context.depth < max_depth && search.counter.horizon {
         search.counter.horizon = false;
         context.depth += 1;
@@ -618,8 +638,10 @@ struct Counter {
     q_nodes: u64,
     /// No more nodes than this.
     max_nodes: Option<u64>,
-    /// No new node from this moment on.
-    deadline: Option<Instant>,
+    /// No new node from this moment on, in milliseconds of `now`.
+    deadline: Option<f64>,
+    /// The clock of `deadline`.
+    now: fn() -> f64,
     /// Whether a leaf at the depth limit was scored (set, never cleared, by the search).
     horizon: bool,
 }
@@ -631,6 +653,7 @@ impl Counter {
             q_nodes: 0,
             max_nodes: None,
             deadline: None,
+            now: native_clock,
             horizon: false,
         }
     }
@@ -639,7 +662,7 @@ impl Counter {
     /// when there is a deadline.
     fn visit(&mut self, ply: u32, context: &Context) -> Option<()> {
         let out_of_nodes = self.max_nodes.is_some_and(|max| self.nodes >= max);
-        let out_of_time = self.deadline.is_some_and(|d| Instant::now() >= d);
+        let out_of_time = self.deadline.is_some_and(|d| (self.now)() >= d);
         if out_of_nodes || out_of_time {
             return None;
         }

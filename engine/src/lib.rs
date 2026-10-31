@@ -31,7 +31,7 @@ pub use agent::{
     Agent, AgentError, AgentSpec, AlphaBetaAgent, DeepeningAgent, MctsAgent, MinimaxAgent,
     ParseAgentError, RandomAgent, Thought, UAgent,
 };
-pub use api::{Session, native_clock, version};
+pub use api::{Session, version};
 pub use arena::{
     AgentFactory, EndReason, GamePosition, GameRecord, MatchGame, MatchPlan, MatchRecord,
     MatchSettings, Schedule, Thinking, game_end, paired_agent_seeds, paired_opening_seed,
@@ -59,7 +59,7 @@ pub use search::{
     Candidate, Decision, Deepening, Limits, MAX_ID_DEPTH, SearchOptions, alpha_beta, alpha_beta_q,
     alpha_beta_rep, alpha_beta_traced, alpha_beta_with, decide, decide_traced, iterative_deepening,
     iterative_deepening_rep, iterative_deepening_traced, iterative_deepening_with, minimax,
-    minimax_q, minimax_traced, quiescence_value, static_value,
+    minimax_q, minimax_traced, native_clock, quiescence_value, static_value,
 };
 pub use sprt::{Pentanomial, Sprt, SprtResult, Verdict, elo_of, expected_score};
 pub use square::Square;

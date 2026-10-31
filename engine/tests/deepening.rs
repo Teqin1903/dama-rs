@@ -5,9 +5,10 @@
 
 mod common;
 
-use std::time::Duration;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::{Duration, Instant};
 
-use engine::{Board, Color, Decision, Limits, Weights, alpha_beta, iterative_deepening};
+use engine::{AgentSpec, Board, Color, Decision, Limits, Weights, alpha_beta, iterative_deepening};
 use serde::Deserialize;
 
 /// A position of decisions.json or movegen.json. Only decisions.json has `name` and `weights`.
@@ -172,6 +173,49 @@ fn a_time_limit_always_gives_a_decision() {
         &id.decision,
         &alpha_beta(&board, Color::White, Weights::TUNED, 3)
     ));
+}
+
+/// The agent `name`, timed by `now`, chooses a move at the start: its nodes, depth and the time
+/// it took.
+fn choose_at_start(name: &str, now: Option<fn() -> f64>) -> (u64, u64, Duration) {
+    let mut agent = name.parse::<AgentSpec>().unwrap().build();
+    if let Some(now) = now {
+        agent.set_clock(now);
+    }
+    agent.new_game(1).unwrap();
+    let board = Board::start();
+    agent.observe(&board, Color::White);
+    let legal = board.legal_moves(Color::White);
+    let start = Instant::now();
+    agent.choose(&board, Color::White, &legal).unwrap();
+    (agent.nodes(), agent.depths(), start.elapsed())
+}
+
+#[test]
+fn a_time_budget_stops_the_search_near_it() {
+    let (_, depth, took) = choose_at_start("idqrot:t50:w=texel1", None);
+    assert!(depth >= 1, "no iteration completed");
+    let ms = took.as_secs_f64() * 1e3;
+    assert!(
+        (50.0..200.0).contains(&ms),
+        "took {ms:.1} ms for a 50 ms budget"
+    );
+}
+
+/// A clock that moves one millisecond each time it is read.
+fn ticking() -> f64 {
+    static TICKS: AtomicU64 = AtomicU64::new(0);
+    TICKS.fetch_add(1, Ordering::Relaxed) as f64
+}
+
+#[test]
+fn a_time_budget_reads_the_agents_clock_once_per_node() {
+    // The deadline is read 0 + 50; depth 1 runs without a budget, then the clock reads 1 to 49
+    // allow one node each, and 50 stops the search.
+    let (depth_one, _, _) = choose_at_start("idqrot:d1:w=texel1", None);
+    let (nodes, depth, _) = choose_at_start("idqrot:t50:w=texel1", Some(ticking));
+    assert_eq!(nodes, depth_one + 49);
+    assert!(depth >= 1);
 }
 
 #[test]

@@ -14,8 +14,11 @@ strings, so the same calls can be tested natively.
   (`rustup target add wasm32-unknown-unknown` once). This writes `site/pkg/dama_web.js`, which defines the
   global `wasm_bindgen`, and `site/pkg/dama_web_bg.wasm`. `--target no-modules` matters: the site is also
   packed into one offline HTML file that works from `file://`.
-- No threads and no `std::time::Instant` in the WebAssembly build (it panics there): budgets are node
-  budgets; `ms` may come from `js_sys::Date::now()` or be 0.
+- No threads and no `std::time::Instant` in the WebAssembly build (it panics there). Budgets in nodes,
+  depth and time (`:tMS`) all work: a time budget is measured with the session's clock, which the `web`
+  crate takes from `performance.now()` (monotonic, finer than a millisecond) and `dama api` from `Instant`
+  (`Session::new(clock)`, `Agent::set_clock`). The clock is read only by searches with a time budget, once
+  per node as natively; node and depth budgets never read it and play as in the arena, bit for bit.
 - A native mirror for tests and for building the site without a browser: `dama api` reads one JSON request
   per line on stdin, `{"call": "think", "args": ["white", "{}"]}`, and prints the same JSON the WebAssembly
   call returns. One `Session` lives for the whole stdin stream.
@@ -23,7 +26,7 @@ strings, so the same calls can be tested natively.
 ## Exports
 
 ```
-version() -> {"engine": "src.<7 hex digits: git tree of the WebAssembly sources, web/build.rs>", "specs": ["tuned", "mm3", "ab5", "id[q][r][o][t]:nN[:w=W]", ...]}
+version() -> {"engine": "src.<7 hex digits: git tree of the WebAssembly sources, web/build.rs>", "specs": ["tuned", "mm3", "ab5", "id[q][r][o][t]:nN[:dN][:tMS]", ...]}
 
 class Session
   new()                                  start position, White to move, no agents
@@ -146,7 +149,9 @@ Position = {"board": "<board>", "turn": "black", "legal": Move[]}
 
 The five opponents (difficulty levels) are our ladder versions: `tuned` (V0), `ab5` (V2), `idqr:n20000`
 (V6), `idqr:n20000:w=texel1` (V8), `idqrot:n20000:w=texel1` (V10). What-if uses `id` with any subset of
-q, r, o, t, budgets n2000, n20000 and n200000, and weights texel1 or tuned.
+q, r, o, t, and weights texel1 or tuned. Levels 3 to 5 and what-if take a budget in positions (n2000, n20000,
+n200000), time (t100 to t3000) or depth (d4, d6, d8, each with n1000000 as a cap); the site offers time
+budgets once `analyze("idqrot:t5:w=texel1", "{}")` answers without an error.
 
 ## Notes for our engine (from reading engine/src)
 
@@ -166,8 +171,10 @@ q, r, o, t, budgets n2000, n20000 and n200000, and weights texel1 or tuned.
   QuietPlies "fifty", Cap "ply_cap".
 - Stats: count probes, hits and cutoffs of the table, beta cutoffs and cutoffs by the first move tried, and
   repetition draws. They may come from a counting tracer, so the arena's search stays untouched.
-- `Instant::now()` panics in WebAssembly: keep `Limits::time` at None there and take `ms` from
-  `js_sys::Date::now()` in the `web` crate (0 natively is fine).
+- `Instant::now()` panics in WebAssembly: no search reads it there. `Session` gives every agent it builds
+  (`set_agent`, `analyze`, a rebuild after `undo`) its clock with `Agent::set_clock`, and `ms` comes from
+  the same clock. A time budget's games depend on the machine, so only node and depth budgets are
+  replayed against the arena.
 - At the root, the moves are tried in legal order, or with the previous iteration's best move first (with
   ordering, `o`): a root move's `reason` is `"pv"` or `"none"`. The root takes no move from the table, so
   `"tt"` never appears there; it does below the root.
