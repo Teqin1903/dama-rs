@@ -77,8 +77,13 @@ fn main() {
         entry.1 += weighted;
         entry.2 += u32::from(weighted >= 2.0);
     }
-    println!("{a} against {b}: {} games, every one as stored", stored.len());
-    println!("draw by\tdraws\tA more pieces\teven\tA fewer\tA ahead by >= 2 men (king = 2.51)\tmean difference (men)");
+    println!(
+        "{a} against {b}: {} games, every one as stored",
+        stored.len()
+    );
+    println!(
+        "draw by\tdraws\tA more pieces\teven\tA fewer\tA ahead by >= 2 men (king = 2.51)\tmean difference (men)"
+    );
     for (reason, (counts, sum, two)) in by {
         let n = counts.iter().sum::<u32>();
         println!(
