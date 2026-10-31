@@ -1,0 +1,364 @@
+{
+  "meta": {
+    "commit": "mcts-1",
+    "date": "2026-10-31T19:49:00Z",
+    "settings": {
+      "schedule": "paired",
+      "opening_plies": 4,
+      "max_plies": 400,
+      "seed": 1,
+      "threads": 6,
+      "draws": "third repetition, 50 plies without a capture, one piece each, ply 400",
+      "ms_per_move": "measured with several games at once: not a measurement of speed"
+    },
+    "elo_model": "Bradley-Terry, maximum likelihood over all games (draws count as half a win), E = 1 / (1 + 10^(-(Ra - Rb) / 400)); self-play left out",
+    "elo_zero": "V10",
+    "mid_opponent": null,
+    "bootstrap": {
+      "samples": 1000,
+      "seed": 1,
+      "rng": "mulberry32",
+      "unit": "colour-swapped pairs of games, drawn again within each pairing",
+      "percentiles": [2.5, 97.5],
+      "diverged": 0
+    },
+    "diverged": [],
+    "wall_s": 1445.3
+  },
+  "versions": [
+    {
+      "id": "V0",
+      "tag": "baseline",
+      "spec": "tuned",
+      "label": "V0_Baseline",
+      "adds": "one ply, U = 1/2.5/-0.05",
+      "side": false,
+      "elo": -617.5,
+      "ci": [-658, -583.8],
+      "avg_nodes_per_move": 9.7,
+      "avg_depth": 1,
+      "ms_per_move": 0.044
+    },
+    {
+      "id": "V2",
+      "tag": "v2-alpha-beta",
+      "spec": "ab5",
+      "label": "V2_AlphaBeta",
+      "adds": "alpha-beta, so 5 plies deep",
+      "side": false,
+      "elo": -279.9,
+      "ci": [-320.9, -241.8],
+      "avg_nodes_per_move": 17826.9,
+      "avg_depth": 5,
+      "ms_per_move": 50.7
+    },
+    {
+      "id": "V10",
+      "tag": "v10-transposition-table",
+      "spec": "idqrot:n20000:w=texel1",
+      "label": "V10_TranspositionTable",
+      "adds": "transposition table (16 MB, Zobrist keys)",
+      "side": false,
+      "elo": 0,
+      "ci": [0, 0],
+      "avg_nodes_per_move": 19455,
+      "avg_depth": 5.545,
+      "ms_per_move": 54.687
+    },
+    {
+      "id": "MC",
+      "tag": "mcts-1",
+      "spec": "mc:n20000",
+      "label": "MC_Flat",
+      "adds": "flat Monte Carlo: random games after each root move",
+      "side": false,
+      "elo": -526.1,
+      "ci": [-568.9, -493.1],
+      "avg_nodes_per_move": 17810,
+      "avg_depth": 0.891,
+      "ms_per_move": 21.34
+    },
+    {
+      "id": "UCT",
+      "tag": "mcts-1",
+      "spec": "uct:n20000",
+      "label": "UCT_RandomGames",
+      "adds": "UCT, a random game from each new position",
+      "side": false,
+      "elo": -467.7,
+      "ci": [-510.7, -431.9],
+      "avg_nodes_per_move": 17859.7,
+      "avg_depth": 4.765,
+      "ms_per_move": 21.988
+    },
+    {
+      "id": "UCTe",
+      "tag": "mcts-1",
+      "spec": "ucte:n20000:w=texel1",
+      "label": "UCT_Eval",
+      "adds": "UCT, each new position scored with sigmoid(K U), texel1",
+      "side": false,
+      "elo": -440.4,
+      "ci": [-483.3, -401.1],
+      "avg_nodes_per_move": 17019.9,
+      "avg_depth": 7.474,
+      "ms_per_move": 103.296
+    },
+    {
+      "id": "UCTq",
+      "tag": "mcts-1",
+      "spec": "uctq:n20000:w=texel1",
+      "label": "UCT_Quiescence",
+      "adds": "UCT, each new position scored with sigmoid(K quiescence), texel1",
+      "side": false,
+      "elo": -444.1,
+      "ci": [-487.2, -403.1],
+      "avg_nodes_per_move": 17100.2,
+      "avg_depth": 7.081,
+      "ms_per_move": 78.315
+    }
+  ],
+  "pairings": [
+    {
+      "a": "MC",
+      "b": "V0",
+      "roles": ["against"],
+      "games": 200,
+      "w": 114,
+      "d": 86,
+      "l": 0,
+      "score": 0.785,
+      "elo_diff": 225,
+      "ci": [193.1, 263.4],
+      "draws_by": {
+        "repetition": 40,
+        "fifty": 44,
+        "one_each": 2,
+        "ply_cap": 0
+      },
+      "no_move": 114,
+      "avg_plies": 143.1
+    },
+    {
+      "a": "MC",
+      "b": "V2",
+      "roles": ["against"],
+      "games": 200,
+      "w": 4,
+      "d": 20,
+      "l": 176,
+      "score": 0.07,
+      "elo_diff": -449.4,
+      "ci": [-530.7, -386.6],
+      "draws_by": {
+        "repetition": 16,
+        "fifty": 2,
+        "one_each": 2,
+        "ply_cap": 0
+      },
+      "no_move": 180,
+      "avg_plies": 93.9
+    },
+    {
+      "a": "MC",
+      "b": "V10",
+      "roles": ["against"],
+      "games": 200,
+      "w": 1,
+      "d": 4,
+      "l": 195,
+      "score": 0.015,
+      "elo_diff": -726.9,
+      "ci": [-1040.4, -603.9],
+      "draws_by": {
+        "repetition": 2,
+        "fifty": 0,
+        "one_each": 2,
+        "ply_cap": 0
+      },
+      "no_move": 196,
+      "avg_plies": 73.7
+    },
+    {
+      "a": "UCT",
+      "b": "V0",
+      "roles": ["against"],
+      "games": 200,
+      "w": 131,
+      "d": 69,
+      "l": 0,
+      "score": 0.8275,
+      "elo_diff": 272.4,
+      "ci": [238.1, 308.3],
+      "draws_by": {
+        "repetition": 47,
+        "fifty": 22,
+        "one_each": 0,
+        "ply_cap": 0
+      },
+      "no_move": 131,
+      "avg_plies": 158.1
+    },
+    {
+      "a": "UCT",
+      "b": "V2",
+      "roles": ["against"],
+      "games": 200,
+      "w": 17,
+      "d": 27,
+      "l": 156,
+      "score": 0.1525,
+      "elo_diff": -297.9,
+      "ci": [-358.8, -249.1],
+      "draws_by": {
+        "repetition": 19,
+        "fifty": 3,
+        "one_each": 5,
+        "ply_cap": 0
+      },
+      "no_move": 173,
+      "avg_plies": 109.1
+    },
+    {
+      "a": "UCT",
+      "b": "V10",
+      "roles": ["against"],
+      "games": 200,
+      "w": 5,
+      "d": 6,
+      "l": 189,
+      "score": 0.04,
+      "elo_diff": -552.1,
+      "ci": [-676.1, -463.2],
+      "draws_by": {
+        "repetition": 3,
+        "fifty": 0,
+        "one_each": 3,
+        "ply_cap": 0
+      },
+      "no_move": 194,
+      "avg_plies": 76.1
+    },
+    {
+      "a": "UCTe",
+      "b": "V0",
+      "roles": ["against"],
+      "games": 200,
+      "w": 38,
+      "d": 162,
+      "l": 0,
+      "score": 0.595,
+      "elo_diff": 66.8,
+      "ci": [48.9, 86.9],
+      "draws_by": {
+        "repetition": 159,
+        "fifty": 3,
+        "one_each": 0,
+        "ply_cap": 0
+      },
+      "no_move": 38,
+      "avg_plies": 52.1
+    },
+    {
+      "a": "UCTe",
+      "b": "V2",
+      "roles": ["against"],
+      "games": 200,
+      "w": 14,
+      "d": 133,
+      "l": 53,
+      "score": 0.4025,
+      "elo_diff": -68.6,
+      "ci": [-92.5, -41.9],
+      "draws_by": {
+        "repetition": 122,
+        "fifty": 2,
+        "one_each": 9,
+        "ply_cap": 0
+      },
+      "no_move": 67,
+      "avg_plies": 86.2
+    },
+    {
+      "a": "UCTe",
+      "b": "V10",
+      "roles": ["against"],
+      "games": 200,
+      "w": 4,
+      "d": 30,
+      "l": 166,
+      "score": 0.095,
+      "elo_diff": -391.6,
+      "ci": [-449.4, -338],
+      "draws_by": {
+        "repetition": 23,
+        "fifty": 0,
+        "one_each": 7,
+        "ply_cap": 0
+      },
+      "no_move": 170,
+      "avg_plies": 76.2
+    },
+    {
+      "a": "UCTq",
+      "b": "V0",
+      "roles": ["against"],
+      "games": 200,
+      "w": 36,
+      "d": 164,
+      "l": 0,
+      "score": 0.59,
+      "elo_diff": 63.2,
+      "ci": [47.2, 81.4],
+      "draws_by": {
+        "repetition": 162,
+        "fifty": 2,
+        "one_each": 0,
+        "ply_cap": 0
+      },
+      "no_move": 36,
+      "avg_plies": 53.1
+    },
+    {
+      "a": "UCTq",
+      "b": "V2",
+      "roles": ["against"],
+      "games": 200,
+      "w": 19,
+      "d": 117,
+      "l": 64,
+      "score": 0.3875,
+      "elo_diff": -79.5,
+      "ci": [-109.5, -52.5],
+      "draws_by": {
+        "repetition": 107,
+        "fifty": 4,
+        "one_each": 6,
+        "ply_cap": 0
+      },
+      "no_move": 83,
+      "avg_plies": 93.4
+    },
+    {
+      "a": "UCTq",
+      "b": "V10",
+      "roles": ["against"],
+      "games": 200,
+      "w": 5,
+      "d": 32,
+      "l": 163,
+      "score": 0.105,
+      "elo_diff": -372.3,
+      "ci": [-424.3, -322.7],
+      "draws_by": {
+        "repetition": 25,
+        "fifty": 0,
+        "one_each": 7,
+        "ply_cap": 0
+      },
+      "no_move": 168,
+      "avg_plies": 76.6
+    }
+  ],
+  "footnotes": []
+}

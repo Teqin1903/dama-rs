@@ -205,3 +205,119 @@ version `ablation-1-3-gc32f484`, 387 s, row in `results/arena.csv`):
   test would fit weights on all positions, quiet or not, and repeat the pair.
 - With the tuned weights the games are longer (123 plies against 88) and end drawn far more often (176 of
   400, 115 of them by 50 quiet plies), as in the ladder's lower rungs.
+
+## Monte Carlo tree search
+
+Why alpha-beta and not Monte Carlo? Four forms of Monte Carlo tree search (engine/src/mcts.rs, AIMA 6.4), each adding
+one thing to the one before it, play the ladder's V0, V2 and V10 with the same budget as alpha-beta: 20 000 nodes per
+move, every position made with `apply` counted (in the tree, in random games and in quiescence).
+
+| id | spec | what it is |
+|---|---|---|
+| MC | `mc:n20000` | flat Monte Carlo: the root moves in turn, a random game after each, the move with the highest mean |
+| UCT | `uct:n20000` | UCT (UCB1, C = √2): a random game from each new position, the move visited most |
+| UCTe | `ucte:n20000:w=texel1` | UCT, each new position scored with sigmoid(K · U), texel1, K = 0.2353 (its Texel K) |
+| UCTq | `uctq:n20000:w=texel1` | UCT, scored with sigmoid(K · quiescence): captures searched until the position is quiet |
+
+Random games end by the arena's rules (no legal move loses; one piece each, 50 quiet plies and ply 400 draw; the
+game's ply and quiet plies carry over), not by a cut at a fixed length: then MC and UCT know nothing but the rules,
+and all knowledge of the position comes in with UCTe. The third repetition is not checked in random games. With one
+legal move the agents play it without a search (0 nodes), so their nodes per move over a game are below 20 000.
+
+Settings as in the ladder: paired schedule, 4 random opening plies, seed 1, `--threads 6`, 200 games per pairing
+(`MCTS_SET` in engine/src/ladder.rs, `dama ladder run --set mcts`, `dama ladder rate --set mcts`). Source:
+`results/mcts/games/*.csv`, `results/mcts/mcts.json`, 12 rows of `results/arena.csv` (version `mcts-1`, tag
+`mcts-1`), 2400 games in 1445 s.
+
+### Results
+
+Every view is the Monte Carlo form's. Elo and its 95% interval are those of the pairing alone (bootstrap over the
+colour-swapped pairs); no pairing scored 0% or 100%, so each has a finite estimate. "Ladder" is the opponent's
+Elo on the ladder (V1 = 0); "implied" is that plus the pairing's Elo, where the form would stand on the ladder by
+this pairing alone. Draws: repetition / 50 quiet plies / one piece each / ply 400. Nodes and ms per move are the
+form's, over the games of the pairing (6 games at once, so the time is not a clean speed measurement; see below).
+
+| form | against | + = − | score | Elo | 95% | ladder | implied | draws rep / 50 / 1-1 / cap | nodes/move | ms/move |
+|---|---|---|---:|---:|---|---:|---:|---|---:|---:|
+| MC | V0 `tuned` | +114 =86 −0 | 78.5% | +225 | [+193, +263] | +8 | +233 | 40 / 44 / 2 / 0 | 18 704 | 23.2 |
+| MC | V2 `ab5` | +4 =20 −176 | 7.0% | −449 | [−531, −387] | +175 | −274 | 16 / 2 / 2 / 0 | 17 501 | 20.5 |
+| MC | V10 | +1 =4 −195 | 1.5% | −727 | [−1040, −604] | +672 | −55 | 2 / 0 / 2 / 0 | 16 409 | 18.7 |
+| UCT | V0 | +131 =69 −0 | 82.8% | +272 | [+238, +308] | +8 | +280 | 47 / 22 / 0 / 0 | 18 765 | 23.6 |
+| UCT | V2 | +17 =27 −156 | 15.2% | −298 | [−359, −249] | +175 | −123 | 19 / 3 / 5 / 0 | 17 574 | 21.3 |
+| UCT | V10 | +5 =6 −189 | 4.0% | −552 | [−676, −463] | +672 | +120 | 3 / 0 / 3 / 0 | 16 323 | 19.5 |
+| UCTe | V0 | +38 =162 −0 | 59.5% | +67 | [+49, +87] | +8 | +75 | 159 / 3 / 0 / 0 | 18 532 | 121.9 |
+| UCTe | V2 | +14 =133 −53 | 40.2% | −69 | [−92, −42] | +175 | +106 | 122 / 2 / 9 / 0 | 17 202 | 106.3 |
+| UCTe | V10 | +4 =30 −166 | 9.5% | −392 | [−449, −338] | +672 | +280 | 23 / 0 / 7 / 0 | 15 792 | 87.4 |
+| UCTq | V0 | +36 =164 −0 | 59.0% | +63 | [+47, +81] | +8 | +71 | 162 / 2 / 0 / 0 | 18 417 | 89.0 |
+| UCTq | V2 | +19 =117 −64 | 38.8% | −80 | [−109, −53] | +175 | +95 | 107 / 4 / 6 / 0 | 17 265 | 75.5 |
+| UCTq | V10 | +5 =32 −163 | 10.5% | −372 | [−424, −323] | +672 | +300 | 25 / 0 / 7 / 0 | 15 993 | 74.4 |
+
+Time per move on the same fixed positions, one search each, pinned to one core (`taskset -c 2
+target/release/examples/mcts ...`: the 383 positions of testdata/decisions.json and movegen.json with more than one
+legal move):
+
+| agent | nodes/move | random games/move | iterations/move | ms/move | tree depth (search depth) |
+|---|---:|---:|---:|---:|---:|
+| MC `mc:n20000` | 20 000 | 1 177 | 1 177 | 13.3 | 1 |
+| UCT `uct:n20000` | 20 000 | 1 423 | 1 423 | 14.8 | 4.98 |
+| UCTe `ucte:n20000:w=texel1` | 20 000 | — | 20 000 | 69.4 | 8.21 |
+| UCTq `uctq:n20000:w=texel1` | 20 000 | — | 14 746 | 55.9 | 7.90 |
+| V10 `idqrot:n20000:w=texel1` | 19 687 | — | — | 33.9 | 5.69 |
+| V2 `ab5` | 20 843 | — | — | 34.6 | 5.00 |
+| V0 `tuned` | 12 | — | — | 0.02 | 1 |
+
+A random game is short: 20 000 nodes are 1 177 games for MC, about 17 plies each (captures are mandatory, so the
+pieces go fast). UCTe spends one node per iteration and is the slowest per node (a new tree node, its legal moves and
+U); UCTq spends a quarter of its nodes in quiescence.
+
+- **No form comes near alpha-beta.** Each beats V0 without losing a game and loses to V2; against V10 the best form
+  scores 10.5%. By head-to-head scores the forms stand between V0 (+8) and V2 (+175) on the ladder; V2 (5 plies,
+  the tuned U, no quiescence, no repetitions) is already stronger than all of them with the same 20 000 nodes.
+- **The implied places disagree** (MC: +233, −274, −55): the ladder's scale is not one line here either (see
+  Intransitivity). The one-ply V0 draws by repetition against agents that do not avoid it, which pulls the forms
+  with U down against V0; MC and UCT lose almost every game to V10, where an Elo from 1.5–4% is very uncertain.
+- **The tree is worth something, U more.** UCT is above MC in every pairing (V2: 15.2% against 7.0%). U at the leaves
+  instead of random games more than doubles the score against V2 (40.2%) and V10 (9.5%), but is worse against V0 (see the
+  repetitions below).
+- **Quiescence is worth nothing to MCTS** (UCTq against UCTe: 59.0 and 59.5%, 38.8 and 40.2%, 10.5 and 9.5%; every
+  interval overlaps), while it is worth 265 to V10 (Ablation). The question was whether MCTS is weak tactically, at
+  leaves in the middle of a capture sequence: it is not, or not mainly. UCTe's tree is already 8 plies deep on average,
+  probably deepest along forced captures (few children), and quiescence costs a quarter of the iterations. What alpha-beta has
+  and UCT does not is a proof that a move is bad: one refutation cuts a move, where UCT needs many visits to lower
+  a mean.
+
+### Three properties of these forms, and what each does to the results
+
+Found by the tests (`engine/tests/mcts.rs`) and in the games; the draws were played again and their last boards
+counted with `target/release/examples/endings results/mcts/games/<pairing>.csv` (every game equal to the stored one;
+"ahead" counts pieces, "ahead by 2" counts a king as 2.51 men, texel1's king).
+
+1. **The forms with random games do not prefer a quicker win.** In a won ending every move wins every random game,
+   so all have the mean 1 and the first in legal order is played (`a_move_that_wins_at_once_is_played`). Effect: the
+   wins of MC and UCT are long. Against V0 they take 157 and 175 plies on average, those of UCTe, UCTq and V10 69,
+   70 and 93 (`V10_vs_V0` of the ablation). It does not turn their wins into draws by 50 quiet plies: in 34 of MC's
+   44 such draws against V0, MC has fewer pieces (UCT: 15 of 22), so those are V0's unfinished wins, not MC's. So it
+   costs time, not points, in these games.
+2. **UCTq sees a win after forced captures as a win.** Quiescence finds the loss of the side that must capture into
+   a position without a move; sigmoid(0.2353 · ~1000) is exactly 1 in f64, so such a move scores 1, as a move that
+   wins at once does (the test checks that only UCTe must play the move that wins at once). Effect: none measurable;
+   it is part of what quiescence adds, and UCTq is not stronger than UCTe in any pairing. Values that saturate at 1
+   do mean that UCTq, like the forms with random games, does not prefer the quicker of two forced wins.
+3. **MCTS does not know repetitions.** Neither in its random games nor in its tree; UCTe and UCTq are also
+   deterministic (no random numbers at all), so the same position gives the same move and a game can cycle. V0 and
+   V2 do not know repetitions either; V10 does. Effect, in both directions:
+   - **against V0 it costs points**: UCTe draws 159 of 200 games by repetition (UCTq 162); its games last 52 plies on average. In
+     63 of those 159 UCTe is ahead by at least two men (UCTq: 57 of 162), and has more pieces in 75. Had the 63 been
+     wins, UCTe would have scored 75% instead of 59.5% against V0. This is why UCTe is below UCT against V0.
+   - **against V2 it saves points**: in 74 of UCTe's 122 repetition draws UCTe has fewer pieces (UCTq: 48 of 107);
+     ab5 is ahead and repeats. Without these draws UCTe's 40.2% against V2 would be lower.
+   - against V10 it matters little (23 and 25 repetition draws of 200).
+
+### Caveats
+
+- One budget (20 000 nodes), one exploration constant (√2) and no tuning of either; MCTS is known to need far more
+  iterations than alpha-beta needs nodes, and a larger budget could change the order of the forms, not likely the
+  gap to V10 (the alpha-beta agents grow stronger with nodes too).
+- No form uses repetitions, a transposition table or an ordering of its expansions; they are the plain algorithms of
+  the textbook, compared with V2 (plain alpha-beta, 5 plies) and V10 (every improvement).
+- 200 games per pairing: intervals of ±20–40 Elo near 50% and far wider near 0%.

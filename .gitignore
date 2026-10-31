@@ -4,4 +4,5 @@ CLAUDE.local.md
 results/ladder/progress.log
 results/ladder/games/*.tmp
 results/ablation/progress.log
+results/mcts/progress.log
 results/ablation/games/*.tmp
