@@ -6,3 +6,5 @@ results/ladder/games/*.tmp
 results/ablation/progress.log
 results/mcts/progress.log
 results/ablation/games/*.tmp
+results/fifty/progress.log
+results/fifty/games/*.tmp

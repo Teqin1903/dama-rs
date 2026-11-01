@@ -321,3 +321,69 @@ counted with `target/release/examples/endings results/mcts/games/<pairing>.csv` 
 - No form uses repetitions, a transposition table or an ordering of its expansions; they are the plain algorithms of
   the textbook, compared with V2 (plain alpha-beta, 5 plies) and V10 (every improvement).
 - 200 games per pairing: intervals of ±20–40 Elo near 50% and far wider near 0%.
+
+## Draw rules in the search
+
+Until now the search knew only repetitions; the 50-ply rule and one piece each were applied by the game alone. In
+V10–V0 of the ablation 43 of V10's 87 draws came from the 50-ply rule, and in scene 3 of the site V10 is a man and
+two kings ahead and still draws at ply 77. The letter `f` (engine/src/search.rs) adds both rules to the search: a
+position after 50 plies in a row without a capture, counted on from the game's count (`Agent::observe`), or with one
+piece each, is a draw (0), checked after a lack of moves (a loss), as in the game. `:fs=1` adds progress pressure: U
+at the depth limit is scaled by (100 − q) / 100, q the count there, so the side ahead prefers a capture early.
+
+The table: one piece each depends only on the board, so those values are kept. A value whose search scored a
+50-ply draw is not kept, and a value is used only where q + draft < 50: quiet moves are played only before the depth
+limit (quiescence plays captures, which reset the count), so then nothing below can reach the limit. With `fs=1`
+every value depends on q, so the count is mixed into the Zobrist key instead, and values are kept as usual. In strict
+mode a table still gives the decisions of the search without one (`tests/fifty.rs`). Agents without `f` are
+unchanged: the stored games of the ladder and the ablation replay.
+
+V10f is `idqrotf:n20000:w=texel1`, V10fs the same with `:fs=1`. Same settings as the ablation (paired, 4 opening
+plies, seed 1, `--threads 6`), 400 games each. Source: `results/fifty/games/`, `results/fifty/fifty.json`
+(`dama ladder run --set fifty`, `dama ladder rate --set fifty`), version `mcts-1-9-ga49200d`, 1600 games in 1024 s.
+Elo is each pairing's own (from the first agent's view); draws are repetition / 50 plies / one piece each.
+
+| pairing | + = − | score | Elo | 95% | draws: rep / 50 / one each | avg plies |
+|---|---|---:|---:|---|---|---:|
+| V10–V0 (ablation, for comparison) | +313 =87 −0 | 89.1% | +365 | [+332, +405] | 44 / 43 / 0 | 86.0 |
+| V10f–V0 | +354 =46 −0 | 94.2% | **+486** | [+443, +536] | 44 / **2** / 0 | 90.8 |
+| V10fs–V0 | +364 =36 −0 | 95.5% | **+531** | [+482, +590] | 36 / **0** / 0 | 83.4 |
+| V10–V9 (ladder, for comparison) | +196 =97 −107 | 61.1% | +79 | [+52, +104] | 6 / 35 / 56 | 106.0 |
+| V10f–V10 | +145 =109 −146 | 49.9% | −1 | [−23, +22] | 12 / 22 / 75 | 105.8 |
+| V10fs–V10 | +154 =128 −118 | 54.5% | **+31** | [+7, +56] | 12 / 51 / 65 | 103.4 |
+
+- **Against V0 the 50-ply draws are gone**: 43 → 2 with `f`, 0 with `fs=1`, and each becomes a win (V10f +41 wins,
+  V10fs +51; V0 still never wins). The draws left are repetitions: 44 and 36, as many as before. The agent sees a
+  repetition as a draw only from the first one and still cannot always avoid V0's.
+- **Against V10 the rules alone are worth nothing** (−1, interval across 0): the two agents play long endgames
+  against each other, and the draws only change kind. Progress pressure is worth **+31** [+7, +56], the only gain
+  against V10.
+- **Who is ahead in the 50-ply draws against V10** (material at the end, man 1 and king 2.5; the games played again
+  with `--log`, the same games): V10f 8 ahead, V10 2 ahead, 12 level, of 22; V10fs 16 ahead, V10 23 ahead, 12
+  level, of 51. With progress pressure the scaling works both ways: the side behind also sees its deficit shrink as
+  the count grows, so V10fs, when behind, steers for the 50-ply draw, and V10, which does not see the rule, lets it
+  happen. Some of the +31 comes from those saved games, not only from the wins it finishes.
+- `fs=1` also ends games sooner against V0 (83.4 plies against 90.8): it captures before the count grows, rather
+  than at the last moment.
+- In these games V10f and V10fs complete fewer plies per move (5.51 and 5.48 against V10's 5.88 in V10f–V10). On
+  the 541 fixed positions, where the count is 0, the depths are the same (5.83 and 5.77 against 5.86;
+  `examples/depth`). An iteration where every line ends in a draw or a loss reaches no leaf at the depth limit, and
+  iterative deepening stops there (see `iterative_deepening`), so near the 50-ply limit a move is decided at a small
+  depth that is already complete. Most likely that is the gap, not a weaker search; it is not measured move by move.
+
+### Scene 3 played on
+
+`cargo run --release --example scene -- fifty WHITE tuned [SEEDS] [--from PLY]` plays the scene's 67 moves (V10–V0,
+game 128, ply 67, Black to move) and lets the agents play on in a `Session`, as the site does. Black is always V0
+(`tuned`). "Site" seats both agents at ply 67 with seeds 1000 and 1001. "Game" seats them at ply 4 with the seeds of
+game 128 (`game128`), lets them think at every ply up to 67 (the recorded move is still played) and then play on.
+
+| White | site (seeds 1000/1001) | game (seeds of game 128, from ply 4) |
+|---|---|---|
+| V10 `idqrot` | draw, 50 plies, ply 77 | draw, 50 plies, ply 77: the stored game (63 of 63 moves the same) |
+| V10f `idqrotf` | **White wins**, ply 125 | **White wins**, ply 149 |
+| V10fs `idqrotf:fs=1` | **White wins**, ply 91 | **White wins**, ply 93 |
+
+V10 shuffles its kings at +11.25 until the count reaches 50. V10f sees the limit only when it is inside its horizon:
+at ply 74 it plays a4-a5 (+7.49), giving a man to start a capture series, and wins 51 plies later. V10fs feels the
+count from the start: at ply 68 it plays h5-b5 instead of a king shuffle, and Black's men fall within 24 plies.

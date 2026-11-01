@@ -1,0 +1,165 @@
+{
+  "meta": {
+    "commit": "mcts-1-9-ga49200d",
+    "date": "2026-11-01T09:36:29Z",
+    "settings": {
+      "schedule": "paired",
+      "opening_plies": 4,
+      "max_plies": 400,
+      "seed": 1,
+      "threads": 6,
+      "draws": "third repetition, 50 plies without a capture, one piece each, ply 400",
+      "ms_per_move": "measured with several games at once: not a measurement of speed"
+    },
+    "elo_model": "Bradley-Terry, maximum likelihood over all games (draws count as half a win), E = 1 / (1 + 10^(-(Ra - Rb) / 400)); self-play left out",
+    "elo_zero": "V10",
+    "mid_opponent": null,
+    "bootstrap": {
+      "samples": 1000,
+      "seed": 1,
+      "rng": "mulberry32",
+      "unit": "colour-swapped pairs of games, drawn again within each pairing",
+      "percentiles": [2.5, 97.5],
+      "diverged": 0
+    },
+    "diverged": [],
+    "wall_s": 1024.2
+  },
+  "versions": [
+    {
+      "id": "V10",
+      "tag": "v10-transposition-table",
+      "spec": "idqrot:n20000:w=texel1",
+      "label": "V10_TranspositionTable",
+      "adds": "transposition table (16 MB, Zobrist keys)",
+      "side": false,
+      "elo": 0,
+      "ci": [0, 0],
+      "avg_nodes_per_move": 19706.7,
+      "avg_depth": 5.882,
+      "ms_per_move": 51.716
+    },
+    {
+      "id": "V0",
+      "tag": "baseline",
+      "spec": "tuned",
+      "label": "V0_Baseline",
+      "adds": "one ply, U = 1/2.5/-0.05",
+      "side": false,
+      "elo": -492.5,
+      "ci": [-532.7, -457.3],
+      "avg_nodes_per_move": 8.6,
+      "avg_depth": 1,
+      "ms_per_move": 0.026
+    },
+    {
+      "id": "V10f",
+      "tag": "fifty-1",
+      "spec": "idqrotf:n20000:w=texel1",
+      "label": "V10_DrawRules",
+      "adds": "the 50-ply and one-piece-each rules in the search",
+      "side": false,
+      "elo": -1.9,
+      "ci": [-23.6, 19.4],
+      "avg_nodes_per_move": 19566.4,
+      "avg_depth": 5.513,
+      "ms_per_move": 54.381
+    },
+    {
+      "id": "V10fs",
+      "tag": "fifty-1",
+      "spec": "idqrotf:n20000:w=texel1:fs=1",
+      "label": "V10_ProgressPressure",
+      "adds": "the draw rules, and U scaled by (100 - quiet plies) / 100 at the depth limit",
+      "side": false,
+      "elo": 32.4,
+      "ci": [9.1, 55],
+      "avg_nodes_per_move": 19561.8,
+      "avg_depth": 5.479,
+      "ms_per_move": 54.406
+    }
+  ],
+  "pairings": [
+    {
+      "a": "V10f",
+      "b": "V10",
+      "roles": ["against"],
+      "games": 400,
+      "w": 145,
+      "d": 109,
+      "l": 146,
+      "score": 0.4988,
+      "elo_diff": -0.9,
+      "ci": [-23.5, 21.7],
+      "draws_by": {
+        "repetition": 12,
+        "fifty": 22,
+        "one_each": 75,
+        "ply_cap": 0
+      },
+      "no_move": 291,
+      "avg_plies": 105.8
+    },
+    {
+      "a": "V10f",
+      "b": "V0",
+      "roles": ["against"],
+      "games": 400,
+      "w": 354,
+      "d": 46,
+      "l": 0,
+      "score": 0.9425,
+      "elo_diff": 485.8,
+      "ci": [442.8, 535.8],
+      "draws_by": {
+        "repetition": 44,
+        "fifty": 2,
+        "one_each": 0,
+        "ply_cap": 0
+      },
+      "no_move": 354,
+      "avg_plies": 90.8
+    },
+    {
+      "a": "V10fs",
+      "b": "V10",
+      "roles": ["against"],
+      "games": 400,
+      "w": 154,
+      "d": 128,
+      "l": 118,
+      "score": 0.545,
+      "elo_diff": 31.4,
+      "ci": [6.9, 56.1],
+      "draws_by": {
+        "repetition": 12,
+        "fifty": 51,
+        "one_each": 65,
+        "ply_cap": 0
+      },
+      "no_move": 272,
+      "avg_plies": 103.4
+    },
+    {
+      "a": "V10fs",
+      "b": "V0",
+      "roles": ["against"],
+      "games": 400,
+      "w": 364,
+      "d": 36,
+      "l": 0,
+      "score": 0.955,
+      "elo_diff": 530.7,
+      "ci": [481.8, 589.5],
+      "draws_by": {
+        "repetition": 36,
+        "fifty": 0,
+        "one_each": 0,
+        "ply_cap": 0
+      },
+      "no_move": 364,
+      "avg_plies": 83.4
+    }
+  ],
+  "footnotes": []
+}
