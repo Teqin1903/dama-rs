@@ -20,6 +20,9 @@ const legalHi = Math.max(FACT(0).legal_per_position, FACT(1).legal_per_position)
 const capLo = Math.min(FACT(0).capture_share, FACT(1).capture_share);
 const capHi = Math.max(FACT(0).capture_share, FACT(1).capture_share);
 const V10V0 = ABP['V0'];
+// V11 = V10 with the game's draw rules in its search and progress pressure (results/fifty/fifty.json calls it V10fs).
+const FP = (a, b) => FIFTY.pairings.find((p) => p.a === a && p.b === b);
+const V11V0 = FP('V10fs', 'V0'), V11V10 = FP('V10fs', 'V10'), V10fV10 = FP('V10f', 'V10');
 
 // ---------- shared pieces ----------
 function card(x, y, w, h, o = {}) {
@@ -64,17 +67,17 @@ function backupChrome(label, title, A, foot) {
 // =====================================================================
 const S1 = {
   left: [
-    { y: 214, label: 'Week 03 · Assignment 1 · Ch 1–2', topic: 'Intelligent agents',
+    { y: 214, label: 'Assignment 1 · Ch 1–2', topic: 'Intelligent agents',
       items: ['A utility-based agent: U scores each board', 'Fully observable, deterministic, two players'] },
-    { y: 464, label: 'Weeks 04–05 · Assignment 2 · Ch 3', topic: 'Solving problems by searching',
+    { y: 464, label: 'Assignment 2 · Ch 3', topic: 'Solving problems by searching',
       items: ['Longest capture inside a move, by DFS', 'Move generator checked by perft, depths 1–8'] },
-    { y: 714, label: 'Weeks 06–07 · Assignment 3 · Ch 4', topic: 'Search in complex environments',
+    { y: 714, label: 'Assignment 3 · Ch 4', topic: 'Search in complex environments',
       items: ['Weights of U tuned by local search', 'What does not apply: chance, hiding, online'] },
   ],
   right: [
-    { y: 214, h: 390, label: 'Weeks 09–10 · Assignment 4 · Ch 6', topic: 'Adversarial search and games',
-      items: ['Minimax, then alpha–beta, then iterative deepening', 'Quiescence: captures past the depth limit', 'Repetitions, move ordering, transposition table', 'Rust: 20,000 positions a move, 5.7 plies deep', 'Monte Carlo tree search tried: below alpha–beta'] },
-    { y: 624, h: 340, label: 'Weeks 11–13 · Assignment 4 · Ch 19, 22, 23', topic: 'Learning',
+    { y: 214, h: 390, label: 'Assignment 4 · Ch 6', topic: 'Adversarial search and games',
+      items: ['Minimax, alpha–beta, iterative deepening, quiescence', 'Repetitions, move ordering, transposition table', 'V11: the 50-ply rule inside the search too', 'Rust: 20,000 positions a move, 5.7 plies deep', 'Measured, not kept: Monte Carlo, PVS, extensions'] },
+    { y: 624, h: 340, label: 'Assignment 4 · Ch 19, 22, 23', topic: 'Learning',
       items: ['Weights fitted to the results of 3,000 games', 'A better fit is not better play: games decide', 'Next: a network of our own, TD self-play'] },
   ],
 };
@@ -83,11 +86,11 @@ SCENES.push({
   notes: [
     'Our agent on one page. Assignments 1 to 3 gave it its frame: a utility-based agent, a move generator checked against a referee, and weights tuned by local search.',
     'This assignment adds the two cards on the right: adversarial search, from minimax to a transposition table, and weights learned from our own games.',
-    'The result: 672 Elo above minimax at three plies, and against our Assignment 3 agent 313 wins, 87 draws and no loss in 400 games.',
+    'The result: V10, the top of our ladder, is 672 Elo above minimax at three plies. V11 adds the game\'s draw rules to its search: against our Assignment 3 agent it won 364 of 400 games, drew 36 and lost none.',
   ],
   render(beat, t) {
     const A = mkA(beat, t);
-    chrome(1, 'Our agent on one page', A, `Elo: one Bradley–Terry fit of the 6,800 ladder games, 95% bootstrap interval (results/ladder/ladder.json). V10 against V0: results/ablation/ablation.json. 5.7 plies: V10's average, same file.`);
+    chrome(1, 'Our agent on one page', A, `Elo: one Bradley–Terry fit of the 6,800 ladder games, 95% bootstrap interval; 5.7 plies: V10's average (results/ladder/ladder.json). V11 against V0: results/fifty/fifty.json.`);
     const pa = A(0, 0, 0.5);
     T('Introduction to AI · Assignment 4 · Turkish draughts', 120, 176, { size: 22, c: C.ink2, a: pa });
     // team, top right
@@ -116,8 +119,8 @@ SCENES.push({
     boardBase(g, { a: A(0, 0, 0.6) });
     boardPieces(g, START, { a: A(0, 0.1, 0.6) });
     const ps = A(2, 0, 0.6);
-    bigStat(960, 640, eloTxt(VER.V10.elo), `Elo over minimax at 3 plies (V1), ${ciTxt(VER.V10.ci)}`, { a: ps, wrap: 380 });
-    bigStat(960, 838, `${V10V0.w}–${V10V0.d}–${V10V0.l}`, `wins, draws, losses against our A3 agent, ${V10V0.games} games`, { a: A(2, 0.25, 0.6), wrap: 380, c: C.turq });
+    bigStat(960, 640, eloTxt(VER.V10.elo), `Elo over minimax at 3 plies (V1), ${ciTxt(VER.V10.ci)}: V10, the top of the ladder`, { a: ps, wrap: 380 });
+    bigStat(960, 838, `${V11V0.w}–${V11V0.d}–${V11V0.l}`, `V11 against our A3 agent: wins, draws, losses in ${V11V0.games} games`, { a: A(2, 0.25, 0.6), wrap: 380, c: C.turq });
   },
 });
 
@@ -279,9 +282,9 @@ SCENES.push({
 // 4. Live demo
 // =====================================================================
 SCENES.push({
-  beats: [210],
+  beats: [190],
   notes: [
-    'Over to the demo (about three and a half minutes): user view, developer view, then the three scenes with keys 1, 2 and 3. Come back with the next slide.',
+    'Over to the demo (a little over three minutes): the user view, pointing at a move to see it on the board; the developer view; the search drawn as a tree with T; then the three scenes with keys 1, 2 and 3. Come back with the next slide.',
   ],
   render(beat, t) {
     const A = mkA(beat, t);
@@ -289,10 +292,10 @@ SCENES.push({
     const p1 = A(0, 0.1, 0.6), p2 = A(0, 0.3, 0.6), p3 = A(0, 0.5, 0.6);
     card(120, 220, 800, 460, { a: p1 });
     T('User view', 160, 280, { f: 'serif', size: 36, a: p1 });
-    ['The moves it considered, each with its value', 'Upper bounds: what alpha–beta never had to finish', 'Why it plays the one it plays, and the line it expects', 'Five opponents: our versions V0, V2, V6, V8 and V10'].forEach((s, k) => checkItem(160, 350 + k * 70, s, { size: 23, a: p1 }));
+    ['The moves it considered, each with its value', 'Upper bounds: what alpha–beta never had to finish', 'Why it plays the one it plays, and the line it expects', 'Point at any move: the board shows it', 'Five opponents: our versions V0, V2, V6, V8 and V10'].forEach((s, k) => checkItem(160, 345 + k * 62, s, { size: 23, a: p1 }));
     card(1000, 220, 800, 460, { a: p2, stroke: C.cobalt, lw: 2.5 });
     T('Developer view', 1040, 280, { f: 'serif', size: 36, a: p2 });
-    ['Search: iterative deepening, one row per depth', 'Tree: any node, with its window and its cutoffs', 'Evaluation: each feature, each piece', 'What if: switch a part off in this very position'].forEach((s, k) => checkItem(1040, 350 + k * 70, s, { size: 23, a: p2 }));
+    ['Search: iterative deepening, one row per depth', 'The search drawn as a tree (T): windows, cutoffs', 'Evaluation: each feature, each piece', 'What if: switch a part off in this very position'].forEach((s, k) => checkItem(1040, 345 + k * 62, s, { size: 23, a: p2 }));
     T('Scenes from our own games', 120, 760, { size: 24, w: 600, a: p3 });
     [['1', 'One ply is blind'], ['2', 'Quiescence and the horizon'], ['3', 'Ahead, and still a draw']].forEach(([k, s], i) => {
       const x = 120 + i * 560;
@@ -383,15 +386,15 @@ const S6 = {
   boxes: [
     { x: 120, title: '3,000 games', text: 'four of our agents, round robin', ch: '' },
     { x: 560, title: 'quiet positions', text: 'labelled with the result: 1, ½, 0', ch: 'Ch 23: value from the outcome' },
-    { x: 1000, title: 'fit σ(K · w · f)', text: 'squared error; every fifth pair kept for validation', ch: 'Ch 19: regression' },
+    { x: 1000, title: 'fit σ(K · w · f)', text: 'squared error, every fifth pair held out; one sigmoid unit (Ch\u00a022)', ch: 'Ch 19: regression' },
     { x: 1440, title: 'texel1', text: 'one weight at a time, ± a step', ch: 'Ch 4: local search' },
   ],
   weights: [['king', 2.5134], ['cen', -0.3085], ['back', -0.3041], ['adv', 0.0831], ['qmob', 0.0813], ['edge', -0.0226], ['mob', 0.0148]],
 };
 SCENES.push({
-  beats: [24, 22],
+  beats: [28, 22],
   notes: [
-    'The Texel weights are our learning part. Each quiet position of 3,000 games gets the game result as its label, so its value is estimated from how the game ended: direct utility estimation, chapter 23. We fit a sigmoid of the evaluation to those labels, regression from chapter 19, with a local search over the weights from chapter 4.',
+    'The Texel weights are our learning part. Each quiet position of 3,000 games gets the game result as its label, so its value is estimated from how the game ended: direct utility estimation, chapter 23. We fit a sigmoid of the evaluation to those labels, regression from chapter 19, with a local search over the weights from chapter 4. That sigmoid is a single unit of the networks of chapter 22: a network of our own would put hidden units in front of it.',
     'The validation error hardly moved, yet the agent gained 250 Elo. And a second tuning on 6,000 games fitted better and played 120 worse. The loss is only a stand-in: games decide.',
   ],
   render(beat, t) {
@@ -436,45 +439,79 @@ SCENES.push({
 });
 
 // =====================================================================
-// 7. Where this leads: deep and reinforcement learning (literature)
+// 7. After the ladder: the 50-ply rule, found in our games and taught to the search (V11)
 // =====================================================================
-const S7 = [
-  { year: 1959, name: 'Samuel', what: 'checkers: weights learned by playing itself', ch: 'Ch 23' },
-  { year: 1995, name: 'TD-Gammon', what: 'TD(λ) trains a neural network by self-play', ch: 'Ch 22, 23' },
-  { year: 2000, name: 'KnightCap', what: 'TD-Leaf: TD learning at alpha–beta leaves', ch: 'Ch 23' },
-  { year: 2007, name: 'Chinook', what: 'checkers solved: alpha–beta and endgame databases', ch: 'Ch 6' },
-  { year: 2015, name: 'Scan', what: 'draughts: alpha–beta, patterns from self-play', ch: 'Ch 6, 19' },
-  { year: 2018, name: 'AlphaZero', what: 'self-play; a deep network guides MCTS', ch: 'Ch 22, 23' },
-  { year: 2018, name: 'NNUE', what: 'a small network inside alpha–beta', ch: 'Ch 22' },
-];
+// Scene 3 played on (examples/scene.rs, site seeds 1000/1001): docs/ladder.md, "Scene 3 played on".
+const SCENE3 = { from: 67, draw: 77, win: 91 };
 SCENES.push({
-  beats: [16, 12],
+  beats: [15, 15, 16, 10],
   notes: [
-    'Where this leads, from the literature. Samuel learned checkers weights by self-play in 1959; TD-Gammon and KnightCap learned by temporal differences; Scan, a top draughts engine, still uses alpha–beta with patterns learned from its own games; AlphaZero and NNUE brought deep networks.',
-    'Our Texel weights sit next to Samuel and Scan. Our next steps follow the arrows: TD learning by self-play, chapter 23, and a small NNUE-style network trained on our positions, chapter 22.',
+    `After the ladder we went back to the games. Against our Assignment 3 agent, ${V10V0.draws_by.fifty} of V10's ${V10V0.d} draws came from the 50-ply rule, which the game applied and the search did not. That is scene 3: a man and two kings ahead, and a draw ten plies later.`,
+    'So the search learned the rule: after 50 quiet plies, or with one piece each, a position is a draw inside the search too. And progress pressure: a lead counts for less as the count grows, so the side ahead captures before the rule takes it away.',
+    `Against our A3 agent the 50-ply draws went from ${V10V0.draws_by.fifty} to none: ${V11V0.w} wins, ${V11V0.d} draws, no loss. Against V10 the rules alone change nothing; with progress pressure, plus ${r0(V11V10.elo_diff)} Elo, interval ${Math.round(V11V10.ci[0])} to ${Math.round(V11V10.ci[1])}, partly from games it saves when behind. That agent is V11.`,
+    'We also tried two classic refinements on V11: principal variation search with aspiration windows, and an extension for forced captures. Neither paid off, so V11 stayed as it is.',
   ],
   render(beat, t) {
     const A = mkA(beat, t);
-    chrome(7, 'Where it leads: deep and reinforcement learning', A, 'Samuel 1959 (IBM J. Res. Dev.); Tesauro 1995 (CACM); Baxter, Tridgell & Weaver 2000 (Machine Learning); Schaeffer et al. 2007 (Science); Scan (F. Letouzey; Computer Olympiad 2015); Silver et al. 2018 (Science); Nasu 2018 (NNUE).');
-    const pa = A(0, 0, 0.6);
-    const x0 = 255, x1 = 1665, yl = 520;
-    seg(x0 - 40, yl, x1 + 40, yl, C.ink3, 2, pa);
-    S7.forEach((m, i) => {
-      const x = x0 + (i * (x1 - x0)) / (S7.length - 1), up = i % 2 === 0;
-      const p = A(0, 0.15 + 0.1 * i, 0.6);
-      fillCircle(x, yl, 10, C.cobalt, p);
-      seg(x, yl + (up ? -14 : 14), x, yl + (up ? -76 : 76), C.hair, 2, p);
-      const yt = up ? yl - 226 : yl + 76;
-      card(x - 135, yt, 270, 150, { a: p });
-      T(String(m.year), x - 110, yt + 38, { size: 18, w: 600, c: C.cobalt, a: p });
-      T(m.name, x - 110, yt + 72, { f: 'serif', size: 26, a: p });
-      TW(m.what, x - 110, yt + 102, 225, 21, { size: 16, c: C.ink2, a: p });
-      tag(m.ch, x + 112, yt + 32, { size: 14, fill: 'rgba(39,71,163,0.10)', c: C.cobalt, al: 'right', a: p });
+    chrome(7, 'After the ladder: the 50-ply rule, found and fixed', A, `V10 against V0: results/ablation/ablation.json. V11 (V10fs there) and V10f: results/fifty/fifty.json (${FIFTY.meta.commit}), 400 games a pairing. Scene 3 played on: docs/ladder.md. PVS and the extension: results/arena.csv, docs/decisions.md.`);
+    const y0 = 214, H = 540;
+    // what the games showed
+    const p1 = A(0, 0.1, 0.6), x1 = 120;
+    card(x1, y0, 520, H, { a: p1 });
+    T('What the games showed', x1 + 36, y0 + 52, { f: 'serif', size: 30, a: p1 });
+    T(`${V10V0.draws_by.fifty} of ${V10V0.d}`, x1 + 36, y0 + 150, { f: 'serif', size: 72, c: C.cobalt, a: p1 });
+    TW(`of V10's draws against our A3 agent ended by the 50-ply rule; the other ${V10V0.draws_by.repetition} by repetition (${V10V0.games} games).`, x1 + 36, y0 + 196, 450, 28, { size: 20, c: C.ink2, a: p1 });
+    seg(x1 + 36, y0 + 300, x1 + 484, y0 + 300, C.hair, 1.5, p1);
+    T(`Scene 3, ply ${SCENE3.from}`, x1 + 36, y0 + 346, { size: 20, w: 600, a: p1 });
+    TW(`V10 is a man and two kings ahead, and it is a draw at ply ${SCENE3.draw}: the game applied the rule, its search did not.`, x1 + 36, y0 + 382, 450, 28, { size: 20, a: p1 });
+    // the fix
+    const p2 = A(1, 0.1, 0.6), x2 = 700;
+    card(x2, y0, 520, H, { a: p2 });
+    T('Two lines in the search', x2 + 36, y0 + 52, { f: 'serif', size: 30, a: p2 });
+    checkItem(x2 + 36, y0 + 118, 'f: after 50 quiet plies, or with one piece each, a position is a draw inside the search too', { size: 20, wrap: 420, a: p2 });
+    checkItem(x2 + 36, y0 + 210, 'fs: progress pressure, U × (100 − q) / 100 at the depth limit', { size: 20, wrap: 420, a: p2 });
+    T('what a lead counts for after q quiet plies', x2 + 36, y0 + 300, { size: 17, w: 600, c: C.ink3, a: p2 });
+    const qs = [0, 10, 20, 30, 40, 49], bw = 46, step = 62, bx0 = x2 + 48, base = y0 + 462, hmax = 110;
+    qs.forEach((q, i) => {
+      const m = (100 - q) / 100, h = m * hmax, x = bx0 + i * step;
+      ctx.save(); ctx.globalAlpha = p2; rr(x, base - h, bw, h, 6); ctx.fillStyle = C.cobalt; ctx.fill(); ctx.restore();
+      T(m.toFixed(2), x + bw / 2, base - h - 8, { size: 15, f: 'mono', c: C.ink2, al: 'center', a: p2 });
+      T(String(q), x + bw / 2, base + 22, { size: 15, c: C.ink3, al: 'center', a: p2 });
     });
-    const pu = A(1, 0, 0.6);
-    card(120, 820, 1680, 150, { a: pu, stroke: C.cobalt, lw: 2.5 });
-    T('Us', 156, 876, { f: 'serif', size: 32, a: pu });
-    TW('Texel weights fitted to game results: the idea of Samuel and Scan. Next: TD learning by self-play (Ch 23), and a small NNUE-style network trained on the same positions (Ch 22), each measured against V10.', 260, 868, 1500, 30, { size: 22, c: C.ink, a: pu });
+    const x50 = bx0 + qs.length * step;
+    seg(x50, base, x50 + bw, base, C.coral, 4, p2);
+    T('draw', x50 + bw / 2, base - 10, { size: 15, w: 600, c: C.coral, al: 'center', a: p2 });
+    T('50', x50 + bw / 2, base + 22, { size: 15, c: C.coral, al: 'center', a: p2 });
+    T('the side ahead captures before the count runs out', x2 + 36, y0 + 516, { size: 18, c: C.ink2, a: p2 });
+    // measured
+    const p3 = A(2, 0.1, 0.6), x3 = 1280;
+    card(x3, y0, 540, H, { a: p3, stroke: C.cobalt, lw: 2.5 });
+    T('Measured: V11', x3 + 36, y0 + 52, { f: 'serif', size: 30, a: p3 });
+    T(`against our A3 agent, ${V11V0.games} games each`, x3 + 36, y0 + 102, { size: 17, w: 600, c: C.ink3, a: p3 });
+    [['V10', V10V0, C.ink], ['V11', V11V0, '#0F6E68']].forEach(([name, p, c], i) => {
+      const y = y0 + 144 + i * 40;
+      T(name, x3 + 36, y, { size: 22, w: 600, c, a: p3 });
+      T(`${p.w}–${p.d}–${p.l}`, x3 + 110, y, { size: 22, f: 'mono', c, a: p3 });
+      T(p.draws_by.fifty ? `${p.draws_by.fifty} draws by the 50-ply rule` : 'none by the 50-ply rule', x3 + 290, y, { size: 18, c: C.ink2, a: p3 });
+    });
+    seg(x3 + 36, y0 + 214, x3 + 504, y0 + 214, C.hair, 1.5, p3);
+    T(`against V10, ${V11V10.games} games each`, x3 + 36, y0 + 254, { size: 17, w: 600, c: C.ink3, a: p3 });
+    T('the rules alone (f)', x3 + 36, y0 + 294, { size: 20, a: p3 });
+    T(`${eloTxt(V10fV10.elo_diff)} Elo, interval across 0`, x3 + 504, y0 + 294, { size: 20, c: C.ink2, al: 'right', a: p3 });
+    T('with progress pressure', x3 + 36, y0 + 334, { size: 20, w: 600, a: p3 });
+    T(`${eloTxt(V11V10.elo_diff)} Elo ${ciTxt(V11V10.ci)}`, x3 + 504, y0 + 334, { size: 22, w: 600, c: '#0F6E68', al: 'right', a: p3 });
+    seg(x3 + 36, y0 + 364, x3 + 504, y0 + 364, C.hair, 1.5, p3);
+    T('scene 3 played on', x3 + 36, y0 + 402, { size: 17, w: 600, c: C.ink3, a: p3 });
+    T(`V10: draw at ply ${SCENE3.draw} · V11: wins at ply ${SCENE3.win}`, x3 + 36, y0 + 436, { size: 20, a: p3 });
+    TW('Part of the gain is games saved: when behind, the same pressure steers V11 to the 50-ply draw.', x3 + 36, y0 + 482, 468, 24, { size: 17, c: C.ink3, a: p3 });
+    // also measured on V11, not kept
+    const p4 = A(3, 0.1, 0.6), X = EXPERIMENTS;
+    card(120, 786, 1700, 176, { a: p4, dash: [8, 6] });
+    T('Also tried on V11: measured, not kept', 156, 830, { size: 22, w: 600, a: p4 });
+    T('Principal variation search, aspiration windows', 156, 874, { size: 20, w: 600, a: p4 });
+    TW(`The same decisions from 4–6% fewer nodes: ${eloTxt(X.pvs.elo)}\u00a0±\u00a0${r0(X.pvs.pm)}\u00a0Elo after ${fmt(X.pvs.games)} games, no verdict.`, 156, 908, 780, 26, { size: 19, c: C.ink2, a: p4 });
+    T('An extension for forced captures', 990, 874, { size: 20, w: 600, a: p4 });
+    TW(`99.9% of single replies are captures. 3 times the nodes: SPRT ${X.ext.sprt} after ${fmt(X.ext.games)} games, ${eloTxt(X.ext.elo)}\u00a0±\u00a0${r0(X.ext.pm)}\u00a0Elo.`, 990, 908, 800, 26, { size: 19, c: C.ink2, a: p4 });
   },
 });
 
@@ -484,17 +521,17 @@ SCENES.push({
 SCENES.push({
   beats: [18, 6],
   notes: [
-    'Next steps. The search does not apply the 50-ply rule, which ended 43 of V10\'s 87 draws against our Assignment 3 agent: that was scene 3. Repetitions are worth nothing measurable now, and we want to know why. Then Monte Carlo with what the plain forms lacked, our own network, TD self-play, and play on the clock.',
+    'Next steps. A network of our own and TD self-play, chapters 22 and 23, on the positions we already have. Why repetitions stopped mattering. Monte Carlo with what the plain forms lacked. A deeper search where it pays, now that PVS and the extension did not. And play on the clock.',
     'Thank you. We are happy to take questions.',
   ],
   render(beat, t) {
     const A = mkA(beat, t);
-    chrome(8, 'Next steps', A, 'Draws of V10 against V0 by kind and Elo of each part: results/ablation/ablation.json. Repetitions when added: V6 against V4, results/ladder/ladder.json.');
+    chrome(8, 'Next steps', A, 'Repetitions when added: V6 against V4, results/ladder/ladder.json; now: results/ablation/ablation.json. PVS and the extension: docs/decisions.md.');
     const items = [
-      ['The 50-ply rule in the search', `It ended ${V10V0.draws_by.fifty} of V10's ${V10V0.d} draws against V0 (scene 3); the other ${V10V0.draws_by.repetition} were repetitions.`],
+      ['A network of our own, and TD self-play', 'Ch 22 and 23, trained on the positions we already have.'],
       ['Why repetitions stopped mattering', `${eloTxt(VER.V6.elo - VER.V4.elo)} Elo when added (V4 → V6), ${r0(-ABV['V10-r'].elo)} now, not significant.`],
       ['Monte Carlo, given what it lacked', 'Repetitions, a table, more iterations, a tuned exploration constant.'],
-      ['A network of our own, and TD self-play', 'Ch 22 and 23, trained on the positions we already have.'],
+      ['Deeper where it pays', 'PVS and the forced-capture extension did not; next, late move reductions.'],
       ['Play on the clock', 'A time limit instead of 20,000 positions a move.'],
     ];
     items.forEach(([h, s], k) => {
@@ -548,14 +585,8 @@ SCENES.push({
     const pa = A(0, 0.1, 0.6);
     const S = [
       'Russell, S. & Norvig, P. (2021). Artificial Intelligence: A Modern Approach, 4th ed., Global Edition. Pearson. Ch 1–4, 6 (§6.4 Monte Carlo tree search), 19, 22, 23.',
-      'Samuel, A. L. (1959). Some studies in machine learning using the game of checkers. IBM Journal of Research and Development 3(3), 210–229.',
-      'Tesauro, G. (1995). Temporal difference learning and TD-Gammon. Communications of the ACM 38(3), 58–68.',
-      'Baxter, J., Tridgell, A. & Weaver, L. (2000). Learning to play chess using temporal differences. Machine Learning 40(3), 243–263.',
-      'Schaeffer, J. et al. (2007). Checkers is solved. Science 317(5844), 1518–1522.',
       'Ramanujan, R., Sabharwal, A. & Selman, B. (2010). On adversarial search spaces and sampling-based planning. ICAPS 2010.',
-      'Silver, D. et al. (2018). A general reinforcement learning algorithm that masters chess, shogi, and Go through self-play. Science 362(6419), 1140–1144.',
-      'Nasu, Y. (2018). Efficiently updatable neural-network-based evaluation functions for computer shogi (NNUE).',
-      'Österlund, P. (2014). Texel\'s tuning method. Chess Programming Wiki. · Letouzey, F. Scan, a draughts engine: won the 18th Computer Olympiad, Leiden 2015 (Chess Programming Wiki, Draughts); “traditional alpha–beta”, patterns from self-play (lidraughts.org blog).',
+      'Österlund, P. (2014). Texel\'s tuning method. Chess Programming Wiki.',
       'Bradley, R. A. & Terry, M. E. (1952). Rank analysis of incomplete block designs. Biometrika 39(3/4), 324–345. · kish 1.1.2 (rules referee).',
     ];
     let y = 220;

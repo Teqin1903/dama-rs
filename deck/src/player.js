@@ -65,7 +65,7 @@
   setInterval(tickClock, 500);
 
   function printScript() {
-    const titles = ['Our agent on one page', 'Since Assignment 3: ten versions on one scale', 'Ablation: switch one part off', 'Live demo', 'Why alpha–beta, and not Monte Carlo tree search?', 'Learning the weights from our own games', 'Where it leads: deep and reinforcement learning', 'Next steps'];
+    const titles = ['Our agent on one page', 'Since Assignment 3: ten versions on one scale', 'Ablation: switch one part off', 'Live demo', 'Why alpha–beta, and not Monte Carlo tree search?', 'Learning the weights from our own games', 'After the ladder: the 50-ply rule, found and fixed', 'Next steps'];
     let cum = 0; const mmss = (x) => `${Math.floor(x / 60)}:${String(Math.round(x % 60)).padStart(2, '0')}`;
     const rows = SCENES.slice(0, SLIDE_COUNT).map((sc, i) => {
       const items = sc.notes.map((n, j) => { cum += sc.beats[j]; return `<li>${n} <small>(${Math.round(sc.beats[j])} s, by ${mmss(cum)})</small></li>`; }).join('');
@@ -73,7 +73,7 @@
     }).join('');
     const w = window.open('', '_blank');
     if (!w) return;
-    w.document.write(`<!doctype html><meta charset="utf-8"><title>Speaker script</title><style>body{font:16px/1.5 system-ui,sans-serif;max-width:760px;margin:32px auto;padding:0 16px;color:#18223D}h1{font-size:24px}h2{font-size:18px;margin:22px 0 6px}li{margin:4px 0}small{color:#7E879B}</style><h1>Speaker script: Turkish draughts, search measured (Team Eight Bits, pair 42)</h1><p>One numbered line = one press of the right arrow. Target: about 8 and a half minutes with the demo, leaving time for questions (11 minutes in all).</p>${rows}`);
+    w.document.write(`<!doctype html><meta charset="utf-8"><title>Speaker script</title><style>body{font:16px/1.5 system-ui,sans-serif;max-width:760px;margin:32px auto;padding:0 16px;color:#18223D}h1{font-size:24px}h2{font-size:18px;margin:22px 0 6px}li{margin:4px 0}small{color:#7E879B}</style><h1>Speaker script: Turkish draughts, search measured (Team Eight Bits, pair 42)</h1><p>One numbered line = one press of the right arrow. Target: about 9 minutes with the demo, leaving 2 for questions (11 minutes in all).</p>${rows}`);
     w.document.close();
   }
   function hideHint() { hintEl.style.opacity = '0'; }
