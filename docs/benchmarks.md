@@ -253,3 +253,101 @@ taskset -c 2 target/release/examples/depth idqrotf:n20000:w=texel1:fs=1 idqrotfp
 systemd-inhibit target/release/dama arena idqrotfp:n20000:w=texel1:fs=1:asp=0.5 idqrotf:n20000:w=texel1:fs=1 \
     --sprt --threads 6 --seed 1
 ```
+
+## Single-reply extension
+
+The letter `x` (docs/decisions.md, `engine/src/search.rs`, code in 2d70171) changes decisions, so the arena is what judges it;
+the numbers here say what it costs. V11 is `idqrotf:n20000:w=texel1:fs=1`, V11+x is `idqrotfx:n20000:w=texel1:fs=1`.
+
+### How often it applies
+
+`examples/forced`, on the 541 fixed positions and on the positions of the 200 games of the match below after their 4 random
+opening plies. Positions with a move only. The extension applies below the root and above the depth limit; these shares are of
+positions as they are, not of the search's nodes.
+
+| positions | with a move | single legal move | share | capture | capture, of single | king's move | sideways | forward | capture, of all |
+|---|---|---|---|---|---|---|---|---|---|
+| 541 fixed | 541 | 158 | 29.21% | 158 | 100.0% | 0 | 0 | 0 | 29.21% |
+| 200 games | 20568 | 3136 | 15.25% | 3133 | 99.9% | 0 | 3 | 0 | 15.23% |
+
+What we left out, the quiet single moves, is 3 positions in 3136: in this game a side with a single move is nearly always a
+side that must capture.
+
+### Nodes and time at a fixed depth
+
+541 positions, each with its own weights; 3 samples, the median sample's time.
+
+| search | nodes per move | µs per move | slowest position, µs |
+|---|---|---|---|
+| ab6ot | 14795.9 | 28826.2 | 258765 |
+| ab6otx | 45123.0 | 96151.6 | 1175778 |
+
+`x` costs 3.05 times the nodes and 3.34 times the time at this depth: a forced capture keeps its whole draft for the
+position after it, and captures come in chains.
+
+### Depth within 20,000 nodes
+
+541 positions with V11's weights, no game history, a table emptied before each position; nodes per move 19224 in both rows.
+Extended nodes and seldepth come from a second pass with a tracer; seldepth is the deepest ply a line reached in a search,
+all iterations together, quiescence included.
+
+| agent | mean depth | sum of depths | mean depth, not proved | proved | extended nodes per move | share of nodes | mean seldepth | highest seldepth | ms per move |
+|---|---|---|---|---|---|---|---|---|---|
+| V11 | 5.774 | 3124 | 5.97 | 21 | 0 | 0 | 10.37 | 16 | 38.72 |
+| V11+x | 5.089 | 2753 | 5.25 | 21 | 526.1 | 2.74% | 11.72 | 17 | 31.63 |
+
+A completed depth with `x` is not one without: its forced lines are longer, so these depths do not compare as they stand. The
+times do not compare either: nodes are equal, and V11's row ran first (32.04 ms for the same agent in the section above).
+
+On the positions of 200 random games (12056 different positions, `ab6qrotx` with texel1) every search ended, and the deepest line
+was 21 plies, against the bound of depth + 31 = 37 (`searches_end_on_the_positions_of_random_games`, with `--nocapture`).
+
+### Arena
+
+Both matches seed 1, paired schedule, 6 threads (`results/arena.csv`, version `mcts-1-14-g2d70171`).
+
+| match | games | V11+x: + = − | score | Elo of V11+x over V11 (95%) | SPRT | time |
+|---|---|---|---|---|---|---|
+| fixed games, for `forced` | 200 | +74 =48 −78 | 49.00% | | | 162 s |
+| SPRT, default bounds | 382 | +133 =100 −149 | 47.91% | −14.6 ± 25.3 | H0, LLR −2.954 within ±2.944 | 310 s |
+
+H0 says V11+x is not 20 Elo stronger than V11. It does not say that it is weaker: the interval (−39.9, +10.7) holds 0.
+
+### Where it decides otherwise
+
+`ab4qox:w=texel1` and `ab4qo:w=texel1` have no best move in common in 3329 of the 17432 positions of those games with more than
+one move (19.10%). A clear one: game 72 of the 200-game match, ply 4 (the first move after the opening, counting from 0), White
+to move, with V11+x as White:
+
+```
+......../bbbbbbbb/b.bbbb.b/.b....../......b./wwwwww.w/wwwwwwww/........
+```
+
+| move | value at depth 4 with `x` | value at depth 4 without |
+|---|---|---|
+| f3-f4 (best with `x`) | −0.0140 | −2.7595 |
+| h3-h4 (best without) | −1.4213 | −1.6211 |
+
+Each value comes from searching that move alone, so it is exact. The line with `x`, `!` for a capture that spent no ply: f3-f4 g4xe4! e3xe5!
+e6xe4! d3-d4 e4xc4! c3xc5xa5! a6xa4! a3xa5! b7-b6 g2-g3. Without `x` the search stops after e6xe4, two men down with no capture to
+look at, and does not see d3-d4 win them back: the horizon effect. White played f3-f4 in that game, and the game follows this line
+at least up to a6xa4. Black, V11, won the game in the end, at ply 104.
+
+### Machine and method
+
+- CPU: Intel Core i7-9750H @ 2.60GHz (laptop), pinned to CPU 2 with `taskset -c 2`; frequency governor
+  `powersave` (intel_pstate); load average 1.7 to 2.7 during the run, nothing else of ours running.
+- OS: CachyOS, Linux 7.2.9-1-cachyos. Rust: rustc 1.99.1, `cargo build --release`.
+- The fixed-depth searches ran from 22:56 to 23:00, the depth runs from 23:00 to 23:02, UTC+3, 2026-11-01.
+
+### Reproduce
+
+```
+cargo build --release --all-targets
+taskset -c 2 target/release/examples/search ab6ot ab6otx
+taskset -c 2 target/release/examples/depth idqrotf:n20000:w=texel1:fs=1 idqrotfx:n20000:w=texel1:fs=1
+target/release/dama arena idqrotfx:n20000:w=texel1:fs=1 idqrotf:n20000:w=texel1:fs=1 --games 200 --seed 1 --threads 6 --log games.tsv
+taskset -c 2 target/release/examples/forced games.tsv
+systemd-inhibit target/release/dama arena idqrotfx:n20000:w=texel1:fs=1 idqrotf:n20000:w=texel1:fs=1 --sprt --threads 6 --seed 1
+cargo test --release -p engine --test extension -- --ignored --nocapture searches_end
+```
