@@ -25,7 +25,7 @@ for a moment, then the piece moves. A longer search (a time budget, depth 8) set
 plays fast.
 
 Point at a move anywhere on the page (the moves considered, the expected line, the game record, the search
-tables, the tree) and the board shows it with an arrow, from the position where it was considered; a banner
+tables, the tree, the capture routes to choose from) and the board shows it with an arrow, from the position where it was considered; a banner
 names it. Move away and the game comes back.
 
 ## The search tree as a picture

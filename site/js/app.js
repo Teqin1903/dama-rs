@@ -257,9 +257,11 @@
     }
   }
   async function humanPlay(mv) {
-    app.sel = null; app.routes = null;
+    app.sel = null; app.routes = null; app.hoverPreview = null; app.hoverEl = null;
     render();
+    app.animating = true;
     await app.board.animate(mv, 180);
+    app.animating = false;
     app.eng.call('play', mv.move);
     app.decisions.push({ side: app.st.turn, human: true, move: mv, ply: app.st.ply });
     refresh(); render();
@@ -309,6 +311,8 @@
     for (const m of app.routes) {
       const b = document.createElement('button');
       b.className = 'btn mono'; b.textContent = m.move;
+      // Pointing at a route draws it on the board (see hoverOn).
+      Object.assign(b.dataset, { hv: '', ply: String(app.st.ply), line: '', mv: m.move, title: `Capture route ${m.move}` });
       b.addEventListener('click', () => humanPlay(m));
       box.appendChild(b);
     }
@@ -324,6 +328,7 @@
     if (app.mode === 'user') renderUser(); else renderDev();
     renderRecord();
     renderScene();
+    renderRoutes(); // the capture-route chooser follows app.routes: it closes once a route is played
     dropStaleHover();
   }
   function renderControls() {
