@@ -96,6 +96,7 @@ fn a_session_plays_the_arenas_games() {
     replay_arena_games("mm2", "idq:n1000", 2);
     replay_arena_games("idqrotf:n2000:w=texel1:fs=1", "ab3qf", 2);
     replay_arena_games("idqrotfp:n2000:w=texel1:fs=1:asp=0.5", "ab3qrp", 2);
+    replay_arena_games("idqrotfx:n2000:w=texel1:fs=1", "ab3qrx", 2);
 }
 
 #[test]
@@ -191,6 +192,21 @@ fn recorded(label: &str, decision: &Decision, recorder: &Recorder) {
     assert_eq!(tree.nodes.len() as u64, tree.nodes_total, "{label}");
     assert_eq!(tree.nodes[0].sub, tree.nodes_total, "{label}");
     assert_eq!(tree.nodes[0].exit, 2 * tree.nodes_total - 1, "{label}");
+    // A forced capture spends no ply, and every other move above the depth limit spends one.
+    for node in &tree.nodes {
+        for &c in &node.children {
+            let child = &tree.nodes[c];
+            if child.extended {
+                assert!(node.parent.is_some(), "{label}: the root does not extend");
+                assert!(node.draft >= 1 && node.legal == 1, "{label}");
+                assert!(child.mv.as_ref().unwrap().is_capture(), "{label}");
+                assert_eq!(child.draft, node.draft, "{label}");
+            } else {
+                assert_eq!(child.draft, node.draft.saturating_sub(1), "{label}");
+            }
+            assert!(!child.quiescence || node.draft == 0, "{label}");
+        }
+    }
     // A move that enters twice under its parent is a scout, then a research.
     for node in &tree.nodes {
         for pair in node.children.windows(2) {
@@ -299,16 +315,20 @@ fn a_traced_search_is_the_untraced_search() {
             leaves_are_static_values(&label, &board, side, weights, &r);
         }
 
-        for (quiescence, order, pvs) in [
-            (false, false, false),
-            (true, true, false),
-            (false, false, true),
-            (true, true, true),
+        for (quiescence, order, pvs, extend) in [
+            (false, false, false, false),
+            (true, true, false, false),
+            (false, false, true, false),
+            (true, true, true, false),
+            (false, false, false, true),
+            (true, true, false, true),
+            (true, true, true, true),
         ] {
             let options = SearchOptions {
                 quiescence,
                 order,
                 pvs,
+                extend,
                 ..SearchOptions::default()
             };
             let mut r = recorder();
@@ -350,17 +370,22 @@ fn a_traced_search_is_the_untraced_search() {
                 from_depth: 2,
             })
         };
-        for (w, order, table, draws, pvs, aspiration) in [
-            (weights, false, false, None, false, None),
-            (texel1, true, true, None, false, None),
-            (texel1, true, true, near(false), false, None),
-            (texel1, true, true, near(true), false, None),
-            (weights, false, false, None, true, None),
-            (texel1, true, true, near(true), true, None),
-            (weights, false, false, None, false, window(1e-6)),
-            (texel1, true, true, None, false, window(0.1)),
-            (texel1, true, true, near(true), true, window(1e-6)),
-            (texel1, true, true, None, true, window(0.5)),
+        for (w, order, table, draws, pvs, aspiration, extend) in [
+            (weights, false, false, None, false, None, false),
+            (texel1, true, true, None, false, None, false),
+            (texel1, true, true, near(false), false, None, false),
+            (texel1, true, true, near(true), false, None, false),
+            (weights, false, false, None, true, None, false),
+            (texel1, true, true, near(true), true, None, false),
+            (weights, false, false, None, false, window(1e-6), false),
+            (texel1, true, true, None, false, window(0.1), false),
+            (texel1, true, true, near(true), true, window(1e-6), false),
+            (texel1, true, true, None, true, window(0.5), false),
+            (weights, false, false, None, false, None, true),
+            (texel1, true, true, None, false, None, true),
+            (texel1, true, true, near(false), false, None, true),
+            (texel1, true, true, near(true), false, None, true),
+            (texel1, true, true, None, true, window(0.5), true),
         ] {
             let options = SearchOptions {
                 quiescence: true,
@@ -368,6 +393,7 @@ fn a_traced_search_is_the_untraced_search() {
                 draws,
                 pvs,
                 aspiration,
+                extend,
             };
             let mut tables = (
                 table.then(|| Table::new(small)),
@@ -416,10 +442,11 @@ fn a_principal_variation_after_a_research_leads_to_its_value() {
         if board.legal_moves(side).is_empty() {
             continue;
         }
-        for pvs in [false, true] {
+        for (pvs, extend) in [(false, false), (true, false), (false, true), (true, true)] {
             let options = SearchOptions {
                 quiescence: true,
                 pvs,
+                extend,
                 ..SearchOptions::default()
             };
             let mut r = recorder();
@@ -440,7 +467,7 @@ fn a_principal_variation_after_a_research_leads_to_its_value() {
                 assert_eq!(
                     leaf.to_bits(),
                     top.u.to_bits(),
-                    "{label}, p {pvs}: {:?}",
+                    "{label}, p {pvs} x {extend}: {:?}",
                     root.pv
                 );
             }

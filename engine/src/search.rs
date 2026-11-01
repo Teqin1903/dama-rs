@@ -99,6 +99,27 @@
 //! cannot fail. A try that reaches H stops at once, for its lower end could pass H. Every try counts
 //! against the budget, and a budget that runs out during one interrupts the iteration.
 //!
+//! The single-reply extension (`SearchOptions::extend`, the letter `x`): below the root, a position
+//! above the depth limit (draft >= 1) whose side to move has a single legal move, a capture, does
+//! not spend a ply: its child gets the same draft. Only a capture, for three reasons:
+//!
+//! 1. A single move that can be undone (a king's move, a step sideways) can go round in a cycle.
+//!    Extending it would need a limit that depends on the path, which would break what a draft means
+//!    in the table.
+//! 2. A single quiet move that cannot be undone (a step forward) raises the count of quiet plies
+//!    without spending draft. With `f` and without `:fs=1`, the rule above that nothing below a
+//!    position with count q and draft d can be a 50-ply draw when q + d < 50 would then be false.
+//! 3. A capture removes a piece, so a line holds at most 31 of them without `f` and 30 with it (one
+//!    piece each is then a draw), and the search ends by itself: quiet moves still spend draft, so a
+//!    line is at most depth + 31 plies long. A capture also sets the count to 0, so q + d < 50 stays
+//!    true. What is below a position still depends only on the position, its draft and (through
+//!    repetitions) the path, so a strict table still gives the decision of the search without one.
+//!
+//! The depth limit is therefore a matter of each node: `bounded_value` is told how many plies are
+//! `left` to it. Above 0 that is its draft, at 0 it is at the limit, and below 0 it is past the limit,
+//! in quiescence. Without `x`, `left` is always depth - ply. It changes the decisions, unlike `o`, `t`
+//! and `p`, and costs nodes; killers are per ply and grow with the longest line.
+//!
 //! Every search has a `_traced` form that reports to a `Tracer` (engine/src/trace.rs) and may be
 //! limited to some root moves (`only`, indices into the legal moves). The forms without it use
 //! `NoTrace`, whose calls compile away, and every root move.
@@ -133,6 +154,9 @@ pub struct SearchOptions {
     /// Search iterations in a window around the previous value (see the module documentation);
     /// the decision stays the same. Only iterative deepening reads it.
     pub aspiration: Option<Aspiration>,
+    /// Search below a single legal capture without spending a ply (see the module documentation);
+    /// this changes the decision.
+    pub extend: bool,
 }
 
 /// The window of an iteration around the previous iteration's best value.
@@ -235,7 +259,14 @@ pub fn decide_traced<T: Tracer>(
                     depth: 1,
                     quiescence: false,
                 };
-                tracer.enter(&child_entry(&mv, index, 1, &context, OPEN, Reason::None));
+                tracer.enter(&child_entry(
+                    &mv,
+                    index,
+                    1,
+                    context.left(1),
+                    OPEN,
+                    Reason::None,
+                ));
                 tracer.leaf(u);
                 tracer.exit(u, ValueBound::Exact, false);
             }
@@ -276,15 +307,22 @@ fn root_entry(depth: u32, window: (f64, f64)) -> Enter<'static> {
         window,
         reason: Reason::None,
         pass: Pass::Full,
+        extended: false,
     }
 }
 
-/// The node after `mv` (move `index` of its parent) at `ply`, for a tracer.
+/// The draft of a node with `left` plies to the depth limit: 0 at or past it.
+fn draft_of(left: i32) -> u32 {
+    left.max(0) as u32
+}
+
+/// The node after `mv` (move `index` of its parent) at `ply`, `left` plies from the depth limit, for
+/// a tracer.
 fn child_entry<'m>(
     mv: &'m Move,
     index: usize,
     ply: u32,
-    context: &Context,
+    left: i32,
     window: (f64, f64),
     reason: Reason,
 ) -> Enter<'m> {
@@ -292,11 +330,12 @@ fn child_entry<'m>(
         mv: Some(mv),
         index,
         ply,
-        draft: context.depth.saturating_sub(ply),
-        quiescence: ply > context.depth,
+        draft: draft_of(left),
+        quiescence: left < 0,
         window,
         reason,
         pass: Pass::Full,
+        extended: false,
     }
 }
 
@@ -338,7 +377,7 @@ pub fn quiescence_value(
     let mut search = Search::new(SearchOptions::default(), None, None, NoTrace);
     // The counter counts `board` itself, which the caller has already counted.
     search.counter.max_nodes = Some(max_nodes + 1);
-    let v = bounded_value((board, 0), to_move, 0, OPEN, &context, &mut search)?;
+    let v = bounded_value((board, 0), to_move, (0, 0), OPEN, &context, &mut search)?;
     Some((v, search.counter.nodes - 1))
 }
 
@@ -387,7 +426,14 @@ pub fn minimax_traced<T: Tracer>(
         .map(|(index, mv)| {
             let after = board.apply(&mv);
             if T::ON {
-                tracer.enter(&child_entry(&mv, index, 1, &context, OPEN, Reason::None));
+                tracer.enter(&child_entry(
+                    &mv,
+                    index,
+                    1,
+                    context.left(1),
+                    OPEN,
+                    Reason::None,
+                ));
             }
             let u = value(
                 &after,
@@ -696,10 +742,16 @@ struct Context {
 }
 
 impl Context {
-    /// Whether a position at `ply` with `moves` to play (not empty) is scored with U, rather than
-    /// searched further.
-    fn is_leaf(&self, ply: u32, moves: &[Move]) -> bool {
-        ply >= self.depth && !(self.quiescence && moves[0].is_capture())
+    /// The plies left to the depth limit at `ply` of a line without extensions, the root's children
+    /// and minimax among them.
+    fn left(&self, ply: u32) -> i32 {
+        self.depth as i32 - ply as i32
+    }
+
+    /// Whether a position `left` plies from the depth limit with `moves` to play (not empty) is scored
+    /// with U, rather than searched further.
+    fn is_leaf(&self, left: i32, moves: &[Move]) -> bool {
+        left <= 0 && !(self.quiescence && moves[0].is_capture())
     }
 
     /// U (`evaluate`) at a leaf where `to_move` has `moves`, from the root side's view.
@@ -750,16 +802,16 @@ impl Counter {
         }
     }
 
-    /// Counts one more node at `ply`, or `None` if the budget is spent. The clock is read only
-    /// when there is a deadline.
-    fn visit(&mut self, ply: u32, context: &Context) -> Option<()> {
+    /// Counts one more node `left` plies from the depth limit, or `None` if the budget is spent. The
+    /// clock is read only when there is a deadline.
+    fn visit(&mut self, left: i32) -> Option<()> {
         let out_of_nodes = self.max_nodes.is_some_and(|max| self.nodes >= max);
         let out_of_time = self.deadline.is_some_and(|d| (self.now)() >= d);
         if out_of_nodes || out_of_time {
             return None;
         }
         self.nodes += 1;
-        if ply > context.depth {
+        if left < 0 {
             self.q_nodes += 1;
         }
         Some(())
@@ -870,8 +922,8 @@ impl Heuristics {
         order
     }
 
-    /// `mv`, played by `side` at `ply` of a search `depth` plies deep, caused a cutoff.
-    fn cutoff(&mut self, mv: &Move, side: Color, ply: u32, depth: u32) {
+    /// `mv`, played by `side` at `ply` at a node of draft `draft`, caused a cutoff.
+    fn cutoff(&mut self, mv: &Move, side: Color, ply: u32, draft: u32) {
         if mv.is_capture() {
             return;
         }
@@ -885,10 +937,9 @@ impl Heuristics {
             killers[1] = killers[0];
             killers[0] = key;
         }
-        // A quiet move is searched only above the depth limit, so at least 1 ply remains.
-        let remaining = depth.saturating_sub(ply as u32);
+        // A quiet move is searched only above the depth limit, so the draft is at least 1.
         let count = &mut self.history[side as usize][mv.from().index()][mv.to().index()];
-        *count = count.saturating_add(remaining * remaining);
+        *count = count.saturating_add(draft * draft);
     }
 }
 
@@ -958,6 +1009,8 @@ struct Search<'h, 't, T: Tracer> {
     /// Principal variation search.
     pvs: bool,
     aspiration: Option<Aspiration>,
+    /// The single-reply extension.
+    extend: bool,
     /// The count of quiet plies at the current node, with `draws`.
     quiet: u32,
     /// Told what the search does; it changes nothing above.
@@ -980,6 +1033,7 @@ impl<'h, 't, T: Tracer> Search<'h, 't, T> {
             draws: options.draws,
             pvs: options.pvs,
             aspiration: options.aspiration,
+            extend: options.extend,
             quiet: options.draws.map_or(0, |rules| rules.quiet),
             tracer,
         }
@@ -1185,25 +1239,39 @@ fn root_alpha_beta<T: Tracer>(
             ((alpha, window.1), Pass::Full)
         };
         if T::ON {
-            let entry = child_entry(mv, i, 1, context, searched_window, reason);
+            let entry = child_entry(mv, i, 1, context.left(1), searched_window, reason);
             search.tracer.enter(&Enter { pass, ..entry });
         }
         let child_key = search.key_after(key, board, mv);
         let quiet = search.quiet;
         search.quiet = search.quiet_after(mv);
         let child = (&after, child_key);
-        let mut u = bounded_value(child, side.opponent(), 1, searched_window, context, search)?;
+        let mut u = bounded_value(
+            child,
+            side.opponent(),
+            (1, context.left(1)),
+            searched_window,
+            context,
+            search,
+        )?;
         let mut lower = alpha;
         if test && alpha < u && u < window.1 {
             lower = window.0;
             if T::ON {
-                let entry = child_entry(mv, i, 1, context, window, reason);
+                let entry = child_entry(mv, i, 1, context.left(1), window, reason);
                 search.tracer.enter(&Enter {
                     pass: Pass::Research,
                     ..entry
                 });
             }
-            u = bounded_value(child, side.opponent(), 1, window, context, search)?;
+            u = bounded_value(
+                child,
+                side.opponent(),
+                (1, context.left(1)),
+                window,
+                context,
+                search,
+            )?;
         }
         search.quiet = quiet;
         tried = true;
@@ -1245,7 +1313,9 @@ fn value<T: Tracer>(
     counter: &mut Counter,
     tracer: &mut T,
 ) -> f64 {
-    counter.visit(ply, context).expect("minimax has no budget");
+    counter
+        .visit(context.left(ply))
+        .expect("minimax has no budget");
     let moves = board.legal_moves(to_move);
     if T::ON {
         tracer.legal(moves.len());
@@ -1257,7 +1327,7 @@ fn value<T: Tracer>(
         }
         return v;
     }
-    if context.is_leaf(ply, &moves) {
+    if context.is_leaf(context.left(ply), &moves) {
         let v = context.leaf_value(board, to_move, &moves);
         if T::ON {
             tracer.leaf(v);
@@ -1267,7 +1337,8 @@ fn value<T: Tracer>(
     }
     let children = moves.iter().enumerate().map(|(i, mv)| {
         if T::ON {
-            tracer.enter(&child_entry(mv, i, ply + 1, context, OPEN, Reason::None));
+            let left = context.left(ply + 1);
+            tracer.enter(&child_entry(mv, i, ply + 1, left, OPEN, Reason::None));
         }
         value(
             &board.apply(mv),
@@ -1289,7 +1360,8 @@ fn value<T: Tracer>(
     v
 }
 
-/// `value` searched with alpha-beta in the window `(alpha, beta)`, fail-soft: a result strictly
+/// `value` searched with alpha-beta at `left` plies from the depth limit in the window `(alpha, beta)`,
+/// fail-soft: a result strictly
 /// inside the window is the exact minimax value; a result `<= alpha` is an upper bound of it and a
 /// result `>= beta` a lower bound. Counts every board it visits in `search.counter`, as `value`
 /// does, and gives `None` as soon as the counter's budget runs out. With repetitions, a position
@@ -1300,12 +1372,12 @@ fn value<T: Tracer>(
 fn bounded_value<T: Tracer>(
     (board, key): (&Board, u64),
     to_move: Color,
-    ply: u32,
+    (ply, left): (u32, i32),
     (mut alpha, mut beta): (f64, f64),
     context: &Context,
     search: &mut Search<T>,
 ) -> Option<f64> {
-    search.counter.visit(ply, context)?;
+    search.counter.visit(left)?;
     if (search.repetitions.as_ref()).is_some_and(|r| r.seen(board, to_move)) {
         search.drawn = true;
         if T::ON {
@@ -1338,7 +1410,7 @@ fn bounded_value<T: Tracer>(
             return Some(DRAW);
         }
     }
-    if context.is_leaf(ply, &moves) {
+    if context.is_leaf(left, &moves) {
         search.counter.horizon = true;
         let mut v = context.leaf_value(board, to_move, &moves);
         if search.keys_quiet() {
@@ -1350,7 +1422,10 @@ fn bounded_value<T: Tracer>(
         }
         return Some(v);
     }
-    let draft = context.depth.saturating_sub(ply);
+    let draft = draft_of(left);
+    // The single-reply extension: a forced capture does not spend a ply.
+    let extended = search.extend && draft >= 1 && moves.len() == 1 && moves[0].is_capture();
+    let child_left = if extended { left } else { left - 1 };
     // The table's move, and whether a value may be used and kept here.
     let (mut first, mut path_free) = (None, true);
     if let Some(table) = search.table.as_deref() {
@@ -1439,8 +1514,12 @@ fn bounded_value<T: Tracer>(
             _ => ((beta.next_down(), beta), Pass::Scout),
         };
         if T::ON {
-            let entry = child_entry(mv, i, ply + 1, context, searched_window, reasons[i]);
-            search.tracer.enter(&Enter { pass, ..entry });
+            let entry = child_entry(mv, i, ply + 1, child_left, searched_window, reasons[i]);
+            search.tracer.enter(&Enter {
+                pass,
+                extended,
+                ..entry
+            });
         }
         let child_key = search.key_after(key, board, mv);
         let quiet = search.quiet;
@@ -1450,7 +1529,7 @@ fn bounded_value<T: Tracer>(
         let mut v = bounded_value(
             child,
             to_move.opponent(),
-            ply + 1,
+            (ply + 1, child_left),
             searched_window,
             context,
             search,
@@ -1459,16 +1538,17 @@ fn bounded_value<T: Tracer>(
         // an empty window nothing is inside, so a node searched with one never searches again.
         if test && alpha < v && v < beta {
             if T::ON {
-                let entry = child_entry(mv, i, ply + 1, context, (alpha, beta), reasons[i]);
+                let entry = child_entry(mv, i, ply + 1, child_left, (alpha, beta), reasons[i]);
                 search.tracer.enter(&Enter {
                     pass: Pass::Research,
+                    extended,
                     ..entry
                 });
             }
             v = bounded_value(
                 child,
                 to_move.opponent(),
-                ply + 1,
+                (ply + 1, child_left),
                 (alpha, beta),
                 context,
                 search,
@@ -1488,7 +1568,7 @@ fn bounded_value<T: Tracer>(
         }
         if alpha >= beta {
             if let Some(heuristics) = &mut search.heuristics {
-                heuristics.cutoff(mv, to_move, ply, context.depth);
+                heuristics.cutoff(mv, to_move, ply, draft);
             }
             cutoff = true;
             break;
@@ -1683,11 +1763,26 @@ mod tests {
             .path
             .push((board, Color::Black));
         let window = (f64::NEG_INFINITY, f64::INFINITY);
-        let draw = bounded_value((&board, 0), Color::Black, 1, window, &context, &mut search);
+        let left = context.left(1);
+        let draw = bounded_value(
+            (&board, 0),
+            Color::Black,
+            (1, left),
+            window,
+            &context,
+            &mut search,
+        );
         // A repetition is a node, but nothing below it is searched.
         assert_eq!((draw, search.counter.nodes), (Some(DRAW), 1));
         // The same side to move is part of the position.
-        let searched = bounded_value((&board, 0), Color::White, 1, window, &context, &mut search);
+        let searched = bounded_value(
+            (&board, 0),
+            Color::White,
+            (1, left),
+            window,
+            &context,
+            &mut search,
+        );
         assert_ne!(searched, Some(DRAW));
         assert!(search.counter.nodes > 2);
         assert_eq!(path(&search), [(board, Color::Black)]);
@@ -1725,7 +1820,7 @@ mod tests {
             let v = bounded_value(
                 (&board, key),
                 Color::White,
-                1,
+                (1, context.left(1)),
                 window,
                 &context,
                 &mut search,
@@ -1785,7 +1880,7 @@ mod tests {
         assert_eq!(heuristics.order(&moves, Color::White, 2, None), expected);
         // g3-g4 cut off at ply 2 of a 4-ply search: a killer at ply 2 and 4 in the history.
         let killer = index("g3-g4");
-        heuristics.cutoff(&moves[killer], Color::White, 2, 4);
+        heuristics.cutoff(&moves[killer], Color::White, 2, 2);
         assert_eq!(
             heuristics.history[0][moves[killer].from().index()][moves[killer].to().index()],
             4
@@ -1797,7 +1892,7 @@ mod tests {
         assert_eq!(order[..2], [promotion, killer]);
         // A newer killer comes first; the older stays second.
         let newer = index("b2-b3");
-        heuristics.cutoff(&moves[newer], Color::White, 2, 4);
+        heuristics.cutoff(&moves[newer], Color::White, 2, 2);
         let order = heuristics.order(&moves, Color::White, 2, None);
         assert_eq!(order[..3], [promotion, newer, killer]);
         // Black's history is its own.

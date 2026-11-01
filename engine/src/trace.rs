@@ -124,6 +124,8 @@ pub struct Enter<'m> {
     pub window: (f64, f64),
     pub reason: Reason,
     pub pass: Pass,
+    /// Its parent's single legal move was a capture, which spent no ply: it has its parent's draft.
+    pub extended: bool,
 }
 
 /// What a search reports. Every method does nothing unless a tracer overrides it.
@@ -276,6 +278,8 @@ pub struct TraceNode {
     /// Why this node's move was tried where it was; `None` at the root.
     pub order: Option<Reason>,
     pub pass: Pass,
+    /// The move to it was a forced capture that spent no ply (`Enter::extended`).
+    pub extended: bool,
     pub cutoff: bool,
     pub tt: Option<TtProbe>,
     pub repetition: bool,
@@ -465,6 +469,7 @@ impl Tracer for Recorder {
                 legal: 0,
                 order: node.mv.map(|_| node.reason),
                 pass: node.pass,
+                extended: node.extended,
                 cutoff: false,
                 tt: None,
                 repetition: false,

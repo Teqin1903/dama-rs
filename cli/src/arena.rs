@@ -57,7 +57,9 @@ agents:
                     q, r, o: ab6o, ab3qro, idqro:n20000
   abNp, idqrotp:... a final p tests all moves but the first of a node with an empty window
                     (principal variation search): the same decisions at a fixed depth, so deeper
-                    within a node budget; letters in the order q, r, o, t, f, p.
+                    within a node budget; letters in the order q, r, o, t, f, p, x.
+  abNx, idqrotx:... a final x: a single legal capture spends no ply (single-reply extension);
+                    this changes the decisions. abNotx, idqrotfx:n20000
   id...:asp=W       aspiration windows: from depth 5 on an iteration searches a window of
                     half-width W (in units of U, a man = 1) around the last iteration's value, and
                     again wider (W, 4W, open) on the side that fails; the same decisions
@@ -326,13 +328,22 @@ fn describe(spec: &AgentSpec) -> String {
                 table,
                 draws,
                 pvs,
+                extend,
                 weights,
             },
             _,
         ) => {
             format!(
                 "{spec} (alpha-beta, {depth} plies{}, {})",
-                extras(*quiescence, *repetition, *order, table, draws, *pvs),
+                extras(
+                    *quiescence,
+                    *repetition,
+                    *order,
+                    table,
+                    draws,
+                    *pvs,
+                    *extend
+                ),
                 weights_text(weights)
             )
         }
@@ -344,6 +355,7 @@ fn describe(spec: &AgentSpec) -> String {
                 table,
                 draws,
                 pvs,
+                extend,
                 aspiration,
                 weights,
                 ..
@@ -351,7 +363,15 @@ fn describe(spec: &AgentSpec) -> String {
             _,
         ) => format!(
             "{spec} (iterative deepening alpha-beta{}{}, {})",
-            extras(*quiescence, *repetition, *order, table, draws, *pvs),
+            extras(
+                *quiescence,
+                *repetition,
+                *order,
+                table,
+                draws,
+                *pvs,
+                *extend
+            ),
             aspiration.map_or(String::new(), |w| format!(", aspiration window {w}")),
             weights_text(weights)
         ),
@@ -390,6 +410,7 @@ fn extras(
     table: &Option<TableOptions>,
     draws: &Option<DrawRules>,
     pvs: bool,
+    extend: bool,
 ) -> String {
     let mut extras = String::new();
     if quiescence {
@@ -413,6 +434,9 @@ fn extras(
     }
     if pvs {
         extras.push_str(", principal variation search");
+    }
+    if extend {
+        extras.push_str(", single-reply extension");
     }
     extras
 }

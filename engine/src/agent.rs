@@ -389,6 +389,7 @@ pub struct AlphaBetaAgent {
     quiescence: bool,
     order: bool,
     pvs: bool,
+    extend: bool,
     /// `Some` with a transposition table.
     table: Option<Table>,
     /// `Some` when repetitions are recognised: the game so far.
@@ -410,6 +411,7 @@ impl AlphaBetaAgent {
             quiescence,
             order: false,
             pvs: false,
+            extend: false,
             table: None,
             history: None,
             draws: None,
@@ -435,6 +437,12 @@ impl AlphaBetaAgent {
     /// The same agent, with principal variation search if `on`.
     pub fn with_pvs(mut self, on: bool) -> AlphaBetaAgent {
         self.pvs = on;
+        self
+    }
+
+    /// The same agent, with the single-reply extension if `on`.
+    pub fn with_extension(mut self, on: bool) -> AlphaBetaAgent {
+        self.extend = on;
         self
     }
 
@@ -471,6 +479,7 @@ impl AlphaBetaAgent {
             }),
             pvs: self.pvs,
             aspiration: None,
+            extend: self.extend,
         };
         let history = self.history.as_ref().map(|h| h.positions.as_slice());
         let decision = alpha_beta_traced(
@@ -563,6 +572,7 @@ pub struct DeepeningAgent {
     quiescence: bool,
     order: bool,
     pvs: bool,
+    extend: bool,
     /// The half-width of an aspiration window at first, if `Some`.
     aspiration: Option<f64>,
     /// `Some` with a transposition table.
@@ -589,6 +599,7 @@ impl DeepeningAgent {
             quiescence,
             order: false,
             pvs: false,
+            extend: false,
             table: None,
             history: None,
             draws: None,
@@ -615,6 +626,12 @@ impl DeepeningAgent {
     /// The same agent, with principal variation search if `on`.
     pub fn with_pvs(mut self, on: bool) -> DeepeningAgent {
         self.pvs = on;
+        self
+    }
+
+    /// The same agent, with the single-reply extension if `on`.
+    pub fn with_extension(mut self, on: bool) -> DeepeningAgent {
+        self.extend = on;
         self
     }
 
@@ -660,6 +677,7 @@ impl DeepeningAgent {
                 half_width,
                 from_depth: Aspiration::FROM_DEPTH,
             }),
+            extend: self.extend,
         };
         let history = self.history.as_ref().map(|h| h.positions.as_slice());
         let deepening = iterative_deepening_traced(
@@ -855,7 +873,8 @@ impl Agent for MctsAgent {
 /// repetitions (`abNr`, `abNqr`, `idqr:LIMITS`), `o` move ordering (`abNo`, `idqro:LIMITS`), `t` a
 /// transposition table (`abNot`, `idqrot:LIMITS`) of 16 MB unless a part `:hash=MB` says
 /// otherwise, in the referee's strict mode with a part `:tt=strict`, `f` the 50-ply and one-piece-each
-/// rules (`:fs=1` adds progress pressure), `p` principal variation search (`abNotp`, `idqrotfp:LIMITS`).
+/// rules (`:fs=1` adds progress pressure), `p` principal variation search (`abNotp`, `idqrotfp:LIMITS`),
+/// `x` the single-reply extension (`abNotx`, `idqrotfx:LIMITS`).
 /// An `id` agent may have aspiration windows with a part `:asp=W`, W the half-width in units of U
 /// (`idqrotf:n20000:asp=0.5`). Monte Carlo tree search
 /// (`mcts.rs`) is `mc:LIMITS`, `uct:LIMITS`, `ucte:LIMITS` or `uctq:LIMITS`, its limits `nK` and
@@ -886,6 +905,8 @@ pub enum AgentSpec {
         draws: Option<DrawRules>,
         /// The letter `p`.
         pvs: bool,
+        /// The letter `x`.
+        extend: bool,
         weights: Weights,
     },
     /// Iterative deepening within `limits`.
@@ -899,6 +920,8 @@ pub enum AgentSpec {
         draws: Option<DrawRules>,
         /// The letter `p`.
         pvs: bool,
+        /// The letter `x`.
+        extend: bool,
         /// `:asp=W`: the half-width of the aspiration window at first.
         aspiration: Option<f64>,
         weights: Weights,
@@ -1001,6 +1024,7 @@ impl AgentSpec {
                 table,
                 draws,
                 pvs,
+                extend,
                 weights,
             } => Box::new(
                 AlphaBetaAgent::new(weights, depth, quiescence, 0)
@@ -1008,7 +1032,8 @@ impl AgentSpec {
                     .with_ordering(order)
                     .with_table(table)
                     .with_draws(draws)
-                    .with_pvs(pvs),
+                    .with_pvs(pvs)
+                    .with_extension(extend),
             ),
             AgentSpec::Deepening {
                 limits,
@@ -1018,6 +1043,7 @@ impl AgentSpec {
                 table,
                 draws,
                 pvs,
+                extend,
                 aspiration,
                 weights,
             } => Box::new(
@@ -1027,6 +1053,7 @@ impl AgentSpec {
                     .with_table(table)
                     .with_draws(draws)
                     .with_pvs(pvs)
+                    .with_extension(extend)
                     .with_aspiration(aspiration),
             ),
             AgentSpec::Mcts {
@@ -1040,7 +1067,7 @@ impl AgentSpec {
 
 impl fmt::Display for AgentSpec {
     /// The canonical name: `random`, `mmN`, `abN` and `id:` with their letters in the order `q`,
-    /// `r`, `o`, `t`, `f`, `p` (`abNqr`, `idqrot:`) and the limits in the order d, n, t, the preset's name, or else `u:MAN/KING/MOB`.
+    /// `r`, `o`, `t`, `f`, `p`, `x` (`abNqr`, `idqrot:`) and the limits in the order d, n, t, the preset's name, or else `u:MAN/KING/MOB`.
     /// `"u:1/3/0".parse()` therefore prints as `material`. Then the weights as `:KEY=VALUE` in the
     /// order of `Weights::KEYS`: for a search those that differ from the tuned weights or, when
     /// that takes fewer parts, `:w=NAME` and those that differ from that named set
@@ -1072,6 +1099,7 @@ impl fmt::Display for AgentSpec {
                     table,
                     draws,
                     pvs,
+                    extend,
                     weights,
                 },
                 _,
@@ -1085,6 +1113,7 @@ impl fmt::Display for AgentSpec {
                     table: table.is_some(),
                     draws: draws.is_some(),
                     pvs: *pvs,
+                    extend: *extend,
                 },
                 weights.suffix(),
                 draws_suffix(draws),
@@ -1099,6 +1128,7 @@ impl fmt::Display for AgentSpec {
                     table,
                     draws,
                     pvs,
+                    extend,
                     aspiration,
                     weights,
                 },
@@ -1111,6 +1141,7 @@ impl fmt::Display for AgentSpec {
                     table: table.is_some(),
                     draws: draws.is_some(),
                     pvs: *pvs,
+                    extend: *extend,
                 };
                 write!(f, "id{letters}")?;
                 if let Some(depth) = limits.depth {
@@ -1164,10 +1195,11 @@ struct Letters {
     table: bool,
     draws: bool,
     pvs: bool,
+    extend: bool,
 }
 
 impl Letters {
-    /// The letters of `letters`; `None` unless each of `q`, `r`, `o`, `t`, `f`, `p` appears at most
+    /// The letters of `letters`; `None` unless each of `q`, `r`, `o`, `t`, `f`, `p`, `x` appears at most
     /// once and in that order, with nothing else.
     fn parse(letters: &str) -> Option<Letters> {
         let mut rest = letters;
@@ -1185,6 +1217,7 @@ impl Letters {
             table: take('t'),
             draws: take('f'),
             pvs: take('p'),
+            extend: take('x'),
         };
         rest.is_empty().then_some(parsed)
     }
@@ -1199,6 +1232,7 @@ impl fmt::Display for Letters {
             (self.table, 't'),
             (self.draws, 'f'),
             (self.pvs, 'p'),
+            (self.extend, 'x'),
         ];
         (letters.into_iter())
             .filter(|&(on, _)| on)
@@ -1266,7 +1300,7 @@ impl fmt::Display for ParseAgentError {
                  u:MAN/KING/MOB, \
                  mmN, abN, id:LIMITS, the last two with letters q (quiescence), r (repetitions) \
                  o (move ordering), t (transposition table), f (50-ply and one-piece-each \
-                 rules) and p (principal variation search) in that order: abNqrotfp, idqrotfp:LIMITS, or Monte Carlo tree search mc:LIMITS, uct:LIMITS, ucte:LIMITS, \
+                 rules), p (principal variation search) and x (single-reply extension) in that order: abNqrotfpx, idqrotfpx:LIMITS, or Monte Carlo tree search mc:LIMITS, uct:LIMITS, ucte:LIMITS, \
                  uctq:LIMITS"
             ),
             ParseAgentError::Depth(name) => write!(
@@ -1457,6 +1491,7 @@ fn parse_base(s: &str) -> Result<AgentSpec, ParseAgentError> {
                 table: letters.table.then(TableOptions::default),
                 draws: letters.draws.then(DrawRules::default),
                 pvs: letters.pvs,
+                extend: letters.extend,
                 aspiration: None,
                 weights: Weights::TUNED,
             })
@@ -1490,6 +1525,7 @@ fn parse_base(s: &str) -> Result<AgentSpec, ParseAgentError> {
             table: letters.table.then(TableOptions::default),
             draws: letters.draws.then(DrawRules::default),
             pvs: letters.pvs,
+            extend: letters.extend,
             weights: Weights::TUNED,
         });
     }
@@ -1569,6 +1605,7 @@ mod tests {
             table: None,
             draws: None,
             pvs: false,
+            extend: false,
             weights: Weights::TUNED,
         };
         let ab = |depth, quiescence, repetition| ab_with(depth, quiescence, repetition, false);
@@ -1593,6 +1630,7 @@ mod tests {
             table: None,
             draws: None,
             pvs: false,
+            extend: false,
             aspiration: None,
             weights: Weights::TUNED,
         };
@@ -1644,6 +1682,7 @@ mod tests {
                 table: None,
                 draws: None,
                 pvs: false,
+                extend: false,
                 aspiration: None,
                 weights: Weights {
                     adv: 0.1,
@@ -1830,13 +1869,13 @@ mod tests {
         let weights = |s: &str| Err(ParseAgentError::Weights(s.to_string()));
         let depth = |s: &str| Err(ParseAgentError::Depth(s.to_string()));
         for s in [
-            "", "Tuned", "minimax", "1/2/3", "u", "idd3", "idqd3", "idx:d3", "idrq:d3", "idqrr:d3",
+            "", "Tuned", "minimax", "1/2/3", "u", "idd3", "idqd3", "idz:d3", "idrq:d3", "idqrr:d3",
             "idoq:d3", "idoo:d3", "idqor:n5",
         ] {
             assert_eq!(s.parse::<AgentSpec>(), unknown(s));
         }
         for s in [
-            "mm", "mm0", "mm10", "mm-1", "mm3x", "mm 3", "mm3q", "ab", "ab0", "ab10", "ab3x",
+            "mm", "mm0", "mm10", "mm-1", "mm3x", "mm 3", "mm3q", "ab", "ab0", "ab10", "ab3z",
             "abq", "ab0q", "ab3qq", "ab10q", "ab3rq", "ab3rr", "abr", "ab0qr", "ab3qrq", "ab3oq",
             "ab3oo", "abo", "ab0o", "mm3o",
         ] {
@@ -2047,6 +2086,10 @@ mod tests {
             "idqrotf:n20000:w=texel1:fs=1:asp=0.5",
             "idqrotfp:n20000:w=texel1:fs=1:asp=0.25",
             "id:d5:asp=1e-6",
+            "ab6x",
+            "ab3qrotfpx",
+            "idqrotfx:n20000:w=texel1:fs=1",
+            "idqrotfpx:n20000:w=texel1:fs=1:asp=0.5",
         ] {
             let spec: AgentSpec = name.parse().unwrap_or_else(|e| panic!("{name}: {e}"));
             let printed = spec.to_string();
@@ -2078,6 +2121,10 @@ mod tests {
             "id:n2000:asp=0.5:asp=1",
             "idpq:n2000",
             "idpp:n2000",
+            "idxp:n2000",
+            "idxx:n2000",
+            "ab3xq",
+            "mm3x",
             "mm3p",
         ] {
             assert!(bad.parse::<AgentSpec>().is_err(), "{bad}");

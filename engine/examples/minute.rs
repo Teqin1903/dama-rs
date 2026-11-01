@@ -66,6 +66,7 @@ fn search(spec: &str, position: &Position, phase: &str) -> Value {
         table,
         draws,
         pvs,
+        extend,
         weights,
         ..
     }) = spec.parse::<AgentSpec>()
@@ -84,6 +85,7 @@ fn search(spec: &str, position: &Position, phase: &str) -> Value {
         order,
         draws,
         pvs,
+        extend,
         ..SearchOptions::default()
     };
     let history = repetition.then_some(&[][..]);

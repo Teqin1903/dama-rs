@@ -808,6 +808,7 @@ fn tree_json(tree: &Tree) -> Json {
             ("legal", count(n.legal as u64)),
             ("order", n.order.map_or(Json::Null, |r| Json::str(r.key()))),
             ("pass", Json::str(n.pass.key())),
+            ("extended", Json::Bool(n.extended)),
             ("cutoff", Json::Bool(n.cutoff)),
             ("tt", n.tt.map_or(Json::Null, |t| Json::str(t.key()))),
             (

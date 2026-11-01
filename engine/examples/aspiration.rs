@@ -69,6 +69,7 @@ fn spec(name: &str) -> Spec {
             table,
             draws,
             pvs,
+            extend,
             weights,
             ..
         }) => Spec {
@@ -78,6 +79,7 @@ fn spec(name: &str) -> Spec {
                 order,
                 draws: draws.map(|rules| DrawRules { quiet: 0, ..rules }),
                 pvs,
+                extend,
                 ..SearchOptions::default()
             },
             repetition,

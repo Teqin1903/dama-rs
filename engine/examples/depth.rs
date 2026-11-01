@@ -17,15 +17,19 @@
 //! completed depth, the mean nodes per move, the mean and longest time per move in milliseconds,
 //! how many positions completed each depth (`depth:count`), and how many stopped by proof, whose
 //! last iteration reached no leaf at the depth limit, with the mean depth of the others. A proof
-//! ends a search early, so an agent that finds more of them shows a lower mean depth for it.
+//! ends a search early, so an agent that finds more of them shows a lower mean depth for it. For an
+//! agent with no time limit also, from a second pass with a tracer (the first gives the times): the
+//! nodes per move entered through the single-reply extension, and the deepest ply a line reached in
+//! each search (seldepth), its mean and its highest, every iteration together. A completed depth of
+//! an agent with `x` is not the same thing as one without: its lines are longer.
 
 use std::collections::BTreeMap;
 use std::path::Path;
 use std::time::{Duration, Instant};
 
 use engine::{
-    AgentSpec, Aspiration, Board, Color, Limits, SearchOptions, Table, Weights, alpha_beta,
-    iterative_deepening_with,
+    AgentSpec, Aspiration, Board, Color, Enter, Limits, SearchOptions, Table, Tracer, Weights,
+    alpha_beta, iterative_deepening_traced, iterative_deepening_with, native_clock,
 };
 use serde::Deserialize;
 
@@ -67,13 +71,28 @@ fn positions() -> Vec<(Board, Color, Weights)> {
     all
 }
 
+/// Counts the extended nodes and the deepest ply of a search.
+#[derive(Default)]
+struct Lines {
+    extended: u64,
+    seldepth: u32,
+}
+
+impl Tracer for Lines {
+    const ON: bool = true;
+    fn enter(&mut self, node: &Enter) {
+        self.extended += u64::from(node.extended);
+        self.seldepth = self.seldepth.max(node.ply);
+    }
+}
+
 fn main() {
     let positions = positions();
     for (board, side, weights) in &positions {
         alpha_beta(board, *side, *weights, 3); // warm-up
     }
     println!(
-        "search\tpositions\tmean_depth\tmin_depth\tmax_depth\tnodes_per_move\tmean_ms\tmax_ms\tdepths\tproved\tmean_depth_unproved"
+        "search\tpositions\tmean_depth\tmin_depth\tmax_depth\tnodes_per_move\tmean_ms\tmax_ms\tdepths\tproved\tmean_depth_unproved\textended_per_move\tmean_seldepth\tmax_seldepth"
     );
     for arg in std::env::args().skip(1) {
         // A number is a time limit with each position's weights; a name brings its own weights.
@@ -94,6 +113,7 @@ fn main() {
                     table,
                     draws,
                     pvs,
+                    extend,
                     aspiration,
                     weights,
                 }) => {
@@ -102,6 +122,7 @@ fn main() {
                         order,
                         draws,
                         pvs,
+                        extend,
                         aspiration: aspiration.map(|half_width| Aspiration {
                             half_width,
                             from_depth: Aspiration::FROM_DEPTH,
@@ -150,10 +171,41 @@ fn main() {
             longest = longest.max(took);
         }
         let n = positions.len() as f64;
+        // Node and depth budgets play the same with a tracer; a time budget would not.
+        let mut lines = String::from("-\t-\t-");
+        if limits.time.is_none() && own_weights.is_some() {
+            let (mut extended, mut seldepths, mut deepest) = (0, 0, 0);
+            for (board, side, weights) in &positions {
+                if let Some(table) = &mut table {
+                    table.clear();
+                }
+                let mut tracer = Lines::default();
+                iterative_deepening_traced(
+                    board,
+                    *side,
+                    own_weights.unwrap_or(*weights),
+                    limits,
+                    options,
+                    history,
+                    table.as_mut(),
+                    None,
+                    &mut tracer,
+                    native_clock,
+                );
+                extended += tracer.extended;
+                seldepths += u64::from(tracer.seldepth);
+                deepest = deepest.max(tracer.seldepth);
+            }
+            lines = format!(
+                "{:.1}\t{:.2}\t{deepest}",
+                extended as f64 / n,
+                seldepths as f64 / n
+            );
+        }
         let sum: u32 = depths.iter().map(|(d, count)| d * count).sum();
         let histogram: Vec<String> = depths.iter().map(|(d, c)| format!("{d}:{c}")).collect();
         println!(
-            "{arg}\t{}\t{:.2}\t{}\t{}\t{:.0}\t{:.2}\t{:.2}\t{}\t{proved}\t{:.2}",
+            "{arg}\t{}\t{:.2}\t{}\t{}\t{:.0}\t{:.2}\t{:.2}\t{}\t{proved}\t{:.2}\t{lines}",
             positions.len(),
             f64::from(sum) / n,
             depths.keys().next().unwrap(),

@@ -113,6 +113,7 @@ Trace = {"iteration": 6, "nodes_total": 8732, "truncated": false,
                     "children": [1, 57, ...],             (in the order tried)
                     "legal": 9, "order": null | reason,   (why this node's move was tried there)
                     "pass": "full" | "scout" | "research", (how it was searched; see below)
+                    "extended": false,                    (true: a forced capture that spent no ply; see below)
                     "cutoff": false,                      (true: the last child caused a cutoff)
                     "tt": null | "miss" | "hit" | "cut",
                     "draw": null | "repetition" | "one_each" | "fifty",
@@ -132,6 +133,12 @@ which replaces it; the research's value is the move's. Every node counts in "nod
 budget, the scout's too. Without p every node is "full". In the "root" list a move appears once: its value and bound
 are those of the last search, its "nodes" those of both, and "order" counts moves, not searches. A scout's own node
 keeps its bound: a value at or below the scout's "alpha" is an upper bound, at or above its "beta" a lower one.
+
+The single-reply extension (the letter x) and the tree. Below the root, when a node above the depth limit
+("depth" >= 1) has "legal": 1 and that move is a capture, its child has "extended": true and the same "depth" as
+its parent, instead of one less: the forced capture spent no ply. So "ply" can pass the iteration's depth while "kind" is
+still "main", and "kind" (not "ply") says whether a node is past the depth limit. Without x it is always false. The
+same move's scout and research both carry it.
 
 Aspiration windows (:asp=W) and the iterations. From depth 5 on an iteration tries a window around the last
 iteration's value and widens it if the window fails, so a depth can be searched more than once. It stays one
