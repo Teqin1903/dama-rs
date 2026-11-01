@@ -266,6 +266,35 @@ pub const MCTS: &[Rung] = &[
 /// The rungs of the ladder every form of `MCTS` plays.
 pub const MCTS_OPPONENTS: &[&str] = &["V0", "V2", "V10"];
 
+/// The game's other draw rules in the search (the letter `f`, engine/src/search.rs): V10 with them,
+/// and with progress pressure too, against V10 and V0 (`FIFTY_PAIRS`).
+pub const FIFTY: &[Rung] = &[
+    LADDER[9],
+    LADDER[0],
+    rung(
+        "V10f",
+        "fifty-1",
+        "idqrotf:n20000:w=texel1",
+        "V10_DrawRules",
+        "the 50-ply and one-piece-each rules in the search",
+    ),
+    rung(
+        "V10fs",
+        "fifty-1",
+        "idqrotf:n20000:w=texel1:fs=1",
+        "V10_ProgressPressure",
+        "the draw rules, and U scaled by (100 - quiet plies) / 100 at the depth limit",
+    ),
+];
+
+/// The pairings of `FIFTY`, as (a, b).
+pub const FIFTY_PAIRS: &[(&str, &str)] = &[
+    ("V10f", "V10"),
+    ("V10f", "V0"),
+    ("V10fs", "V10"),
+    ("V10fs", "V0"),
+];
+
 /// The reference opponent, whose Elo is 0.
 pub const ANCHOR: &str = "V1";
 /// The mid-ladder opponent of the upper rungs.
@@ -436,7 +465,30 @@ pub fn against_plan(rungs: &[Rung], opponents: &[&str]) -> Vec<Pairing> {
         .collect()
 }
 
-/// A set of rungs rated together: the ladder, the ablation or Monte Carlo tree search.
+/// The pairings `pairs` of `rungs` (ids, a against b), `LONG_MATCH` games each, in that order.
+///
+/// # Panics
+/// If an id is not one of `rungs`.
+pub fn pairs_plan(rungs: &[Rung], pairs: &[(&str, &str)]) -> Vec<Pairing> {
+    let index = |id: &str| {
+        rungs
+            .iter()
+            .position(|r| r.id == id)
+            .unwrap_or_else(|| panic!("no rung {id}"))
+    };
+    (pairs.iter())
+        .map(|&(a, b)| Pairing {
+            a: index(a),
+            b: index(b),
+            roles: vec![Role::Against],
+            games: LONG_MATCH,
+            reused: false,
+        })
+        .collect()
+}
+
+/// A set of rungs rated together: the ladder, the ablation, Monte Carlo tree search or the draw
+/// rules.
 #[derive(Clone, Copy, Debug)]
 pub struct Set {
     /// `ladder`, `ablation`: the name `dama ladder --set` takes.
@@ -447,6 +499,8 @@ pub struct Set {
     pub mid: Option<&'static str>,
     /// When not empty, every other rung plays each of these (`against_plan`).
     pub opponents: &'static [&'static str],
+    /// When not empty, exactly these pairings are played (`pairs_plan`).
+    pub pairs: &'static [(&'static str, &'static str)],
     pub footnotes: &'static [(&'static str, &'static str, &'static str)],
     /// Where its games and its JSON file go, and the file's name.
     pub dir: &'static str,
@@ -459,6 +513,7 @@ pub const LADDER_SET: Set = Set {
     zero: ANCHOR,
     mid: Some(MID),
     opponents: &[],
+    pairs: &[],
     footnotes: FOOTNOTES,
     dir: "results/ladder",
     json: "ladder.json",
@@ -470,6 +525,7 @@ pub const ABLATION_SET: Set = Set {
     zero: "V10",
     mid: None,
     opponents: &[],
+    pairs: &[],
     footnotes: ABLATION_FOOTNOTES,
     dir: "results/ablation",
     json: "ablation.json",
@@ -481,18 +537,32 @@ pub const MCTS_SET: Set = Set {
     zero: "V10",
     mid: None,
     opponents: MCTS_OPPONENTS,
+    pairs: &[],
     footnotes: &[],
     dir: "results/mcts",
     json: "mcts.json",
 };
 
+pub const FIFTY_SET: Set = Set {
+    name: "fifty",
+    rungs: FIFTY,
+    zero: "V10",
+    mid: None,
+    opponents: &[],
+    pairs: FIFTY_PAIRS,
+    footnotes: &[],
+    dir: "results/fifty",
+    json: "fifty.json",
+};
+
 impl Set {
     /// The sets `dama ladder --set` knows.
-    pub const ALL: [Set; 3] = [LADDER_SET, ABLATION_SET, MCTS_SET];
+    pub const ALL: [Set; 4] = [LADDER_SET, ABLATION_SET, MCTS_SET, FIFTY_SET];
 
     /// Its pairings, in the order they are played.
     pub fn plan(&self) -> Vec<Pairing> {
         match self.mid {
+            _ if !self.pairs.is_empty() => pairs_plan(self.rungs, self.pairs),
             _ if !self.opponents.is_empty() => against_plan(self.rungs, self.opponents),
             Some(mid) => plan(self.rungs, self.zero, mid),
             None => ablation_plan(self.rungs, self.zero),

@@ -90,9 +90,14 @@ fn main() {
                     repetition,
                     order,
                     table,
+                    draws,
                     weights,
                 }) => {
-                    let options = SearchOptions { quiescence, order };
+                    let options = SearchOptions {
+                        quiescence,
+                        order,
+                        draws,
+                    };
                     let history = repetition.then_some(&[][..]);
                     (
                         limits,

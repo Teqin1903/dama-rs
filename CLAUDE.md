@@ -61,6 +61,9 @@ match kish 1.1.2, and every number in our Assignment 3 talk came from it.
 - Monte Carlo tree search (docs/ladder.md): `ladder run --set mcts` (and `--estimate`, `rate --set mcts`): the four
   forms (`MCTS`: `mc`, `uct`, `ucte`, `uctq`, 20000 nodes per move) against V0, V2 and V10 (`MCTS_OPPONENTS`), 200
   games each, into `results/mcts/` and `mcts.json`
+- Draw rules in the search (docs/ladder.md): `ladder run --set fifty` (and `--estimate`, `rate --set fifty`): V10f
+  (`idqrotf:n20000:w=texel1`) and V10fs (`…:fs=1`) against V10 and V0 (`FIFTY_PAIRS`), 400 games each, into
+  `results/fifty/` and `fifty.json`
 - Web API: `scripts/build-web.sh` builds `site/pkg/` (wasm-pack, keeping only `dama_web.js` and
   `dama_web_bg.wasm`); `target/release/dama api < requests.jsonl` answers the same calls natively, one JSON
   request per line (`{"call": "think", "args": ["white", "{}"]}`). Tracing must never change a search: the searches take a generic
@@ -116,7 +119,10 @@ Never change an expected value to make a test pass: find the bug and explain whi
 the search path that occurs again is a draw, 0; agents learn the game through `Agent::observe`), and move ordering
 for a final `o` (`ab6o`, `idqro:...`: the previous iteration's best move at the root, then promotions, killers,
 history; the same decisions at a fixed depth, so deeper within a budget), and a transposition table for a final `t`
-(`ab6ot`, `idqrot:n20000`; letters always in the order q, r, o, t). The table belongs to the agent, is cleared at
+(`ab6ot`, `idqrot:n20000`), and the game's other draw rules for a final `f` (`idqrotf:n20000`: a position of the
+search after 50 quiet plies, counted from the game's count from `Agent::observe`, or with one piece each, is a draw;
+`:fs=1` adds progress pressure, U scaled by (100 − quiet plies) / 100 at the depth limit, with the count in the table's
+key) (letters always in the order q, r, o, t, f). The table belongs to the agent, is cleared at
 every game, is 16 MB unless `:hash=MB`, and does not keep a value that scored a repetition below it; `:tt=strict` is
 the referee's mode (same draft only and, with repetitions, only where the value cannot depend on the path), whose
 games equal those without a table: check new table ideas against it. Keep new search ideas there, behind the

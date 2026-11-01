@@ -119,7 +119,11 @@ impl Search {
             "qo" => (true, true),
             _ => return None,
         };
-        let options = SearchOptions { quiescence, order };
+        let options = SearchOptions {
+            quiescence,
+            order,
+            draws: None,
+        };
         let search = match prefix {
             "mm" if !order && !table => Search::Minimax { quiescence },
             "ab" => Search::AlphaBeta(options),

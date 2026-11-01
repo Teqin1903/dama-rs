@@ -63,6 +63,24 @@
 //! the root side's view, a side ahead (U > 0) avoids the repetition and a side behind (U < 0)
 //! welcomes it. Without repetitions, the search is the one above, node for node.
 //!
+//! The game's other draw rules (`SearchOptions::draws`, the letter `f`): a position below the root
+//! where each side has one piece left, or that comes after 50 plies in a row without a capture, is
+//! a draw worth `DRAW`, checked after the position's lack of moves (a loss), as in `game_end`. The
+//! count of quiet plies starts from the game's count at the root (`DrawRules::quiet`), goes up by
+//! one with every move below and back to 0 with every capture. One piece each depends only on the
+//! board, so its draws may go into the table. The 50-ply rule depends on the count, which the key
+//! does not see: a value whose search scored such a draw below it is not kept, as with repetitions.
+//! Quiet moves are played only before the depth limit (quiescence plays captures, which reset the
+//! count), so below a position with count q and draft d the count stays below q + d; when
+//! q + d < 50, nothing below can be a 50-ply draw, and only then is a table's value used or, in
+//! strict mode, kept. Then a strict table still gives the decision of the search without one.
+//!
+//! Progress pressure (`DrawRules::progress`, `:fs=1`) scales U at the depth limit by
+//! (100 - q) / 100, q the count there, so that the side ahead prefers to capture before the
+//! 50-ply rule takes its advantage; wins are not scaled. A leaf of quiescence follows a capture, so
+//! q is 0 there. Every value now depends on the count, so the key mixes in the count
+//! (`quiet_key`), and values, 50-ply draws included, are kept and used as without the rule.
+//!
 //! Every search has a `_traced` form that reports to a `Tracer` (engine/src/trace.rs) and may be
 //! limited to some root moves (`only`, indices into the legal moves). The forms without it use
 //! `NoTrace`, whose calls compile away, and every root move.
@@ -72,6 +90,7 @@ use std::ops::Range;
 use std::sync::OnceLock;
 use std::time::{Duration, Instant};
 
+use crate::arena::QUIET_PLIES;
 use crate::board::{Board, Color};
 use crate::eval::{DRAW, Features, U_EPSILON, WIN, Weights, evaluate};
 use crate::movegen::Move;
@@ -79,7 +98,7 @@ use crate::rng::Mulberry32;
 use crate::square::Square;
 use crate::table::{Bound, Entry, Table};
 use crate::trace::{Enter, NoTrace, Reason, Tracer, TtProbe, ValueBound};
-use crate::zobrist::{zobrist, zobrist_after};
+use crate::zobrist::{quiet_key, zobrist, zobrist_after};
 
 /// How an alpha-beta search goes beyond its depth limit and weights.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -88,6 +107,17 @@ pub struct SearchOptions {
     pub quiescence: bool,
     /// Order the moves (see the module documentation); the decision stays the same.
     pub order: bool,
+    /// Apply the game's draw rules besides repetitions (see the module documentation).
+    pub draws: Option<DrawRules>,
+}
+
+/// The 50-ply and one-piece-each rules in a search (the letter `f`).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct DrawRules {
+    /// Plies in a row without a capture before the root, in the game (`Agent::observe`).
+    pub quiet: u32,
+    /// Scale U at the depth limit toward 0 as the count grows (`:fs=1`).
+    pub progress: bool,
 }
 
 /// A legal move with the features and U of the board after it.
@@ -859,8 +889,12 @@ struct Search<'h, 't, T: Tracer> {
     repetitions: Option<Repetitions<'h>>,
     heuristics: Option<Heuristics>,
     table: Option<&'t mut Table>,
-    /// Whether a repetition was scored (set by the search; each node keeps its own below it).
+    /// Whether a draw that depends on the path was scored: a repetition, or by the 50-ply rule
+    /// unless the key holds the count (set by the search; each node keeps its own below it).
     drawn: bool,
+    draws: Option<DrawRules>,
+    /// The count of quiet plies at the current node, with `draws`.
+    quiet: u32,
     /// Told what the search does; it changes nothing above.
     tracer: T,
 }
@@ -878,16 +912,31 @@ impl<'h, 't, T: Tracer> Search<'h, 't, T> {
             heuristics: options.order.then(Heuristics::new),
             table,
             drawn: false,
+            draws: options.draws,
+            quiet: options.draws.map_or(0, |rules| rules.quiet),
             tracer,
         }
     }
 
+    /// Whether the key holds the count of quiet plies (with progress pressure).
+    fn keys_quiet(&self) -> bool {
+        self.draws.is_some_and(|rules| rules.progress)
+    }
+
+    /// The count of quiet plies after `mv`, from the current node's.
+    fn quiet_after(&self, mv: &Move) -> u32 {
+        if mv.is_capture() { 0 } else { self.quiet + 1 }
+    }
+
     /// The key of the position after `mv` on `board`, whose key is `key`; 0 without a table.
     fn key_after(&self, key: u64, board: &Board, mv: &Move) -> u64 {
-        if self.table.is_some() {
-            zobrist_after(key, board, mv)
-        } else {
-            0
+        match () {
+            _ if self.table.is_none() => 0,
+            _ if self.keys_quiet() => {
+                let quiet = quiet_key(self.quiet) ^ quiet_key(self.quiet_after(mv));
+                zobrist_after(key, board, mv) ^ quiet
+            }
+            _ => zobrist_after(key, board, mv),
         }
     }
 }
@@ -981,10 +1030,11 @@ fn root_alpha_beta<T: Tracer>(
         repetitions.path.clear();
         repetitions.path.push((*board, side));
     }
-    let key = if search.table.is_some() {
-        zobrist(board, side)
-    } else {
-        0
+    search.quiet = search.draws.map_or(0, |rules| rules.quiet);
+    let key = match () {
+        _ if search.table.is_none() => 0,
+        _ if search.keys_quiet() => zobrist(board, side) ^ quiet_key(search.quiet),
+        _ => zobrist(board, side),
     };
     let moves = board.legal_moves(side);
     if T::ON {
@@ -1010,14 +1060,18 @@ fn root_alpha_beta<T: Tracer>(
             let window = (alpha, f64::INFINITY);
             (search.tracer).enter(&child_entry(mv, i, 1, context, window, reason));
         }
+        let child_key = search.key_after(key, board, mv);
+        let quiet = search.quiet;
+        search.quiet = search.quiet_after(mv);
         let u = bounded_value(
-            (&after, search.key_after(key, board, mv)),
+            (&after, child_key),
             side.opponent(),
             1,
             (alpha, f64::INFINITY),
             context,
             search,
         )?;
+        search.quiet = quiet;
         best = best.max(u);
         candidates[i] = Some(Candidate {
             features: Features::of(&after, side),
@@ -1127,9 +1181,25 @@ fn bounded_value<T: Tracer>(
         }
         return Some(v);
     }
+    if let Some(rules) = search.draws {
+        let one_each =
+            board.pieces(Color::White).len() == 1 && board.pieces(Color::Black).len() == 1;
+        let fifty = search.quiet >= QUIET_PLIES;
+        if one_each || fifty {
+            // One piece each is the board's; the count is the path's unless the key holds it.
+            search.drawn |= !one_each && !rules.progress;
+            if T::ON {
+                search.tracer.exit(DRAW, ValueBound::Exact, false);
+            }
+            return Some(DRAW);
+        }
+    }
     if context.is_leaf(ply, &moves) {
         search.counter.horizon = true;
-        let v = context.leaf_value(board, to_move, &moves);
+        let mut v = context.leaf_value(board, to_move, &moves);
+        if search.keys_quiet() {
+            v = v * f64::from(100 - search.quiet) / 100.0;
+        }
         if T::ON {
             search.tracer.leaf(v);
             search.tracer.exit(v, ValueBound::Exact, false);
@@ -1142,6 +1212,10 @@ fn bounded_value<T: Tracer>(
     if let Some(table) = search.table.as_deref() {
         path_free =
             !(table.strict() && (search.repetitions.as_ref()).is_some_and(|r| r.exposes(board)));
+        // Without the count in the key, a 50-ply draw below must be out of reach.
+        if search.draws.is_some() && !search.keys_quiet() {
+            path_free &= search.quiet + draft < QUIET_PLIES;
+        }
         let entry = table.probe(key);
         if T::ON && entry.is_none() {
             search.tracer.tt(TtProbe::Miss);
@@ -1217,14 +1291,18 @@ fn bounded_value<T: Tracer>(
             let entry = child_entry(mv, i, ply + 1, context, (alpha, beta), reasons[i]);
             search.tracer.enter(&entry);
         }
+        let child_key = search.key_after(key, board, mv);
+        let quiet = search.quiet;
+        search.quiet = search.quiet_after(mv);
         let v = bounded_value(
-            (&board.apply(mv), search.key_after(key, board, mv)),
+            (&board.apply(mv), child_key),
             to_move.opponent(),
             ply + 1,
             (alpha, beta),
             context,
             search,
         )?;
+        search.quiet = quiet;
         if (maximising && v > best) || (!maximising && v < best) {
             best_move = i;
         }

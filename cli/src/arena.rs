@@ -10,8 +10,8 @@ use std::process::{Command, ExitCode};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use engine::{
-    AgentSpec, Color, MatchPlan, MatchRecord, MctsKind, Schedule, Sprt, TableOptions, Thinking,
-    Weights, play_match,
+    AgentSpec, Color, DrawRules, MatchPlan, MatchRecord, MctsKind, Schedule, Sprt, TableOptions,
+    Thinking, Weights, play_match,
 };
 
 const HELP: &str = "\
@@ -318,13 +318,14 @@ fn describe(spec: &AgentSpec) -> String {
                 repetition,
                 order,
                 table,
+                draws,
                 weights,
             },
             _,
         ) => {
             format!(
                 "{spec} (alpha-beta, {depth} plies{}, {})",
-                extras(*quiescence, *repetition, *order, table),
+                extras(*quiescence, *repetition, *order, table, draws),
                 weights_text(weights)
             )
         }
@@ -334,13 +335,14 @@ fn describe(spec: &AgentSpec) -> String {
                 repetition,
                 order,
                 table,
+                draws,
                 weights,
                 ..
             },
             _,
         ) => format!(
             "{spec} (iterative deepening alpha-beta{}, {})",
-            extras(*quiescence, *repetition, *order, table),
+            extras(*quiescence, *repetition, *order, table, draws),
             weights_text(weights)
         ),
         (AgentSpec::Mcts { kind, weights, .. }, _) => {
@@ -371,7 +373,13 @@ fn weights_text(weights: &Weights) -> String {
 
 /// `, quiescence`, `, repetitions`, `, move ordering` and `, table 16 MB` for the searches that
 /// have them.
-fn extras(quiescence: bool, repetition: bool, order: bool, table: &Option<TableOptions>) -> String {
+fn extras(
+    quiescence: bool,
+    repetition: bool,
+    order: bool,
+    table: &Option<TableOptions>,
+    draws: &Option<DrawRules>,
+) -> String {
     let mut extras = String::new();
     if quiescence {
         extras.push_str(", quiescence");
@@ -384,6 +392,13 @@ fn extras(quiescence: bool, repetition: bool, order: bool, table: &Option<TableO
     }
     if let Some(table) = table {
         extras.push_str(&format!(", table {table}"));
+    }
+    match draws {
+        Some(DrawRules { progress: true, .. }) => {
+            extras.push_str(", 50-ply and one-each rules, progress pressure")
+        }
+        Some(_) => extras.push_str(", 50-ply and one-each rules"),
+        None => {}
     }
     extras
 }

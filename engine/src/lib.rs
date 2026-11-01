@@ -34,8 +34,8 @@ pub use agent::{
 pub use api::{Session, version};
 pub use arena::{
     AgentFactory, EndReason, GamePosition, GameRecord, MatchGame, MatchPlan, MatchRecord,
-    MatchSettings, Schedule, Thinking, game_end, paired_agent_seeds, paired_opening_seed,
-    play_game, play_match,
+    MatchSettings, QUIET_PLIES, Schedule, Thinking, game_end, paired_agent_seeds,
+    paired_opening_seed, play_game, play_match,
 };
 pub use bitboard::Bitboard;
 pub use board::{Board, Color, Kind, ParseBoardError, Piece};
@@ -46,20 +46,21 @@ pub use eval::{
 };
 pub use json::Json;
 pub use ladder::{
-    ABLATION, ABLATION_FOOTNOTES, ABLATION_SET, ANCHOR, FOOTNOTES, GAMES_HEADER, GameRow, LADDER,
-    LADDER_SET, LONG_MATCH, MCTS, MCTS_OPPONENTS, MCTS_SET, MID, Meta, Pairing, PairingSummary,
-    Report, Role, Rung, SEED, SHORT_MATCH, Set, SideStats, VersionSummary, ablation_plan,
-    against_plan, plan, rate, rows_of,
+    ABLATION, ABLATION_FOOTNOTES, ABLATION_SET, ANCHOR, FIFTY, FIFTY_PAIRS, FIFTY_SET, FOOTNOTES,
+    GAMES_HEADER, GameRow, LADDER, LADDER_SET, LONG_MATCH, MCTS, MCTS_OPPONENTS, MCTS_SET, MID,
+    Meta, Pairing, PairingSummary, Report, Role, Rung, SEED, SHORT_MATCH, Set, SideStats,
+    VersionSummary, ablation_plan, against_plan, pairs_plan, plan, rate, rows_of,
 };
 pub use mcts::{Clock, EXPLORATION, MctsKind, MctsResult, TEXEL1_K, mcts};
 pub use movegen::Move;
 pub use perft::perft;
 pub use rng::{Mulberry32, derive_seed};
 pub use search::{
-    Candidate, Decision, Deepening, Limits, MAX_ID_DEPTH, SearchOptions, alpha_beta, alpha_beta_q,
-    alpha_beta_rep, alpha_beta_traced, alpha_beta_with, decide, decide_traced, iterative_deepening,
-    iterative_deepening_rep, iterative_deepening_traced, iterative_deepening_with, minimax,
-    minimax_q, minimax_traced, native_clock, quiescence_value, static_value,
+    Candidate, Decision, Deepening, DrawRules, Limits, MAX_ID_DEPTH, SearchOptions, alpha_beta,
+    alpha_beta_q, alpha_beta_rep, alpha_beta_traced, alpha_beta_with, decide, decide_traced,
+    iterative_deepening, iterative_deepening_rep, iterative_deepening_traced,
+    iterative_deepening_with, minimax, minimax_q, minimax_traced, native_clock, quiescence_value,
+    static_value,
 };
 pub use sprt::{Pentanomial, Sprt, SprtResult, Verdict, elo_of, expected_score};
 pub use square::Square;
@@ -72,4 +73,4 @@ pub use trace::{
     Enter, Iteration, NoTrace, Reason, Recorder, RootMove, Stats, TraceNode, TraceRequest, Tracer,
     Tree, TtProbe, ValueBound,
 };
-pub use zobrist::{zobrist, zobrist_after};
+pub use zobrist::{quiet_key, zobrist, zobrist_after};

@@ -17,7 +17,7 @@ use crate::mcts::{Clock, MctsKind, mcts};
 use crate::movegen::Move;
 use crate::rng::Mulberry32;
 use crate::search::{
-    Decision, Limits, MAX_ID_DEPTH, SearchOptions, alpha_beta_traced, decide_traced,
+    Decision, DrawRules, Limits, MAX_ID_DEPTH, SearchOptions, alpha_beta_traced, decide_traced,
     iterative_deepening_traced, minimax_traced, native_clock,
 };
 #[cfg(test)]
@@ -144,6 +144,32 @@ impl GameHistory {
             self.positions.clear();
         }
         self.positions.push((*board, side));
+    }
+}
+
+/// The current game's plies in a row without a capture, from the positions observed, for an agent
+/// whose search applies the draw rules (the letter `f`).
+#[derive(Clone, Debug, Default)]
+struct QuietCount {
+    last: Option<Board>,
+    quiet: u32,
+}
+
+impl QuietCount {
+    fn clear(&mut self) {
+        *self = QuietCount::default();
+    }
+
+    fn push(&mut self, board: &Board) {
+        let pieces = |b: &Board| b.pieces(Color::White).len() + b.pieces(Color::Black).len();
+        if let Some(last) = &self.last {
+            self.quiet = if pieces(board) < pieces(last) {
+                0
+            } else {
+                self.quiet + 1
+            };
+        }
+        self.last = Some(*board);
     }
 }
 
@@ -366,6 +392,9 @@ pub struct AlphaBetaAgent {
     table: Option<Table>,
     /// `Some` when repetitions are recognised: the game so far.
     history: Option<GameHistory>,
+    /// `Some` when the search applies the other draw rules; its count comes from `quiet`.
+    draws: Option<DrawRules>,
+    quiet: QuietCount,
     rng: Mulberry32,
     nodes: u64,
     /// The sum of `Agent::depths`.
@@ -381,6 +410,8 @@ impl AlphaBetaAgent {
             order: false,
             table: None,
             history: None,
+            draws: None,
+            quiet: QuietCount::default(),
             rng: Mulberry32::new(seed),
             nodes: 0,
             depths: 0,
@@ -405,6 +436,13 @@ impl AlphaBetaAgent {
         self.table = options.map(Table::new);
         self
     }
+
+    /// The same agent, applying the 50-ply and one-piece-each rules in its search if `Some`
+    /// (their `quiet` is ignored: the agent counts the game's quiet plies itself).
+    pub fn with_draws(mut self, draws: Option<DrawRules>) -> AlphaBetaAgent {
+        self.draws = draws;
+        self
+    }
 }
 
 impl AlphaBetaAgent {
@@ -419,6 +457,10 @@ impl AlphaBetaAgent {
         let options = SearchOptions {
             quiescence: self.quiescence,
             order: self.order,
+            draws: (self.draws).map(|rules| DrawRules {
+                quiet: self.quiet.quiet,
+                ..rules
+            }),
         };
         let history = self.history.as_ref().map(|h| h.positions.as_slice());
         let decision = alpha_beta_traced(
@@ -444,6 +486,7 @@ impl Agent for AlphaBetaAgent {
         if let Some(history) = &mut self.history {
             history.clear();
         }
+        self.quiet.clear();
         if let Some(table) = &mut self.table {
             table.clear();
         }
@@ -476,12 +519,16 @@ impl Agent for AlphaBetaAgent {
         if let Some(history) = &mut self.history {
             history.push(board, side);
         }
+        if self.draws.is_some() {
+            self.quiet.push(board);
+        }
     }
 
     fn forget_game(&mut self) {
         if let Some(history) = &mut self.history {
             history.clear();
         }
+        self.quiet.clear();
     }
 
     fn nodes(&self) -> u64 {
@@ -509,6 +556,9 @@ pub struct DeepeningAgent {
     table: Option<Table>,
     /// `Some` when repetitions are recognised: the game so far.
     history: Option<GameHistory>,
+    /// `Some` when the search applies the other draw rules; its count comes from `quiet`.
+    draws: Option<DrawRules>,
+    quiet: QuietCount,
     rng: Mulberry32,
     /// The clock of a time limit.
     now: fn() -> f64,
@@ -526,6 +576,8 @@ impl DeepeningAgent {
             order: false,
             table: None,
             history: None,
+            draws: None,
+            quiet: QuietCount::default(),
             rng: Mulberry32::new(seed),
             now: native_clock,
             nodes: 0,
@@ -551,6 +603,13 @@ impl DeepeningAgent {
         self.table = options.map(Table::new);
         self
     }
+
+    /// The same agent, applying the 50-ply and one-piece-each rules in its search if `Some`
+    /// (their `quiet` is ignored: the agent counts the game's quiet plies itself).
+    pub fn with_draws(mut self, draws: Option<DrawRules>) -> DeepeningAgent {
+        self.draws = draws;
+        self
+    }
 }
 
 impl DeepeningAgent {
@@ -565,6 +624,10 @@ impl DeepeningAgent {
         let options = SearchOptions {
             quiescence: self.quiescence,
             order: self.order,
+            draws: (self.draws).map(|rules| DrawRules {
+                quiet: self.quiet.quiet,
+                ..rules
+            }),
         };
         let history = self.history.as_ref().map(|h| h.positions.as_slice());
         let deepening = iterative_deepening_traced(
@@ -591,6 +654,7 @@ impl Agent for DeepeningAgent {
         if let Some(history) = &mut self.history {
             history.clear();
         }
+        self.quiet.clear();
         if let Some(table) = &mut self.table {
             table.clear();
         }
@@ -623,12 +687,16 @@ impl Agent for DeepeningAgent {
         if let Some(history) = &mut self.history {
             history.push(board, side);
         }
+        if self.draws.is_some() {
+            self.quiet.push(board);
+        }
     }
 
     fn forget_game(&mut self) {
         if let Some(history) = &mut self.history {
             history.clear();
         }
+        self.quiet.clear();
     }
 
     fn set_clock(&mut self, now: fn() -> f64) {
@@ -779,6 +847,8 @@ pub enum AgentSpec {
         repetition: bool,
         order: bool,
         table: Option<TableOptions>,
+        /// The letter `f`; its `quiet` is 0 (the agent counts the game's).
+        draws: Option<DrawRules>,
         weights: Weights,
     },
     /// Iterative deepening within `limits`.
@@ -788,6 +858,8 @@ pub enum AgentSpec {
         repetition: bool,
         order: bool,
         table: Option<TableOptions>,
+        /// The letter `f`; its `quiet` is 0 (the agent counts the game's).
+        draws: Option<DrawRules>,
         weights: Weights,
     },
     /// Monte Carlo tree search of `kind` within `limits` (nodes and/or time, no depth); `weights`
@@ -844,6 +916,16 @@ impl AgentSpec {
         }
     }
 
+    /// The draw rules, to change them; none without the letter `f`.
+    fn draws_mut(&mut self) -> Option<&mut DrawRules> {
+        match self {
+            AgentSpec::AlphaBeta { draws, .. } | AgentSpec::Deepening { draws, .. } => {
+                draws.as_mut()
+            }
+            _ => None,
+        }
+    }
+
     /// The weights, to change them; none for `random`, `mc` and `uct`.
     fn weights_mut(&mut self) -> Option<&mut Weights> {
         match self {
@@ -868,12 +950,14 @@ impl AgentSpec {
                 repetition,
                 order,
                 table,
+                draws,
                 weights,
             } => Box::new(
                 AlphaBetaAgent::new(weights, depth, quiescence, 0)
                     .with_repetitions(repetition)
                     .with_ordering(order)
-                    .with_table(table),
+                    .with_table(table)
+                    .with_draws(draws),
             ),
             AgentSpec::Deepening {
                 limits,
@@ -881,12 +965,14 @@ impl AgentSpec {
                 repetition,
                 order,
                 table,
+                draws,
                 weights,
             } => Box::new(
                 DeepeningAgent::new(weights, limits, quiescence, 0)
                     .with_repetitions(repetition)
                     .with_ordering(order)
-                    .with_table(table),
+                    .with_table(table)
+                    .with_draws(draws),
             ),
             AgentSpec::Mcts {
                 kind,
@@ -929,14 +1015,22 @@ impl fmt::Display for AgentSpec {
                     repetition,
                     order,
                     table,
+                    draws,
                     weights,
                 },
                 _,
             ) => write!(
                 f,
-                "ab{depth}{}{}{}",
-                letters(*quiescence, *repetition, *order, table.is_some()),
+                "ab{depth}{}{}{}{}",
+                Letters {
+                    quiescence: *quiescence,
+                    repetition: *repetition,
+                    order: *order,
+                    table: table.is_some(),
+                    draws: draws.is_some(),
+                },
                 weights.suffix(),
+                draws_suffix(draws),
                 table_suffix(table)
             ),
             (
@@ -946,15 +1040,19 @@ impl fmt::Display for AgentSpec {
                     repetition,
                     order,
                     table,
+                    draws,
                     weights,
                 },
                 _,
             ) => {
-                write!(
-                    f,
-                    "id{}",
-                    letters(*quiescence, *repetition, *order, table.is_some())
-                )?;
+                let letters = Letters {
+                    quiescence: *quiescence,
+                    repetition: *repetition,
+                    order: *order,
+                    table: table.is_some(),
+                    draws: draws.is_some(),
+                };
+                write!(f, "id{letters}")?;
                 if let Some(depth) = limits.depth {
                     write!(f, ":d{depth}")?;
                 }
@@ -964,7 +1062,8 @@ impl fmt::Display for AgentSpec {
                 if let Some(time) = limits.time {
                     write!(f, ":t{}", time.as_millis())?;
                 }
-                write!(f, "{}{}", weights.suffix(), table_suffix(table))
+                let (weights, draws) = (weights.suffix(), draws_suffix(draws));
+                write!(f, "{weights}{draws}{}", table_suffix(table))
             }
             (
                 AgentSpec::Mcts {
@@ -991,17 +1090,62 @@ impl fmt::Display for AgentSpec {
 }
 
 /// The letters of `ab` and `id` names: `q` for quiescence, `r` for repetitions, `o` for move
-/// ordering, `t` for a transposition table, in that order.
-fn letters(quiescence: bool, repetition: bool, order: bool, table: bool) -> String {
-    [
-        (quiescence, 'q'),
-        (repetition, 'r'),
-        (order, 'o'),
-        (table, 't'),
-    ]
-    .into_iter()
-    .filter_map(|(on, letter)| on.then_some(letter))
-    .collect()
+/// ordering, `t` for a transposition table, `f` for the 50-ply and one-piece-each rules, in that
+/// order.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+struct Letters {
+    quiescence: bool,
+    repetition: bool,
+    order: bool,
+    table: bool,
+    draws: bool,
+}
+
+impl Letters {
+    /// The letters of `letters`; `None` unless each of `q`, `r`, `o`, `t`, `f` appears at most
+    /// once and in that order, with nothing else.
+    fn parse(letters: &str) -> Option<Letters> {
+        let mut rest = letters;
+        let mut take = |letter: char| match rest.strip_prefix(letter) {
+            Some(after) => {
+                rest = after;
+                true
+            }
+            None => false,
+        };
+        let parsed = Letters {
+            quiescence: take('q'),
+            repetition: take('r'),
+            order: take('o'),
+            table: take('t'),
+            draws: take('f'),
+        };
+        rest.is_empty().then_some(parsed)
+    }
+}
+
+impl fmt::Display for Letters {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let letters = [
+            (self.quiescence, 'q'),
+            (self.repetition, 'r'),
+            (self.order, 'o'),
+            (self.table, 't'),
+            (self.draws, 'f'),
+        ];
+        (letters.into_iter())
+            .filter(|&(on, _)| on)
+            .try_for_each(|(_, letter)| write!(f, "{letter}"))
+    }
+}
+
+/// The draw rules' part of a name: `:fs=1` with progress pressure.
+fn draws_suffix(draws: &Option<DrawRules>) -> &'static str {
+    if draws.is_some_and(|rules| rules.progress) {
+        ":fs=1"
+    } else {
+        ""
+    }
 }
 
 /// The table's parts of a name: `:hash=MB` unless the default, `:tt=strict` in strict mode.
@@ -1016,22 +1160,6 @@ fn table_suffix(table: &Option<TableOptions>) -> String {
         }
     }
     suffix
-}
-
-/// The search options of `letters` (see `letters`): quiescence, repetitions, ordering, table;
-/// `None` unless each of `q`, `r`, `o`, `t` appears at most once and in that order, with nothing
-/// else.
-fn parse_letters(letters: &str) -> Option<(bool, bool, bool, bool)> {
-    let mut rest = letters;
-    let mut take = |letter: char| match rest.strip_prefix(letter) {
-        Some(after) => {
-            rest = after;
-            true
-        }
-        None => false,
-    };
-    let options = (take('q'), take('r'), take('o'), take('t'));
-    rest.is_empty().then_some(options)
 }
 
 /// Why a name is not an agent.
@@ -1054,6 +1182,9 @@ pub enum ParseAgentError {
     /// The `:hash=MB` and `:tt=strict` parts of the name (the first string) do not set a table;
     /// the second string says why.
     Table(String, String),
+    /// The `:fs=0|1` part of the name (the first string) does not set the draw rules; the second
+    /// string says why.
+    Draws(String, String),
 }
 
 impl fmt::Display for ParseAgentError {
@@ -1064,8 +1195,8 @@ impl fmt::Display for ParseAgentError {
                 "unknown agent {name:?}: expected random, material, first, tuned, texel1, texel2, texel2s, \
                  u:MAN/KING/MOB, \
                  mmN, abN, id:LIMITS, the last two with letters q (quiescence), r (repetitions) \
-                 o (move ordering) and t (transposition table) in that order: abNqrot, \
-                 idqrot:LIMITS, or Monte Carlo tree search mc:LIMITS, uct:LIMITS, ucte:LIMITS, \
+                 o (move ordering), t (transposition table) and f (50-ply and one-piece-each \
+                 rules) in that order: abNqrotf, idqrotf:LIMITS, or Monte Carlo tree search mc:LIMITS, uct:LIMITS, ucte:LIMITS, \
                  uctq:LIMITS"
             ),
             ParseAgentError::Depth(name) => write!(
@@ -1100,6 +1231,12 @@ impl fmt::Display for ParseAgentError {
                  example idqrot:n20000:hash=64",
                 TableOptions::DEFAULT_MB
             ),
+            ParseAgentError::Draws(name, why) => write!(
+                f,
+                "agent {name:?}: {why}; an ab or id agent with the letter f applies the 50-ply and \
+                 one-piece-each rules in its search, with progress pressure if :fs=1, for example \
+                 idqrotf:n20000:fs=1"
+            ),
         }
     }
 }
@@ -1124,8 +1261,23 @@ impl FromStr for AgentSpec {
             return Err(ParseAgentError::Unknown(s.to_string()));
         }
         let mut spec = parse_base(&parts[..first_weight].join(":"))?;
-        // `hash` and `tt` set the table; every other part sets a weight.
-        let (table_parts, weight_parts): (Vec<&str>, Vec<&str>) = parts[first_weight..]
+        // `fs` sets the draw rules, `hash` and `tt` the table; every other part sets a weight.
+        let (draw_parts, parts_left): (Vec<&str>, Vec<&str>) = parts[first_weight..]
+            .iter()
+            .partition(|part| part.starts_with("fs="));
+        if !draw_parts.is_empty() {
+            let draws_error = |why: &str| ParseAgentError::Draws(s.to_string(), why.to_string());
+            let draws = spec
+                .draws_mut()
+                .ok_or_else(|| draws_error("fs needs the draw rules, the letter f"))?;
+            draws.progress = match draw_parts[..] {
+                ["fs=0"] => false,
+                ["fs=1"] => true,
+                [_] => return Err(draws_error("fs is 0 or 1")),
+                _ => return Err(draws_error("fs may be given once")),
+            };
+        }
+        let (table_parts, weight_parts): (Vec<&str>, Vec<&str>) = parts_left
             .iter()
             .partition(|part| part.starts_with("hash=") || part.starts_with("tt="));
         if !table_parts.is_empty() {
@@ -1200,16 +1352,17 @@ fn parse_base(s: &str) -> Result<AgentSpec, ParseAgentError> {
     // "id", its letters up to the first ':', then the limits.
     let deepening = s.strip_prefix("id").and_then(|rest| {
         let (letters, limits) = rest.split_at(rest.find(':').unwrap_or(rest.len()));
-        Some((parse_letters(letters)?, limits))
+        Some((Letters::parse(letters)?, limits))
     });
-    if let Some(((quiescence, repetition, order, table), limits)) = deepening {
+    if let Some((letters, limits)) = deepening {
         return parse_limits(limits)
             .map(|limits| AgentSpec::Deepening {
                 limits,
-                quiescence,
-                repetition,
-                order,
-                table: table.then(TableOptions::default),
+                quiescence: letters.quiescence,
+                repetition: letters.repetition,
+                order: letters.order,
+                table: letters.table.then(TableOptions::default),
+                draws: letters.draws.then(DrawRules::default),
                 weights: Weights::TUNED,
             })
             .ok_or_else(|| ParseAgentError::Limits(s.to_string()));
@@ -1232,14 +1385,15 @@ fn parse_base(s: &str) -> Result<AgentSpec, ParseAgentError> {
             rest.find(|c: char| !c.is_ascii_digit())
                 .unwrap_or(rest.len()),
         );
-        let (quiescence, repetition, order, table) =
-            parse_letters(letters).ok_or_else(|| ParseAgentError::Depth(s.to_string()))?;
+        let letters =
+            Letters::parse(letters).ok_or_else(|| ParseAgentError::Depth(s.to_string()))?;
         return depth(digits).map(|depth| AgentSpec::AlphaBeta {
             depth,
-            quiescence,
-            repetition,
-            order,
-            table: table.then(TableOptions::default),
+            quiescence: letters.quiescence,
+            repetition: letters.repetition,
+            order: letters.order,
+            table: letters.table.then(TableOptions::default),
+            draws: letters.draws.then(DrawRules::default),
             weights: Weights::TUNED,
         });
     }
@@ -1317,6 +1471,7 @@ mod tests {
             repetition,
             order,
             table: None,
+            draws: None,
             weights: Weights::TUNED,
         };
         let ab = |depth, quiescence, repetition| ab_with(depth, quiescence, repetition, false);
@@ -1339,6 +1494,7 @@ mod tests {
             repetition,
             order,
             table: None,
+            draws: None,
             weights: Weights::TUNED,
         };
         let id = |limits, quiescence, repetition| id_with(limits, quiescence, repetition, false);
@@ -1387,6 +1543,7 @@ mod tests {
                 repetition: true,
                 order: false,
                 table: None,
+                draws: None,
                 weights: Weights {
                     adv: 0.1,
                     ..Weights::TUNED

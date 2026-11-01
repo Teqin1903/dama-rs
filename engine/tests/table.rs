@@ -114,6 +114,7 @@ fn strict_decisions_at(depth: u32) {
                 let options = SearchOptions {
                     quiescence: k & 1 != 0,
                     order: k & 2 != 0,
+                    draws: None,
                 };
                 let history = (k & 4 != 0).then_some(&[][..]);
                 let what =
@@ -209,6 +210,7 @@ fn strict_tables_make_the_same_decisions_after_repetitions_in_the_game() {
                 let options = SearchOptions {
                     quiescence,
                     order: true,
+                    draws: None,
                 };
                 let without = alpha_beta_with(
                     &board,
@@ -249,6 +251,7 @@ fn strict_iterative_deepening_decides_as_without_a_table() {
             let options = SearchOptions {
                 quiescence: true,
                 order: true,
+                draws: None,
             };
             let history = Some(&[][..]);
             let without =
@@ -283,6 +286,7 @@ fn a_win_found_through_the_table_keeps_its_distance() {
                 let options = SearchOptions {
                     quiescence: true,
                     order,
+                    draws: None,
                 };
                 let decision = alpha_beta_with(
                     &board,
@@ -316,6 +320,7 @@ fn normal_tables_are_repeatable_and_save_nodes() {
         let options = SearchOptions {
             quiescence: true,
             order: true,
+            draws: None,
         };
         let run = || {
             let mut table = table(false);

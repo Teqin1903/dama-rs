@@ -64,6 +64,7 @@ fn search(spec: &str, position: &Position, phase: &str) -> Value {
         repetition,
         order,
         table,
+        draws,
         weights,
     }) = spec.parse::<AgentSpec>()
     else {
@@ -76,7 +77,11 @@ fn search(spec: &str, position: &Position, phase: &str) -> Value {
         Color::Black
     };
     let mut table = table.map(Table::new);
-    let options = SearchOptions { quiescence, order };
+    let options = SearchOptions {
+        quiescence,
+        order,
+        draws,
+    };
     let history = repetition.then_some(&[][..]);
     let start = Instant::now();
     let id = iterative_deepening_with(

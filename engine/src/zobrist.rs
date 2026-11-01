@@ -3,6 +3,10 @@
 //! squares, so the key after it (`zobrist_after`) is the key before it with those squares' numbers
 //! toggled; it must always equal the key computed from scratch (`zobrist`).
 //!
+//! A search with progress pressure (the `fs` part of an agent's name) also mixes in one number per
+//! count of quiet plies (`quiet_key`), since its values depend on that count; other searches never
+//! do, so their keys are unchanged.
+//!
 //! The random numbers are fixed (splitmix64 from a constant seed, computed at compile time), so a
 //! key is the same in every run, and a search that uses them can be repeated.
 
@@ -38,6 +42,26 @@ const KEYS: ([[u64; 64]; 4], u64) = {
     let (_, black_to_move) = splitmix64(state);
     (keys, black_to_move)
 };
+
+/// The numbers of 0 to 50 plies in a row without a capture, from a seed of their own so that
+/// `KEYS` stay as they were.
+const QUIET_KEYS: [u64; 51] = {
+    let mut keys = [0; 51];
+    let mut state = 0x7175_6965_7470_6c79; // any fixed seed
+    let mut q = 0;
+    while q < 51 {
+        let (next, number) = splitmix64(state);
+        keys[q] = number;
+        state = next;
+        q += 1;
+    }
+    keys
+};
+
+/// The number of `quiet` plies in a row without a capture (0 to 50), to mix into a key.
+pub fn quiet_key(quiet: u32) -> u64 {
+    QUIET_KEYS[quiet as usize]
+}
 
 /// 0 white man, 1 white king, 2 black man, 3 black king.
 const fn piece_index(color: Color, king: bool) -> usize {

@@ -5,10 +5,10 @@
 mod common;
 
 use engine::{
-    AgentSpec, Board, Color, Decision, Json, Limits, MatchPlan, Recorder, Schedule, SearchOptions,
-    Session, Table, TableOptions, TraceRequest, Weights, alpha_beta_traced, alpha_beta_with,
-    decide, decide_traced, iterative_deepening_traced, iterative_deepening_with, minimax,
-    minimax_traced, native_clock, paired_agent_seeds, play_match, static_value,
+    AgentSpec, Board, Color, Decision, DrawRules, Json, Limits, MatchPlan, Recorder, Schedule,
+    SearchOptions, Session, Table, TableOptions, TraceRequest, Weights, alpha_beta_traced,
+    alpha_beta_with, decide, decide_traced, iterative_deepening_traced, iterative_deepening_with,
+    minimax, minimax_traced, native_clock, paired_agent_seeds, play_match, static_value,
 };
 
 fn clock() -> f64 {
@@ -93,6 +93,7 @@ fn a_session_plays_the_arenas_games() {
     replay_arena_games("idqrot:n2000:w=texel1", "idqr:n2000", 2);
     replay_arena_games("ab3o", "tuned", 2);
     replay_arena_games("mm2", "idq:n1000", 2);
+    replay_arena_games("idqrotf:n2000:w=texel1:fs=1", "ab3qf", 2);
 }
 
 #[test]
@@ -100,6 +101,7 @@ fn a_session_plays_the_arenas_games() {
 fn a_session_plays_the_arenas_games_at_the_ladders_budgets() {
     replay_arena_games("idqrot:n20000:w=texel1", "idqr:n20000:w=texel1", 4);
     replay_arena_games("idqr:n20000", "ab5", 4);
+    replay_arena_games("idqrotf:n20000:w=texel1", "tuned", 4);
 }
 
 /// A position with the side to move, and the positions of the game up to it.
@@ -258,7 +260,11 @@ fn a_traced_search_is_the_untraced_search() {
         }
 
         for (quiescence, order) in [(false, false), (true, true)] {
-            let options = SearchOptions { quiescence, order };
+            let options = SearchOptions {
+                quiescence,
+                order,
+                draws: None,
+            };
             let mut r = recorder();
             let (mut t1, mut t2) = (Table::new(small), Table::new(small));
             let plain = alpha_beta_with(&board, side, weights, 3, options, history, Some(&mut t1));
@@ -284,10 +290,23 @@ fn a_traced_search_is_the_untraced_search() {
             nodes: Some(2000),
             ..Limits::default()
         };
-        for (w, order, table) in [(weights, false, false), (texel1, true, true)] {
+        // The draw rules near the 50-ply limit, with and without progress pressure.
+        let near = |progress| {
+            Some(DrawRules {
+                quiet: 45,
+                progress,
+            })
+        };
+        for (w, order, table, draws) in [
+            (weights, false, false, None),
+            (texel1, true, true, None),
+            (texel1, true, true, near(false)),
+            (texel1, true, true, near(true)),
+        ] {
             let options = SearchOptions {
                 quiescence: true,
                 order,
+                draws,
             };
             let mut tables = (
                 table.then(|| Table::new(small)),
@@ -319,7 +338,8 @@ fn a_traced_search_is_the_untraced_search() {
             assert_eq!(plain.depth, traced.depth, "{label}");
             assert_eq!(r.iterations.last().unwrap().depth, traced.depth, "{label}");
             recorded(&label, &traced.decision, &r);
-            if check_leaves {
+            // Progress pressure scales U at the leaves.
+            if check_leaves && draws.is_none_or(|rules| !rules.progress) {
                 leaves_are_static_values(&label, &board, side, w, &r);
             }
         }

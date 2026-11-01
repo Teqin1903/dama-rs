@@ -74,6 +74,7 @@ fn same_decisions_at(depth: u32) {
                 let plain = SearchOptions {
                     quiescence,
                     order: false,
+                    draws: None,
                 };
                 let ordered = SearchOptions {
                     order: true,
@@ -137,6 +138,7 @@ fn same_decisions_after_a_repetition_in_the_game() {
                 let plain = SearchOptions {
                     quiescence,
                     order: false,
+                    draws: None,
                 };
                 let ordered = SearchOptions {
                     order: true,
@@ -175,6 +177,7 @@ fn deepening_decides_as_alpha_beta(limits: Limits, quiescence: bool, step: usize
         let ordered = SearchOptions {
             quiescence,
             order: true,
+            draws: None,
         };
         let plain = SearchOptions {
             order: false,

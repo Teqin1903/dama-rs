@@ -57,7 +57,7 @@ use crate::sprt::{Pentanomial, Sprt, SprtResult, Verdict};
 const REPETITIONS: u32 = 3;
 
 /// A game is drawn after this many plies in a row without a capture.
-const QUIET_PLIES: u32 = 50;
+pub const QUIET_PLIES: u32 = 50;
 
 /// The settings of a match that may change. The other draw rules are fixed, as in agent.js.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
