@@ -23,6 +23,7 @@ fn options(quiet: u32, progress: bool) -> SearchOptions {
         quiescence: true,
         order: true,
         draws: Some(DrawRules { quiet, progress }),
+        ..SearchOptions::default()
     }
 }
 

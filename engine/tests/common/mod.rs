@@ -3,7 +3,7 @@
 
 use std::path::Path;
 
-use engine::{Board, Color, Weights};
+use engine::{Board, Color, Decision, U_EPSILON, Weights};
 use serde::Deserialize;
 
 /// The contents of `testdata/<file>`.
@@ -58,4 +58,50 @@ pub fn positions() -> Vec<(String, Board, Color, Weights)> {
     }
     assert_eq!(all.len(), 541);
     all
+}
+
+/// The differences between `ordered` and `plain`, the decision of alpha-beta in legal order: a
+/// search that must make the same decision from other nodes.
+#[allow(dead_code)]
+pub fn compare(label: &str, plain: &Decision, ordered: &Decision) -> Vec<String> {
+    let mut errors = Vec::new();
+    if ordered.top != plain.top {
+        errors.push(format!(
+            "{label}: top {:?}, in legal order {:?}",
+            ordered.top, plain.top
+        ));
+    }
+    if ordered.candidates.len() != plain.candidates.len() {
+        errors.push(format!("{label}: number of candidates differs"));
+        return errors;
+    }
+    let best = plain
+        .candidates
+        .iter()
+        .map(|c| c.u)
+        .fold(f64::NEG_INFINITY, f64::max);
+    for (i, (o, p)) in ordered.candidates.iter().zip(&plain.candidates).enumerate() {
+        let what = format!("{label}: move {} ({i})", p.mv);
+        if o.mv != p.mv || o.features != p.features {
+            errors.push(format!("{what}: move or features differ"));
+        }
+        if plain.top.contains(&i) && !o.exact {
+            errors.push(format!("{what}: a best move without an exact value"));
+        }
+        if o.exact && p.exact && o.u != p.u {
+            errors.push(format!(
+                "{what}: exact value {}, in legal order {}",
+                o.u, p.u
+            ));
+        }
+        // An exact value in legal order is the minimax value: the bound must be above it, and
+        // far enough below the best to rule the move out.
+        if !o.exact && (best - o.u <= U_EPSILON || (p.exact && o.u < p.u)) {
+            errors.push(format!(
+                "{what}: bound {}, in legal order {} (exact: {}), best {best}",
+                o.u, p.u, p.exact
+            ));
+        }
+    }
+    errors
 }

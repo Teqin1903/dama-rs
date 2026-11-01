@@ -15,14 +15,16 @@
 //!
 //! Output: one tab-separated line per argument: the argument, positions, the mean, lowest and highest
 //! completed depth, the mean nodes per move, the mean and longest time per move in milliseconds,
-//! and how many positions completed each depth (`depth:count`).
+//! how many positions completed each depth (`depth:count`), and how many stopped by proof, whose
+//! last iteration reached no leaf at the depth limit, with the mean depth of the others. A proof
+//! ends a search early, so an agent that finds more of them shows a lower mean depth for it.
 
 use std::collections::BTreeMap;
 use std::path::Path;
 use std::time::{Duration, Instant};
 
 use engine::{
-    AgentSpec, Board, Color, Limits, SearchOptions, Table, Weights, alpha_beta,
+    AgentSpec, Aspiration, Board, Color, Limits, SearchOptions, Table, Weights, alpha_beta,
     iterative_deepening_with,
 };
 use serde::Deserialize;
@@ -71,7 +73,7 @@ fn main() {
         alpha_beta(board, *side, *weights, 3); // warm-up
     }
     println!(
-        "search\tpositions\tmean_depth\tmin_depth\tmax_depth\tnodes_per_move\tmean_ms\tmax_ms\tdepths"
+        "search\tpositions\tmean_depth\tmin_depth\tmax_depth\tnodes_per_move\tmean_ms\tmax_ms\tdepths\tproved\tmean_depth_unproved"
     );
     for arg in std::env::args().skip(1) {
         // A number is a time limit with each position's weights; a name brings its own weights.
@@ -91,12 +93,19 @@ fn main() {
                     order,
                     table,
                     draws,
+                    pvs,
+                    aspiration,
                     weights,
                 }) => {
                     let options = SearchOptions {
                         quiescence,
                         order,
                         draws,
+                        pvs,
+                        aspiration: aspiration.map(|half_width| Aspiration {
+                            half_width,
+                            from_depth: Aspiration::FROM_DEPTH,
+                        }),
                     };
                     let history = repetition.then_some(&[][..]);
                     (
@@ -112,6 +121,7 @@ fn main() {
         };
         let mut depths = BTreeMap::new();
         let (mut nodes, mut total, mut longest) = (0, Duration::ZERO, Duration::ZERO);
+        let (mut proved, mut unproved_depths) = (0, 0);
         for (board, side, weights) in &positions {
             // A table starts empty for every position, as at the start of a game.
             if let Some(table) = &mut table {
@@ -130,6 +140,11 @@ fn main() {
             );
             let took = start.elapsed();
             *depths.entry(id.depth).or_insert(0) += 1;
+            if id.proved {
+                proved += 1;
+            } else {
+                unproved_depths += id.depth;
+            }
             nodes += id.decision.nodes;
             total += took;
             longest = longest.max(took);
@@ -138,7 +153,7 @@ fn main() {
         let sum: u32 = depths.iter().map(|(d, count)| d * count).sum();
         let histogram: Vec<String> = depths.iter().map(|(d, c)| format!("{d}:{c}")).collect();
         println!(
-            "{arg}\t{}\t{:.2}\t{}\t{}\t{:.0}\t{:.2}\t{:.2}\t{}",
+            "{arg}\t{}\t{:.2}\t{}\t{}\t{:.0}\t{:.2}\t{:.2}\t{}\t{proved}\t{:.2}",
             positions.len(),
             f64::from(sum) / n,
             depths.keys().next().unwrap(),
@@ -146,7 +161,8 @@ fn main() {
             nodes as f64 / n,
             total.as_secs_f64() * 1e3 / n,
             longest.as_secs_f64() * 1e3,
-            histogram.join(" ")
+            histogram.join(" "),
+            f64::from(unproved_depths) / (n - f64::from(proved))
         );
     }
 }

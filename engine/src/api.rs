@@ -692,6 +692,22 @@ fn report(
             ("nodes", count(it.nodes)),
             ("ms", Json::num(it.ms, 3)),
             (
+                "attempts",
+                Json::Arr(
+                    it.attempts
+                        .iter()
+                        .map(|a| {
+                            Json::obj(vec![
+                                ("alpha", finite(a.window.0)),
+                                ("beta", finite(a.window.1)),
+                                ("value", Json::Num(a.value)),
+                                ("nodes", count(a.nodes)),
+                            ])
+                        })
+                        .collect(),
+                ),
+            ),
+            (
                 "pv",
                 top.map_or(Json::Arr(Vec::new()), |r| notation_list(&r.pv)),
             ),
@@ -791,6 +807,7 @@ fn tree_json(tree: &Tree) -> Json {
             ),
             ("legal", count(n.legal as u64)),
             ("order", n.order.map_or(Json::Null, |r| Json::str(r.key()))),
+            ("pass", Json::str(n.pass.key())),
             ("cutoff", Json::Bool(n.cutoff)),
             ("tt", n.tt.map_or(Json::Null, |t| Json::str(t.key()))),
             (

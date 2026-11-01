@@ -5,10 +5,11 @@
 mod common;
 
 use engine::{
-    AgentSpec, Board, Color, Decision, DrawRules, Json, Limits, MatchPlan, Recorder, Schedule,
-    SearchOptions, Session, Table, TableOptions, TraceRequest, Weights, alpha_beta_traced,
-    alpha_beta_with, decide, decide_traced, iterative_deepening_traced, iterative_deepening_with,
-    minimax, minimax_traced, native_clock, paired_agent_seeds, play_match, static_value,
+    AgentSpec, Aspiration, Board, Color, Decision, DrawRules, Json, Limits, MatchPlan, Pass,
+    Recorder, Schedule, SearchOptions, Session, Table, TableOptions, TraceRequest, Weights,
+    alpha_beta_traced, alpha_beta_with, decide, decide_traced, iterative_deepening_traced,
+    iterative_deepening_with, minimax, minimax_traced, native_clock, paired_agent_seeds,
+    play_match, static_value,
 };
 
 fn clock() -> f64 {
@@ -94,6 +95,7 @@ fn a_session_plays_the_arenas_games() {
     replay_arena_games("ab3o", "tuned", 2);
     replay_arena_games("mm2", "idq:n1000", 2);
     replay_arena_games("idqrotf:n2000:w=texel1:fs=1", "ab3qf", 2);
+    replay_arena_games("idqrotfp:n2000:w=texel1:fs=1:asp=0.5", "ab3qrp", 2);
 }
 
 #[test]
@@ -178,12 +180,50 @@ fn recorded(label: &str, decision: &Decision, recorder: &Recorder) {
     }
     let tree = recorder.tree.as_ref().expect("a tree was asked for");
     assert!(!tree.truncated, "{label}");
-    // The iteration's own nodes, and its root.
-    let before = nodes.len().checked_sub(2).map_or(0, |i| nodes[i]);
+    // The iteration's own nodes in the try that counted, and its root.
+    let before = last
+        .attempts
+        .last()
+        .map_or(nodes.len().checked_sub(2).map_or(0, |i| nodes[i]), |a| {
+            a.nodes
+        });
     assert_eq!(tree.nodes_total, last.nodes - before + 1, "{label}");
     assert_eq!(tree.nodes.len() as u64, tree.nodes_total, "{label}");
     assert_eq!(tree.nodes[0].sub, tree.nodes_total, "{label}");
     assert_eq!(tree.nodes[0].exit, 2 * tree.nodes_total - 1, "{label}");
+    // A move that enters twice under its parent is a scout, then a research.
+    for node in &tree.nodes {
+        for pair in node.children.windows(2) {
+            let (a, b) = (&tree.nodes[pair[0]], &tree.nodes[pair[1]]);
+            if b.pass == Pass::Research {
+                assert_eq!((a.pass, &a.mv), (Pass::Scout, &b.mv), "{label}");
+            }
+        }
+        let first = node.children.first().map(|&c| tree.nodes[c].pass);
+        assert_ne!(
+            first,
+            Some(Pass::Scout),
+            "{label}: the first move has no test"
+        );
+        assert_ne!(
+            first,
+            Some(Pass::Research),
+            "{label}: the first move has no test"
+        );
+    }
+    let mut root_moves: Vec<usize> = last.root.iter().map(|r| r.index).collect();
+    root_moves.sort_unstable();
+    root_moves.dedup();
+    assert_eq!(
+        root_moves.len(),
+        last.root.len(),
+        "{label}: a root move twice"
+    );
+    let orders: Vec<u32> = last.root.iter().map(|r| r.order).collect();
+    assert!(
+        orders.iter().copied().eq(1..=orders.len() as u32),
+        "{label}: {orders:?}"
+    );
 }
 
 /// Every leaf of the tree carries the static value of its position from the root side, bit for
@@ -259,11 +299,17 @@ fn a_traced_search_is_the_untraced_search() {
             leaves_are_static_values(&label, &board, side, weights, &r);
         }
 
-        for (quiescence, order) in [(false, false), (true, true)] {
+        for (quiescence, order, pvs) in [
+            (false, false, false),
+            (true, true, false),
+            (false, false, true),
+            (true, true, true),
+        ] {
             let options = SearchOptions {
                 quiescence,
                 order,
-                draws: None,
+                pvs,
+                ..SearchOptions::default()
             };
             let mut r = recorder();
             let (mut t1, mut t2) = (Table::new(small), Table::new(small));
@@ -297,16 +343,31 @@ fn a_traced_search_is_the_untraced_search() {
                 progress,
             })
         };
-        for (w, order, table, draws) in [
-            (weights, false, false, None),
-            (texel1, true, true, None),
-            (texel1, true, true, near(false)),
-            (texel1, true, true, near(true)),
+        // Windows from depth 2 on, so that even a short search has some.
+        let window = |half_width| {
+            Some(Aspiration {
+                half_width,
+                from_depth: 2,
+            })
+        };
+        for (w, order, table, draws, pvs, aspiration) in [
+            (weights, false, false, None, false, None),
+            (texel1, true, true, None, false, None),
+            (texel1, true, true, near(false), false, None),
+            (texel1, true, true, near(true), false, None),
+            (weights, false, false, None, true, None),
+            (texel1, true, true, near(true), true, None),
+            (weights, false, false, None, false, window(1e-6)),
+            (texel1, true, true, None, false, window(0.1)),
+            (texel1, true, true, near(true), true, window(1e-6)),
+            (texel1, true, true, None, true, window(0.5)),
         ] {
             let options = SearchOptions {
                 quiescence: true,
                 order,
                 draws,
+                pvs,
+                aspiration,
             };
             let mut tables = (
                 table.then(|| Table::new(small)),
@@ -341,6 +402,47 @@ fn a_traced_search_is_the_untraced_search() {
             // Progress pressure scales U at the leaves.
             if check_leaves && draws.is_none_or(|rules| !rules.progress) {
                 leaves_are_static_values(&label, &board, side, w, &r);
+            }
+        }
+    }
+}
+
+/// The move a research replaces its scout in the recorder: the principal variation of the best
+/// move ends in the position whose value it has, though the scout before the research found the
+/// same value through other, cut-off lines.
+#[test]
+fn a_principal_variation_after_a_research_leads_to_its_value() {
+    for (label, board, side, weights) in common::positions().into_iter().step_by(3) {
+        if board.legal_moves(side).is_empty() {
+            continue;
+        }
+        for pvs in [false, true] {
+            let options = SearchOptions {
+                quiescence: true,
+                pvs,
+                ..SearchOptions::default()
+            };
+            let mut r = recorder();
+            let d = alpha_beta_traced(&board, side, weights, 3, options, None, None, None, &mut r);
+            let top = &d.candidates[d.top[0]];
+            let last = r.iterations.last().unwrap();
+            let root = last.root.iter().find(|m| m.index == top.index).unwrap();
+            assert_eq!(root.value.to_bits(), top.u.to_bits(), "{label}");
+            let (mut b, mut to_move) = (board, side);
+            for mv in &root.pv {
+                b = b.apply(mv);
+                to_move = to_move.opponent();
+            }
+            let moves = b.legal_moves(to_move);
+            // A line that ends in a win has no value of U to compare.
+            if !moves.is_empty() {
+                let leaf = static_value(&b, to_move, side, weights);
+                assert_eq!(
+                    leaf.to_bits(),
+                    top.u.to_bits(),
+                    "{label}, p {pvs}: {:?}",
+                    root.pv
+                );
             }
         }
     }

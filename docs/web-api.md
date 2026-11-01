@@ -95,7 +95,8 @@ Report = {"spec": "idqrot:n20000:w=texel1", "side": "white", "board": "<board at
           "turn": "white", "ply": 12, "legal": 9,
           "best": "d3-d4", "value": 0.42, "bound": "exact", "depth": 6, "nodes": 19834, "qnodes": 7340, "ms": 48,
           "pv": ["d3-d4", "e6-e5", ...], "ties": ["d3-d4"],
-          "iterations": [{"depth": 1, "best": "c3-c4", "value": 0.10, "nodes": 12, "ms": 0, "pv": ["c3-c4"]}, ...],
+          "iterations": [{"depth": 1, "best": "c3-c4", "value": 0.10, "nodes": 12, "ms": 0, "attempts": [],
+                          "pv": ["c3-c4"]}, ...],
           "root": [{"move": "d3-d4", "value": 0.42, "bound": "exact", "order": 1, "reason": "tt", "nodes": 8120}, ...],
           "stats": {"qnodes": 7340, "tt_probes": 9000, "tt_hits": 2100, "tt_cutoffs": 800,
                     "beta_cutoffs": 3000, "first_move_cutoffs": 2700, "repetition_draws": 4},
@@ -111,6 +112,7 @@ Trace = {"iteration": 6, "nodes_total": 8732, "truncated": false,
                     "static": null | 0.12,                (when the node returned its static evaluation)
                     "children": [1, 57, ...],             (in the order tried)
                     "legal": 9, "order": null | reason,   (why this node's move was tried there)
+                    "pass": "full" | "scout" | "research", (how it was searched; see below)
                     "cutoff": false,                      (true: the last child caused a cutoff)
                     "tt": null | "miss" | "hit" | "cut",
                     "draw": null | "repetition" | "one_each" | "fifty",
@@ -121,6 +123,25 @@ Values and windows in a trace are from the root side: MAX nodes have the root si
 other side. Our search already keeps every value from the root side's view (search.rs), so they are reported
 as they are, with no sign change. Nodes are numbered in visit order; recording stops at max_nodes
 (truncated: true) while the search itself runs on unchanged. iteration -1 means the last completed iteration.
+
+Principal variation search (the letter p) and the tree. All moves of a node but the first are first tested with
+an empty window: that child has "pass": "scout", and "alpha" and "beta" are next to each other. If the value lands
+strictly inside the parent's window, the same move enters again right after it, as the next child, with "pass":
+"research" and the parent's window. So one move can appear twice in "children": the scout and then the research,
+which replaces it; the research's value is the move's. Every node counts in "nodes_total", "sub" and the node
+budget, the scout's too. Without p every node is "full". In the "root" list a move appears once: its value and bound
+are those of the last search, its "nodes" those of both, and "order" counts moves, not searches. A scout's own node
+keeps its bound: a value at or below the scout's "alpha" is an upper bound, at or above its "beta" a lower one.
+
+Aspiration windows (:asp=W) and the iterations. From depth 5 on an iteration tries a window around the last
+iteration's value and widens it if the window fails, so a depth can be searched more than once. It stays one
+entry of "iterations", and it shows only the try that counted. The tries that failed are in that entry's "attempts",
+oldest first: {"alpha": 0.1, "beta": 0.6, "value": 0.72, "nodes": 8120}, with null for an infinite end, the best value
+the try found (one that reached "beta" stops at once, so its value is only a bound), and the nodes the search had
+counted when it failed, earlier iterations included. Without :asp=W "attempts" is always empty. "root" and the Trace
+are those of the try that counted: the root's "alpha" and "beta" are its window, null when open, and "nodes_total"
+and "in"/"out" start from it. The iteration's "nodes" and "ms" and the "stats" hold every try. An
+iteration's "nodes" less the last failed try's "nodes" (or the iteration before) is that "nodes_total" less the root.
 
 Eval = {"weights": "texel1", "side": "white", "board": "<board>", "total": 0.33, "win": null,
         "features": [{"key": "adv", "name": "advancement", "white": 12, "black": 9, "weight": 0.0831, "contribution": 0.249}, ...],

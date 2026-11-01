@@ -55,6 +55,12 @@ agents:
                     killer moves, history heuristic): the same moves as without at a fixed depth,
                     from fewer nodes, so deeper within a node budget. Letters come in the order
                     q, r, o: ab6o, ab3qro, idqro:n20000
+  abNp, idqrotp:... a final p tests all moves but the first of a node with an empty window
+                    (principal variation search): the same decisions at a fixed depth, so deeper
+                    within a node budget; letters in the order q, r, o, t, f, p.
+  id...:asp=W       aspiration windows: from depth 5 on an iteration searches a window of
+                    half-width W (in units of U, a man = 1) around the last iteration's value, and
+                    again wider (W, 4W, open) on the side that fails; the same decisions
   abNt, idqrot:...  a final t adds a transposition table (Zobrist keys; each game starts with an
                     empty one): 16 MB unless :hash=MB says otherwise, e.g. idqrot:n20000:hash=64.
                     :tt=strict is the referee's mode: a value is used only from a search of the
@@ -319,13 +325,14 @@ fn describe(spec: &AgentSpec) -> String {
                 order,
                 table,
                 draws,
+                pvs,
                 weights,
             },
             _,
         ) => {
             format!(
                 "{spec} (alpha-beta, {depth} plies{}, {})",
-                extras(*quiescence, *repetition, *order, table, draws),
+                extras(*quiescence, *repetition, *order, table, draws, *pvs),
                 weights_text(weights)
             )
         }
@@ -336,13 +343,16 @@ fn describe(spec: &AgentSpec) -> String {
                 order,
                 table,
                 draws,
+                pvs,
+                aspiration,
                 weights,
                 ..
             },
             _,
         ) => format!(
-            "{spec} (iterative deepening alpha-beta{}, {})",
-            extras(*quiescence, *repetition, *order, table, draws),
+            "{spec} (iterative deepening alpha-beta{}{}, {})",
+            extras(*quiescence, *repetition, *order, table, draws, *pvs),
+            aspiration.map_or(String::new(), |w| format!(", aspiration window {w}")),
             weights_text(weights)
         ),
         (AgentSpec::Mcts { kind, weights, .. }, _) => {
@@ -379,6 +389,7 @@ fn extras(
     order: bool,
     table: &Option<TableOptions>,
     draws: &Option<DrawRules>,
+    pvs: bool,
 ) -> String {
     let mut extras = String::new();
     if quiescence {
@@ -399,6 +410,9 @@ fn extras(
         }
         Some(_) => extras.push_str(", 50-ply and one-each rules"),
         None => {}
+    }
+    if pvs {
+        extras.push_str(", principal variation search");
     }
     extras
 }

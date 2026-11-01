@@ -17,8 +17,8 @@ use crate::mcts::{Clock, MctsKind, mcts};
 use crate::movegen::Move;
 use crate::rng::Mulberry32;
 use crate::search::{
-    Decision, DrawRules, Limits, MAX_ID_DEPTH, SearchOptions, alpha_beta_traced, decide_traced,
-    iterative_deepening_traced, minimax_traced, native_clock,
+    Aspiration, Decision, DrawRules, Limits, MAX_ID_DEPTH, SearchOptions, alpha_beta_traced,
+    decide_traced, iterative_deepening_traced, minimax_traced, native_clock,
 };
 #[cfg(test)]
 use crate::search::{alpha_beta, decide, iterative_deepening, minimax};
@@ -388,6 +388,7 @@ pub struct AlphaBetaAgent {
     depth: u32,
     quiescence: bool,
     order: bool,
+    pvs: bool,
     /// `Some` with a transposition table.
     table: Option<Table>,
     /// `Some` when repetitions are recognised: the game so far.
@@ -408,6 +409,7 @@ impl AlphaBetaAgent {
             depth,
             quiescence,
             order: false,
+            pvs: false,
             table: None,
             history: None,
             draws: None,
@@ -427,6 +429,12 @@ impl AlphaBetaAgent {
     /// The same agent, ordering its moves if `on`.
     pub fn with_ordering(mut self, on: bool) -> AlphaBetaAgent {
         self.order = on;
+        self
+    }
+
+    /// The same agent, with principal variation search if `on`.
+    pub fn with_pvs(mut self, on: bool) -> AlphaBetaAgent {
+        self.pvs = on;
         self
     }
 
@@ -461,6 +469,8 @@ impl AlphaBetaAgent {
                 quiet: self.quiet.quiet,
                 ..rules
             }),
+            pvs: self.pvs,
+            aspiration: None,
         };
         let history = self.history.as_ref().map(|h| h.positions.as_slice());
         let decision = alpha_beta_traced(
@@ -552,6 +562,9 @@ pub struct DeepeningAgent {
     limits: Limits,
     quiescence: bool,
     order: bool,
+    pvs: bool,
+    /// The half-width of an aspiration window at first, if `Some`.
+    aspiration: Option<f64>,
     /// `Some` with a transposition table.
     table: Option<Table>,
     /// `Some` when repetitions are recognised: the game so far.
@@ -570,10 +583,12 @@ pub struct DeepeningAgent {
 impl DeepeningAgent {
     pub fn new(weights: Weights, limits: Limits, quiescence: bool, seed: u32) -> DeepeningAgent {
         DeepeningAgent {
+            aspiration: None,
             weights,
             limits,
             quiescence,
             order: false,
+            pvs: false,
             table: None,
             history: None,
             draws: None,
@@ -597,6 +612,12 @@ impl DeepeningAgent {
         self
     }
 
+    /// The same agent, with principal variation search if `on`.
+    pub fn with_pvs(mut self, on: bool) -> DeepeningAgent {
+        self.pvs = on;
+        self
+    }
+
     /// The same agent, with a transposition table of these options if `Some` (cleared at the start
     /// of every game).
     pub fn with_table(mut self, options: Option<TableOptions>) -> DeepeningAgent {
@@ -608,6 +629,12 @@ impl DeepeningAgent {
     /// (their `quiet` is ignored: the agent counts the game's quiet plies itself).
     pub fn with_draws(mut self, draws: Option<DrawRules>) -> DeepeningAgent {
         self.draws = draws;
+        self
+    }
+
+    /// The same agent, with aspiration windows of this half-width at first if `Some`.
+    pub fn with_aspiration(mut self, half_width: Option<f64>) -> DeepeningAgent {
+        self.aspiration = half_width;
         self
     }
 }
@@ -627,6 +654,11 @@ impl DeepeningAgent {
             draws: (self.draws).map(|rules| DrawRules {
                 quiet: self.quiet.quiet,
                 ..rules
+            }),
+            pvs: self.pvs,
+            aspiration: self.aspiration.map(|half_width| Aspiration {
+                half_width,
+                from_depth: Aspiration::FROM_DEPTH,
             }),
         };
         let history = self.history.as_ref().map(|h| h.positions.as_slice());
@@ -822,7 +854,10 @@ impl Agent for MctsAgent {
 /// the search, each at most once and in this order: `q` quiescence (`abNq`, `idq:LIMITS`), `r`
 /// repetitions (`abNr`, `abNqr`, `idqr:LIMITS`), `o` move ordering (`abNo`, `idqro:LIMITS`), `t` a
 /// transposition table (`abNot`, `idqrot:LIMITS`) of 16 MB unless a part `:hash=MB` says
-/// otherwise, in the referee's strict mode with a part `:tt=strict`. Monte Carlo tree search
+/// otherwise, in the referee's strict mode with a part `:tt=strict`, `f` the 50-ply and one-piece-each
+/// rules (`:fs=1` adds progress pressure), `p` principal variation search (`abNotp`, `idqrotfp:LIMITS`).
+/// An `id` agent may have aspiration windows with a part `:asp=W`, W the half-width in units of U
+/// (`idqrotf:n20000:asp=0.5`). Monte Carlo tree search
 /// (`mcts.rs`) is `mc:LIMITS`, `uct:LIMITS`, `ucte:LIMITS` or `uctq:LIMITS`, its limits `nK` and
 /// `tMS` only; only `ucte` and `uctq` take weights.
 ///
@@ -849,6 +884,8 @@ pub enum AgentSpec {
         table: Option<TableOptions>,
         /// The letter `f`; its `quiet` is 0 (the agent counts the game's).
         draws: Option<DrawRules>,
+        /// The letter `p`.
+        pvs: bool,
         weights: Weights,
     },
     /// Iterative deepening within `limits`.
@@ -860,6 +897,10 @@ pub enum AgentSpec {
         table: Option<TableOptions>,
         /// The letter `f`; its `quiet` is 0 (the agent counts the game's).
         draws: Option<DrawRules>,
+        /// The letter `p`.
+        pvs: bool,
+        /// `:asp=W`: the half-width of the aspiration window at first.
+        aspiration: Option<f64>,
         weights: Weights,
     },
     /// Monte Carlo tree search of `kind` within `limits` (nodes and/or time, no depth); `weights`
@@ -916,6 +957,14 @@ impl AgentSpec {
         }
     }
 
+    /// The half-width of the aspiration window, to change it; only iterative deepening has one.
+    fn aspiration_mut(&mut self) -> Option<&mut Option<f64>> {
+        match self {
+            AgentSpec::Deepening { aspiration, .. } => Some(aspiration),
+            _ => None,
+        }
+    }
+
     /// The draw rules, to change them; none without the letter `f`.
     fn draws_mut(&mut self) -> Option<&mut DrawRules> {
         match self {
@@ -951,13 +1000,15 @@ impl AgentSpec {
                 order,
                 table,
                 draws,
+                pvs,
                 weights,
             } => Box::new(
                 AlphaBetaAgent::new(weights, depth, quiescence, 0)
                     .with_repetitions(repetition)
                     .with_ordering(order)
                     .with_table(table)
-                    .with_draws(draws),
+                    .with_draws(draws)
+                    .with_pvs(pvs),
             ),
             AgentSpec::Deepening {
                 limits,
@@ -966,13 +1017,17 @@ impl AgentSpec {
                 order,
                 table,
                 draws,
+                pvs,
+                aspiration,
                 weights,
             } => Box::new(
                 DeepeningAgent::new(weights, limits, quiescence, 0)
                     .with_repetitions(repetition)
                     .with_ordering(order)
                     .with_table(table)
-                    .with_draws(draws),
+                    .with_draws(draws)
+                    .with_pvs(pvs)
+                    .with_aspiration(aspiration),
             ),
             AgentSpec::Mcts {
                 kind,
@@ -985,13 +1040,13 @@ impl AgentSpec {
 
 impl fmt::Display for AgentSpec {
     /// The canonical name: `random`, `mmN`, `abN` and `id:` with their letters in the order `q`,
-    /// `r`, `o`, `t` (`abNqr`, `idqrot:`) and the limits in the order d, n, t, the preset's name, or else `u:MAN/KING/MOB`.
+    /// `r`, `o`, `t`, `f`, `p` (`abNqr`, `idqrot:`) and the limits in the order d, n, t, the preset's name, or else `u:MAN/KING/MOB`.
     /// `"u:1/3/0".parse()` therefore prints as `material`. Then the weights as `:KEY=VALUE` in the
     /// order of `Weights::KEYS`: for a search those that differ from the tuned weights or, when
     /// that takes fewer parts, `:w=NAME` and those that differ from that named set
     /// (`Weights::suffix`), for the baseline agent (unless it is a preset) the positional weights
     /// that are not 0. A weight set to its default is left out: `idqr:n2000:adv=0` prints as
-    /// `idqr:n2000`. Last the table's options that are not the default: `:hash=MB`, `:tt=strict`.
+    /// `idqr:n2000`. Then the table's options that are not the default: `:hash=MB`, `:tt=strict`. Last `:asp=W`.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match (self, self.preset()) {
             (AgentSpec::Random, _) => f.write_str("random"),
@@ -1016,6 +1071,7 @@ impl fmt::Display for AgentSpec {
                     order,
                     table,
                     draws,
+                    pvs,
                     weights,
                 },
                 _,
@@ -1028,6 +1084,7 @@ impl fmt::Display for AgentSpec {
                     order: *order,
                     table: table.is_some(),
                     draws: draws.is_some(),
+                    pvs: *pvs,
                 },
                 weights.suffix(),
                 draws_suffix(draws),
@@ -1041,6 +1098,8 @@ impl fmt::Display for AgentSpec {
                     order,
                     table,
                     draws,
+                    pvs,
+                    aspiration,
                     weights,
                 },
                 _,
@@ -1051,6 +1110,7 @@ impl fmt::Display for AgentSpec {
                     order: *order,
                     table: table.is_some(),
                     draws: draws.is_some(),
+                    pvs: *pvs,
                 };
                 write!(f, "id{letters}")?;
                 if let Some(depth) = limits.depth {
@@ -1063,7 +1123,11 @@ impl fmt::Display for AgentSpec {
                     write!(f, ":t{}", time.as_millis())?;
                 }
                 let (weights, draws) = (weights.suffix(), draws_suffix(draws));
-                write!(f, "{weights}{draws}{}", table_suffix(table))
+                write!(f, "{weights}{draws}{}", table_suffix(table))?;
+                if let Some(half_width) = aspiration {
+                    write!(f, ":asp={half_width}")?;
+                }
+                Ok(())
             }
             (
                 AgentSpec::Mcts {
@@ -1099,10 +1163,11 @@ struct Letters {
     order: bool,
     table: bool,
     draws: bool,
+    pvs: bool,
 }
 
 impl Letters {
-    /// The letters of `letters`; `None` unless each of `q`, `r`, `o`, `t`, `f` appears at most
+    /// The letters of `letters`; `None` unless each of `q`, `r`, `o`, `t`, `f`, `p` appears at most
     /// once and in that order, with nothing else.
     fn parse(letters: &str) -> Option<Letters> {
         let mut rest = letters;
@@ -1119,6 +1184,7 @@ impl Letters {
             order: take('o'),
             table: take('t'),
             draws: take('f'),
+            pvs: take('p'),
         };
         rest.is_empty().then_some(parsed)
     }
@@ -1132,6 +1198,7 @@ impl fmt::Display for Letters {
             (self.order, 'o'),
             (self.table, 't'),
             (self.draws, 'f'),
+            (self.pvs, 'p'),
         ];
         (letters.into_iter())
             .filter(|&(on, _)| on)
@@ -1185,6 +1252,9 @@ pub enum ParseAgentError {
     /// The `:fs=0|1` part of the name (the first string) does not set the draw rules; the second
     /// string says why.
     Draws(String, String),
+    /// The `:asp=W` part of the name (the first string) does not set an aspiration window; the
+    /// second string says why.
+    Aspiration(String, String),
 }
 
 impl fmt::Display for ParseAgentError {
@@ -1195,8 +1265,8 @@ impl fmt::Display for ParseAgentError {
                 "unknown agent {name:?}: expected random, material, first, tuned, texel1, texel2, texel2s, \
                  u:MAN/KING/MOB, \
                  mmN, abN, id:LIMITS, the last two with letters q (quiescence), r (repetitions) \
-                 o (move ordering), t (transposition table) and f (50-ply and one-piece-each \
-                 rules) in that order: abNqrotf, idqrotf:LIMITS, or Monte Carlo tree search mc:LIMITS, uct:LIMITS, ucte:LIMITS, \
+                 o (move ordering), t (transposition table), f (50-ply and one-piece-each \
+                 rules) and p (principal variation search) in that order: abNqrotfp, idqrotfp:LIMITS, or Monte Carlo tree search mc:LIMITS, uct:LIMITS, ucte:LIMITS, \
                  uctq:LIMITS"
             ),
             ParseAgentError::Depth(name) => write!(
@@ -1217,6 +1287,7 @@ impl fmt::Display for ParseAgentError {
                  for example id:n20000 or id:d5:t50; mc, uct, ucte and uctq take nK and tMS only, \
                  for example uct:n20000"
             ),
+            ParseAgentError::Aspiration(name, why) => write!(f, "agent {name:?}: {why}"),
             ParseAgentError::Weight(name, why) => write!(
                 f,
                 "agent {name:?}: {why}; weights are set with :KEY=VALUE at the end of the name, \
@@ -1261,10 +1332,32 @@ impl FromStr for AgentSpec {
             return Err(ParseAgentError::Unknown(s.to_string()));
         }
         let mut spec = parse_base(&parts[..first_weight].join(":"))?;
-        // `fs` sets the draw rules, `hash` and `tt` the table; every other part sets a weight.
-        let (draw_parts, parts_left): (Vec<&str>, Vec<&str>) = parts[first_weight..]
+        // `asp` sets the aspiration window, `fs` the draw rules, `hash` and `tt` the table; every
+        // other part sets a weight.
+        let (asp_parts, parts_left): (Vec<&str>, Vec<&str>) = parts[first_weight..]
             .iter()
-            .partition(|part| part.starts_with("fs="));
+            .partition(|part| part.starts_with("asp="));
+        if !asp_parts.is_empty() {
+            let asp_error = |why: &str| ParseAgentError::Aspiration(s.to_string(), why.to_string());
+            let aspiration = spec
+                .aspiration_mut()
+                .ok_or_else(|| asp_error("asp needs iterative deepening, an id agent"))?;
+            let ["asp", value] = asp_parts[0].split('=').collect::<Vec<_>>()[..] else {
+                return Err(asp_error("asp=W, W a number"));
+            };
+            if asp_parts.len() > 1 {
+                return Err(asp_error("asp may be given once"));
+            }
+            *aspiration = Some(
+                value
+                    .parse::<f64>()
+                    .ok()
+                    .filter(|w| w.is_finite() && *w > 0.0)
+                    .ok_or_else(|| asp_error("asp is a finite number above 0"))?,
+            );
+        }
+        let (draw_parts, parts_left): (Vec<&str>, Vec<&str>) =
+            parts_left.iter().partition(|part| part.starts_with("fs="));
         if !draw_parts.is_empty() {
             let draws_error = |why: &str| ParseAgentError::Draws(s.to_string(), why.to_string());
             let draws = spec
@@ -1363,6 +1456,8 @@ fn parse_base(s: &str) -> Result<AgentSpec, ParseAgentError> {
                 order: letters.order,
                 table: letters.table.then(TableOptions::default),
                 draws: letters.draws.then(DrawRules::default),
+                pvs: letters.pvs,
+                aspiration: None,
                 weights: Weights::TUNED,
             })
             .ok_or_else(|| ParseAgentError::Limits(s.to_string()));
@@ -1394,6 +1489,7 @@ fn parse_base(s: &str) -> Result<AgentSpec, ParseAgentError> {
             order: letters.order,
             table: letters.table.then(TableOptions::default),
             draws: letters.draws.then(DrawRules::default),
+            pvs: letters.pvs,
             weights: Weights::TUNED,
         });
     }
@@ -1472,6 +1568,7 @@ mod tests {
             order,
             table: None,
             draws: None,
+            pvs: false,
             weights: Weights::TUNED,
         };
         let ab = |depth, quiescence, repetition| ab_with(depth, quiescence, repetition, false);
@@ -1495,6 +1592,8 @@ mod tests {
             order,
             table: None,
             draws: None,
+            pvs: false,
+            aspiration: None,
             weights: Weights::TUNED,
         };
         let id = |limits, quiescence, repetition| id_with(limits, quiescence, repetition, false);
@@ -1544,6 +1643,8 @@ mod tests {
                 order: false,
                 table: None,
                 draws: None,
+                pvs: false,
+                aspiration: None,
                 weights: Weights {
                     adv: 0.1,
                     ..Weights::TUNED
@@ -1933,6 +2034,53 @@ mod tests {
                     "{name} and {ordered}, seed {seed}"
                 );
             }
+        }
+    }
+
+    #[test]
+    fn the_letter_p_and_asp_parse_and_print_back() {
+        for name in [
+            "ab6p",
+            "ab3qrotfp",
+            "idp:n2000",
+            "idqrotfp:n20000:w=texel1:fs=1",
+            "idqrotf:n20000:w=texel1:fs=1:asp=0.5",
+            "idqrotfp:n20000:w=texel1:fs=1:asp=0.25",
+            "id:d5:asp=1e-6",
+        ] {
+            let spec: AgentSpec = name.parse().unwrap_or_else(|e| panic!("{name}: {e}"));
+            let printed = spec.to_string();
+            assert_eq!(printed.parse::<AgentSpec>().unwrap(), spec, "{name}");
+        }
+        assert!(matches!(
+            "idqrotfp:n2000:asp=0.5".parse(),
+            Ok(AgentSpec::Deepening {
+                pvs: true,
+                aspiration: Some(0.5),
+                ..
+            })
+        ));
+        // The order of the parts at the end does not matter.
+        assert_eq!(
+            "id:n2000:asp=0.5:w=texel1:adv=0.1".parse::<AgentSpec>(),
+            "id:n2000:w=texel1:adv=0.1:asp=0.5".parse::<AgentSpec>()
+        );
+        for bad in [
+            "ab6:asp=0.5",
+            "tuned:asp=0.5",
+            "mm3:asp=0.5",
+            "uct:n200:asp=0.5",
+            "id:n2000:asp=0",
+            "id:n2000:asp=-1",
+            "id:n2000:asp=inf",
+            "id:n2000:asp=NaN",
+            "id:n2000:asp=",
+            "id:n2000:asp=0.5:asp=1",
+            "idpq:n2000",
+            "idpp:n2000",
+            "mm3p",
+        ] {
+            assert!(bad.parse::<AgentSpec>().is_err(), "{bad}");
         }
     }
 }

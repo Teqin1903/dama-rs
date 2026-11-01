@@ -56,9 +56,9 @@ pub use movegen::Move;
 pub use perft::perft;
 pub use rng::{Mulberry32, derive_seed};
 pub use search::{
-    Candidate, Decision, Deepening, DrawRules, Limits, MAX_ID_DEPTH, SearchOptions, alpha_beta,
-    alpha_beta_q, alpha_beta_rep, alpha_beta_traced, alpha_beta_with, decide, decide_traced,
-    iterative_deepening, iterative_deepening_rep, iterative_deepening_traced,
+    Aspiration, Candidate, Decision, Deepening, DrawRules, Limits, MAX_ID_DEPTH, SearchOptions,
+    alpha_beta, alpha_beta_q, alpha_beta_rep, alpha_beta_traced, alpha_beta_with, decide,
+    decide_traced, iterative_deepening, iterative_deepening_rep, iterative_deepening_traced,
     iterative_deepening_with, minimax, minimax_q, minimax_traced, native_clock, quiescence_value,
     static_value,
 };
@@ -70,7 +70,7 @@ pub use texel::{
     quiet_positions, samples_of, to_array, tune, value,
 };
 pub use trace::{
-    Enter, Iteration, NoTrace, Reason, Recorder, RootMove, Stats, TraceNode, TraceRequest, Tracer,
-    Tree, TtProbe, ValueBound,
+    Attempt, Enter, Iteration, NoTrace, Pass, Reason, Recorder, RootMove, Stats, TraceNode,
+    TraceRequest, Tracer, Tree, TtProbe, ValueBound,
 };
 pub use zobrist::{quiet_key, zobrist, zobrist_after};

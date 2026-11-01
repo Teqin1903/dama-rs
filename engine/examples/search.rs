@@ -6,8 +6,9 @@
 //!
 //! Each argument is a search: `mmN` (minimax), `abN` (alpha-beta) or `idN` (iterative deepening
 //! up to N plies, no node or time limit), N plies deep, and with a `q` after N (`ab3q`) with
-//! quiescence; for `ab` and `id` an `o` (`ab6o`, `id5qo`) orders the moves and a final `t`
-//! (`ab6ot`) adds a transposition table of 16 MB, emptied before each position. A search may end in `:KEY=VALUE` parts that set weights on top of each position's
+//! quiescence; for `ab` and `id` an `o` (`ab6o`, `id5qo`) orders the moves, a `t` (`ab6ot`) adds a
+//! transposition table of 16 MB, emptied before each position, and a final `p` (`ab6op`, `ab6otp`)
+//! adds principal variation search. A search may end in `:KEY=VALUE` parts that set weights on top of each position's
 //! (`ab4q:adv=0.01:qmob=0.01`, as in agent names). One pass over all positions is a sample; 3 samples per search, after one warm-up
 //! pass, and the time per move is the median sample / the number of positions.
 //!
@@ -108,6 +109,10 @@ impl Search {
             .find(|c: char| !c.is_ascii_digit())
             .unwrap_or(rest.len());
         let (depth, letters) = rest.split_at(digits);
+        let (letters, pvs) = match letters.strip_suffix('p') {
+            Some(letters) => (letters, true),
+            None => (letters, false),
+        };
         let (letters, table) = match letters.strip_suffix('t') {
             Some(letters) => (letters, true),
             None => (letters, false),
@@ -122,10 +127,11 @@ impl Search {
         let options = SearchOptions {
             quiescence,
             order,
-            draws: None,
+            pvs,
+            ..SearchOptions::default()
         };
         let search = match prefix {
-            "mm" if !order && !table => Search::Minimax { quiescence },
+            "mm" if !order && !table && !pvs => Search::Minimax { quiescence },
             "ab" => Search::AlphaBeta(options),
             "id" => Search::Deepening(options),
             _ => return None,

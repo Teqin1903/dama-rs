@@ -65,7 +65,9 @@ fn search(spec: &str, position: &Position, phase: &str) -> Value {
         order,
         table,
         draws,
+        pvs,
         weights,
+        ..
     }) = spec.parse::<AgentSpec>()
     else {
         panic!("{spec}: expected an iterative-deepening agent");
@@ -81,6 +83,8 @@ fn search(spec: &str, position: &Position, phase: &str) -> Value {
         quiescence,
         order,
         draws,
+        pvs,
+        ..SearchOptions::default()
     };
     let history = repetition.then_some(&[][..]);
     let start = Instant::now();

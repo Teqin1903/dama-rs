@@ -81,6 +81,24 @@
 //! q is 0 there. Every value now depends on the count, so the key mixes in the count
 //! (`quiet_key`), and values, 50-ply draws included, are kept and used as without the rule.
 //!
+//! Principal variation search (`SearchOptions::pvs`, the letter `p`) expects the first move of a node
+//! to be its best: the others are first tested with an empty window, which has no number between
+//! its ends: (alpha, alpha.next_up()) at a maximising node, (beta.next_down(), beta) at a minimising
+//! one. Only a move whose test lands strictly inside the node's window is searched again with that
+//! window. A test outside the window is a true bound, which is all alpha-beta needs, and alpha-beta
+//! with any window only selects among leaf values, so the decision stays the same. At the root the
+//! test is at the root's lower end, max(L, best - 2 * `U_EPSILON`); a move above it is searched again
+//! with the window (L, H) of the iteration, so every move that can be in `top` gets an exact value.
+//!
+//! Aspiration windows (`SearchOptions::aspiration`, `:asp=W`) search an iteration from depth
+//! `Aspiration::FROM_DEPTH` on in (L, H) = (previous - W, previous + W) around the previous
+//! iteration's best value, unless that value is a win or a loss. The result counts only if
+//! L <= best - 2 * `U_EPSILON` and best < H: then every move within `U_EPSILON` of the best has an
+//! exact value and the decision is that of the open window. Otherwise the side that failed widens,
+//! W to 4W to infinity, and the iteration is searched again: at most five tries, since an open side
+//! cannot fail. A try that reaches H stops at once, for its lower end could pass H. Every try counts
+//! against the budget, and a budget that runs out during one interrupts the iteration.
+//!
 //! Every search has a `_traced` form that reports to a `Tracer` (engine/src/trace.rs) and may be
 //! limited to some root moves (`only`, indices into the legal moves). The forms without it use
 //! `NoTrace`, whose calls compile away, and every root move.
@@ -97,11 +115,11 @@ use crate::movegen::Move;
 use crate::rng::Mulberry32;
 use crate::square::Square;
 use crate::table::{Bound, Entry, Table};
-use crate::trace::{Enter, NoTrace, Reason, Tracer, TtProbe, ValueBound};
+use crate::trace::{Enter, NoTrace, Pass, Reason, Tracer, TtProbe, ValueBound};
 use crate::zobrist::{quiet_key, zobrist, zobrist_after};
 
 /// How an alpha-beta search goes beyond its depth limit and weights.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct SearchOptions {
     /// Search captures past the depth limit until the position is quiet.
     pub quiescence: bool,
@@ -109,6 +127,36 @@ pub struct SearchOptions {
     pub order: bool,
     /// Apply the game's draw rules besides repetitions (see the module documentation).
     pub draws: Option<DrawRules>,
+    /// Test all moves of a node but the first with an empty window (see the module documentation);
+    /// the decision stays the same.
+    pub pvs: bool,
+    /// Search iterations in a window around the previous value (see the module documentation);
+    /// the decision stays the same. Only iterative deepening reads it.
+    pub aspiration: Option<Aspiration>,
+}
+
+/// The window of an iteration around the previous iteration's best value.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Aspiration {
+    /// The window's half-width at first, in units of U: W in `:asp=W`.
+    pub half_width: f64,
+    /// The first depth with a window; earlier iterations stay open.
+    pub from_depth: u32,
+}
+
+impl Aspiration {
+    /// The depth `:asp=W` starts from: the depths before it hold few nodes and are the ones where
+    /// a window fails most (docs/benchmarks.md).
+    pub const FROM_DEPTH: u32 = 5;
+
+    /// The half-width after `step` failures of a side: W, 4W, then open.
+    fn width(&self, step: u32) -> f64 {
+        match step {
+            0 => self.half_width,
+            1 => 4.0 * self.half_width,
+            _ => f64::INFINITY,
+        }
+    }
 }
 
 /// The 50-ply and one-piece-each rules in a search (the letter `f`).
@@ -168,7 +216,7 @@ pub fn decide_traced<T: Tracer>(
     let moves = board.legal_moves(side);
     if T::ON {
         tracer.iteration_start(1);
-        tracer.enter(&root_entry(1));
+        tracer.enter(&root_entry(1, OPEN));
         tracer.legal(moves.len());
     }
     let mut best = f64::NEG_INFINITY;
@@ -218,15 +266,16 @@ fn searched(only: Option<&[usize]>, i: usize) -> bool {
 }
 
 /// The root of an iteration `depth` plies deep, for a tracer.
-fn root_entry(depth: u32) -> Enter<'static> {
+fn root_entry(depth: u32, window: (f64, f64)) -> Enter<'static> {
     Enter {
         mv: None,
         index: 0,
         ply: 0,
         draft: depth,
         quiescence: false,
-        window: OPEN,
+        window,
         reason: Reason::None,
+        pass: Pass::Full,
     }
 }
 
@@ -247,6 +296,7 @@ fn child_entry<'m>(
         quiescence: ply > context.depth,
         window,
         reason,
+        pass: Pass::Full,
     }
 }
 
@@ -326,7 +376,7 @@ pub fn minimax_traced<T: Tracer>(
     let moves = board.legal_moves(side);
     if T::ON {
         tracer.iteration_start(depth);
-        tracer.enter(&root_entry(depth));
+        tracer.enter(&root_entry(depth, OPEN));
         tracer.legal(moves.len());
     }
     let mut best = f64::NEG_INFINITY;
@@ -432,7 +482,7 @@ pub fn alpha_beta_with(
         quiescence: options.quiescence,
     };
     let mut search = Search::new(options, history, table, NoTrace);
-    iteration(board, &context, &mut search, None, None)
+    iteration(board, &context, &mut search, None, None, None)
         .expect("a search without a budget is never interrupted")
 }
 
@@ -457,7 +507,7 @@ pub fn alpha_beta_traced<T: Tracer>(
         quiescence: options.quiescence,
     };
     let mut search = Search::new(options, history, table, tracer);
-    iteration(board, &context, &mut search, None, only)
+    iteration(board, &context, &mut search, None, only, None)
         .expect("a search without a budget is never interrupted")
 }
 
@@ -490,6 +540,9 @@ pub struct Deepening {
     pub decision: Decision,
     /// The depth of that iteration.
     pub depth: u32,
+    /// That iteration reached no leaf at the depth limit: every line it searched ended first, so
+    /// its decision holds at any depth.
+    pub proved: bool,
 }
 
 /// Alpha-beta 1, 2, 3, ... plies deep until `limits` stop it, and the decision of the deepest
@@ -592,8 +645,9 @@ pub fn iterative_deepening_traced<T: Tracer>(
         quiescence: options.quiescence,
     };
     let mut search = Search::new(options, history, table, tracer);
-    let mut decision = iteration(board, &context, &mut search, None, only)
+    let mut decision = iteration(board, &context, &mut search, None, only, None)
         .expect("a search without a budget is never interrupted");
+    let mut proved = !search.counter.horizon;
     search.counter.max_nodes = limits.nodes;
     search.counter.deadline = deadline;
     search.counter.now = now;
@@ -607,8 +661,15 @@ pub fn iterative_deepening_traced<T: Tracer>(
             .flatten();
         // `?` cannot help here: an interrupted iteration is not an error of this function, so the
         // `Option` is matched and `None` ends the loop.
-        match iteration(board, &context, &mut search, first, only) {
-            Some(deeper) => decision = deeper,
+        let previous = options.aspiration.and_then(|_| {
+            let best = best_of(&decision);
+            (best.abs() <= WIN_ZONE).then_some(best)
+        });
+        match iteration(board, &context, &mut search, first, only, previous) {
+            Some(deeper) => {
+                decision = deeper;
+                proved = !search.counter.horizon;
+            }
             None => {
                 context.depth -= 1;
                 break;
@@ -620,6 +681,7 @@ pub fn iterative_deepening_traced<T: Tracer>(
     Deepening {
         decision,
         depth: context.depth,
+        proved,
     }
 }
 
@@ -893,6 +955,9 @@ struct Search<'h, 't, T: Tracer> {
     /// unless the key holds the count (set by the search; each node keeps its own below it).
     drawn: bool,
     draws: Option<DrawRules>,
+    /// Principal variation search.
+    pvs: bool,
+    aspiration: Option<Aspiration>,
     /// The count of quiet plies at the current node, with `draws`.
     quiet: u32,
     /// Told what the search does; it changes nothing above.
@@ -913,6 +978,8 @@ impl<'h, 't, T: Tracer> Search<'h, 't, T> {
             table,
             drawn: false,
             draws: options.draws,
+            pvs: options.pvs,
+            aspiration: options.aspiration,
             quiet: options.draws.map_or(0, |rules| rules.quiet),
             tracer,
         }
@@ -993,18 +1060,34 @@ fn turned(bound: Bound) -> Bound {
     }
 }
 
-/// One iteration: `root_alpha_beta`, between the tracer's `iteration_start` and `iteration_end`.
+/// The highest value of `decision`'s moves.
+fn best_of(decision: &Decision) -> f64 {
+    (decision.candidates.iter())
+        .map(|c| c.u)
+        .fold(f64::NEG_INFINITY, f64::max)
+}
+
+/// One iteration, between the tracer's `iteration_start` and `iteration_end`: `root_alpha_beta`, or
+/// `aspirated` if the search has a window from this depth on and `previous` holds a value to put it
+/// around.
 fn iteration<T: Tracer>(
     board: &Board,
     context: &Context,
     search: &mut Search<T>,
     first: Option<usize>,
     only: Option<&[usize]>,
+    previous: Option<f64>,
 ) -> Option<Decision> {
     if T::ON {
         search.tracer.iteration_start(context.depth);
     }
-    let decision = root_alpha_beta(board, context, search, first, only);
+    let aspiration = search.aspiration.filter(|a| context.depth >= a.from_depth);
+    let decision = match (aspiration, previous) {
+        (Some(aspiration), Some(previous)) => {
+            aspirated(board, context, search, first, only, aspiration, previous)
+        }
+        _ => root_alpha_beta(board, context, search, first, only, OPEN),
+    };
     if T::ON {
         let nodes = search.counter.nodes;
         (search.tracer).iteration_end(context.depth, decision.is_some(), nodes);
@@ -1012,8 +1095,44 @@ fn iteration<T: Tracer>(
     decision
 }
 
-/// Alpha-beta at the root, as `alpha_beta` describes, counting in `search.counter`: `None` if the
-/// budget ran out. The root moves (those in `only`, if given) are searched in legal order, or with
+/// `root_alpha_beta` in a window around `previous`, as the module documentation describes, until a
+/// try counts. `horizon` tells of the try that counted: a failed try proves nothing about the end
+/// of the lines.
+fn aspirated<T: Tracer>(
+    board: &Board,
+    context: &Context,
+    search: &mut Search<T>,
+    first: Option<usize>,
+    only: Option<&[usize]>,
+    aspiration: Aspiration,
+    previous: f64,
+) -> Option<Decision> {
+    let (mut low_step, mut high_step) = (0, 0);
+    loop {
+        let window = (
+            previous - aspiration.width(low_step),
+            previous + aspiration.width(high_step),
+        );
+        search.counter.horizon = false;
+        let decision = root_alpha_beta(board, context, search, first, only, window)?;
+        let best = best_of(&decision);
+        let (fails_low, fails_high) = (window.0 > best - 2.0 * U_EPSILON, best >= window.1);
+        if !fails_low && !fails_high {
+            return Some(decision);
+        }
+        if T::ON {
+            let nodes = search.counter.nodes;
+            search.tracer.retry(context.depth, window, best, nodes);
+        }
+        low_step += u32::from(fails_low);
+        high_step += u32::from(fails_high);
+    }
+}
+
+/// Alpha-beta at the root, as `alpha_beta` describes, in the iteration's `window` (L, H), with L the
+/// lowest the moves' window starts at; `OPEN` is the plain search. A move that reaches H ends the
+/// search, and the decision then holds only the moves searched so far. Counts in `search.counter`:
+/// `None` if the budget ran out. The root moves (those in `only`, if given) are searched in legal order, or with
 /// `first` (an index into the legal moves) that move first and then the others in legal order;
 /// `candidates` are in legal order either way. The decision's `nodes` and `q_nodes` are the
 /// counter's at the end. With repetitions, a repetition below the root is a draw.
@@ -1023,6 +1142,7 @@ fn root_alpha_beta<T: Tracer>(
     search: &mut Search<T>,
     first: Option<usize>,
     only: Option<&[usize]>,
+    window: (f64, f64),
 ) -> Option<Decision> {
     let side = context.root;
     if let Some(repetitions) = &mut search.repetitions {
@@ -1038,7 +1158,7 @@ fn root_alpha_beta<T: Tracer>(
     };
     let moves = board.legal_moves(side);
     if T::ON {
-        search.tracer.enter(&root_entry(context.depth));
+        search.tracer.enter(&root_entry(context.depth, window));
         search.tracer.legal(moves.len());
     }
     let order = first
@@ -1047,44 +1167,68 @@ fn root_alpha_beta<T: Tracer>(
         .filter(|&i| searched(only, i));
     let mut best = f64::NEG_INFINITY;
     let mut candidates: Vec<Option<Candidate>> = vec![None; moves.len()];
+    let mut tried = false;
+    let mut reached_high = false;
     for i in order {
         let mv = &moves[i];
         let after = board.apply(mv);
-        let alpha = best - 2.0 * U_EPSILON;
+        let alpha = window.0.max(best - 2.0 * U_EPSILON);
+        let reason = if T::ON && Some(i) == first {
+            Reason::Pv
+        } else {
+            Reason::None
+        };
+        let test = search.pvs && tried;
+        let (searched_window, pass) = if test {
+            ((alpha, alpha.next_up()), Pass::Scout)
+        } else {
+            ((alpha, window.1), Pass::Full)
+        };
         if T::ON {
-            let reason = if Some(i) == first {
-                Reason::Pv
-            } else {
-                Reason::None
-            };
-            let window = (alpha, f64::INFINITY);
-            (search.tracer).enter(&child_entry(mv, i, 1, context, window, reason));
+            let entry = child_entry(mv, i, 1, context, searched_window, reason);
+            search.tracer.enter(&Enter { pass, ..entry });
         }
         let child_key = search.key_after(key, board, mv);
         let quiet = search.quiet;
         search.quiet = search.quiet_after(mv);
-        let u = bounded_value(
-            (&after, child_key),
-            side.opponent(),
-            1,
-            (alpha, f64::INFINITY),
-            context,
-            search,
-        )?;
+        let child = (&after, child_key);
+        let mut u = bounded_value(child, side.opponent(), 1, searched_window, context, search)?;
+        let mut lower = alpha;
+        if test && alpha < u && u < window.1 {
+            lower = window.0;
+            if T::ON {
+                let entry = child_entry(mv, i, 1, context, window, reason);
+                search.tracer.enter(&Enter {
+                    pass: Pass::Research,
+                    ..entry
+                });
+            }
+            u = bounded_value(child, side.opponent(), 1, window, context, search)?;
+        }
         search.quiet = quiet;
+        tried = true;
         best = best.max(u);
         candidates[i] = Some(Candidate {
             features: Features::of(&after, side),
             u,
-            exact: u > alpha,
+            exact: u > lower,
             mv: mv.clone(),
             index: i,
         });
+        if u >= window.1 {
+            reached_high = true;
+            break;
+        }
     }
     if T::ON {
-        search.tracer.exit(best, ValueBound::Exact, false);
+        let bound = match () {
+            _ if reached_high => ValueBound::Lower,
+            _ if best <= window.0 && window.0 != OPEN.0 => ValueBound::Upper,
+            _ => ValueBound::Exact,
+        };
+        search.tracer.exit(best, bound, reached_high);
     }
-    // Every root move is searched, or every one in `only`.
+    // Every root move is searched, or every one in `only`, unless one reached H.
     let candidates = candidates.into_iter().flatten().collect();
     let counter = &search.counter;
     Some(Decision::new(candidates, counter.nodes, counter.q_nodes))
@@ -1285,23 +1429,52 @@ fn bounded_value<T: Tracer>(
         Vec::new()
     };
     let mut cutoff = false;
+    let mut tried = false;
     for i in order {
         let mv = &moves[i];
+        let test = search.pvs && tried;
+        let (searched_window, pass) = match () {
+            _ if !test => ((alpha, beta), Pass::Full),
+            _ if maximising => ((alpha, alpha.next_up()), Pass::Scout),
+            _ => ((beta.next_down(), beta), Pass::Scout),
+        };
         if T::ON {
-            let entry = child_entry(mv, i, ply + 1, context, (alpha, beta), reasons[i]);
-            search.tracer.enter(&entry);
+            let entry = child_entry(mv, i, ply + 1, context, searched_window, reasons[i]);
+            search.tracer.enter(&Enter { pass, ..entry });
         }
         let child_key = search.key_after(key, board, mv);
         let quiet = search.quiet;
         search.quiet = search.quiet_after(mv);
-        let v = bounded_value(
-            (&board.apply(mv), child_key),
+        let after = board.apply(mv);
+        let child = (&after, child_key);
+        let mut v = bounded_value(
+            child,
             to_move.opponent(),
             ply + 1,
-            (alpha, beta),
+            searched_window,
             context,
             search,
         )?;
+        // At both kinds of node, a test inside the window says the move needs its exact value. In
+        // an empty window nothing is inside, so a node searched with one never searches again.
+        if test && alpha < v && v < beta {
+            if T::ON {
+                let entry = child_entry(mv, i, ply + 1, context, (alpha, beta), reasons[i]);
+                search.tracer.enter(&Enter {
+                    pass: Pass::Research,
+                    ..entry
+                });
+            }
+            v = bounded_value(
+                child,
+                to_move.opponent(),
+                ply + 1,
+                (alpha, beta),
+                context,
+                search,
+            )?;
+        }
+        tried = true;
         search.quiet = quiet;
         if (maximising && v > best) || (!maximising && v < best) {
             best_move = i;
@@ -1519,7 +1692,7 @@ mod tests {
         assert!(search.counter.nodes > 2);
         assert_eq!(path(&search), [(board, Color::Black)]);
         // A root search leaves only the root on the path.
-        root_alpha_beta(&board, &context, &mut search, None, None).unwrap();
+        root_alpha_beta(&board, &context, &mut search, None, None, OPEN).unwrap();
         assert_eq!(path(&search), [(board, Color::White)]);
     }
 

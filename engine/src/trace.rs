@@ -64,6 +64,29 @@ impl Reason {
     }
 }
 
+/// How a node is searched, seen from its parent. With principal variation search a move can enter
+/// twice under its parent: first a `Scout`, then a `Research`, which replaces it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Pass {
+    /// With the parent's window.
+    Full,
+    /// With an empty window, to see whether the move can improve the parent.
+    Scout,
+    /// With the parent's window, after a `Scout` that landed inside it.
+    Research,
+}
+
+impl Pass {
+    /// The name docs/web-api.md uses.
+    pub fn key(self) -> &'static str {
+        match self {
+            Pass::Full => "full",
+            Pass::Scout => "scout",
+            Pass::Research => "research",
+        }
+    }
+}
+
 /// What a probe of the transposition table found.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TtProbe {
@@ -100,6 +123,7 @@ pub struct Enter<'m> {
     /// The window `(alpha, beta)` the node is searched with, from the root side's view.
     pub window: (f64, f64),
     pub reason: Reason,
+    pub pass: Pass,
 }
 
 /// What a search reports. Every method does nothing unless a tracer overrides it.
@@ -112,6 +136,10 @@ pub trait Tracer {
     /// node count so far, every iteration together. An interrupted iteration leaves nodes that were
     /// entered and never left.
     fn iteration_end(&mut self, _depth: u32, _completed: bool, _nodes: u64) {}
+    /// A try of the iteration in the aspiration window `window` failed with the best value `value`,
+    /// and it starts again from the root; `nodes` as in `iteration_end`. The try's root has been
+    /// left. Comes between `iteration_start` and `iteration_end`.
+    fn retry(&mut self, _depth: u32, _window: (f64, f64), _value: f64, _nodes: u64) {}
     /// The search enters a node (it has already counted it).
     fn enter(&mut self, _node: &Enter) {}
     /// The node's side to move has `moves` legal moves.
@@ -142,6 +170,9 @@ impl<R: Tracer> Tracer for &mut R {
     }
     fn iteration_end(&mut self, depth: u32, completed: bool, nodes: u64) {
         (**self).iteration_end(depth, completed, nodes);
+    }
+    fn retry(&mut self, depth: u32, window: (f64, f64), value: f64, nodes: u64) {
+        (**self).retry(depth, window, value, nodes);
     }
     fn enter(&mut self, node: &Enter) {
         (**self).enter(node);
@@ -187,10 +218,21 @@ pub struct RootMove {
     /// 1 for the first move tried.
     pub order: u32,
     pub reason: Reason,
-    /// Nodes in its subtree, itself included.
+    /// Nodes in its subtree, itself included, its test's too.
     pub nodes: u64,
     /// Its principal variation, the move itself first.
     pub pv: Vec<Move>,
+}
+
+/// A try of an iteration whose aspiration window failed.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Attempt {
+    pub window: (f64, f64),
+    /// The best value it found: at or below the window's lower end, or just above it, or at or
+    /// above its upper end.
+    pub value: f64,
+    /// The nodes the search had counted when it failed, earlier iterations included.
+    pub nodes: u64,
 }
 
 /// A completed iteration.
@@ -201,8 +243,10 @@ pub struct Iteration {
     /// included.
     pub nodes: u64,
     pub ms: f64,
-    /// The root moves in the order they were tried.
+    /// The root moves in the order they were tried, in the try that counted.
     pub root: Vec<RootMove>,
+    /// The tries before that one, whose aspiration windows failed.
+    pub attempts: Vec<Attempt>,
 }
 
 /// Which iteration's tree to record, and how many of its nodes at most.
@@ -231,6 +275,7 @@ pub struct TraceNode {
     pub legal: usize,
     /// Why this node's move was tried where it was; `None` at the root.
     pub order: Option<Reason>,
+    pub pass: Pass,
     pub cutoff: bool,
     pub tt: Option<TtProbe>,
     pub repetition: bool,
@@ -245,7 +290,7 @@ pub struct TraceNode {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Tree {
     pub iteration: u32,
-    /// Every node the iteration entered, the root included.
+    /// Every node the try that counted entered, the root included.
     pub nodes_total: u64,
     /// Whether `max_nodes` stopped the recording before the iteration ended.
     pub truncated: bool,
@@ -263,12 +308,17 @@ struct Frame {
     ply: u32,
     window: (f64, f64),
     reason: Reason,
+    pass: Pass,
     /// Nodes entered in the iteration before it.
     entered_before: u64,
+    /// The nodes of the test it searches again.
+    test_nodes: u64,
     children: u32,
     /// The best child value so far, and its principal variation (the child's move first).
     best: Option<f64>,
     pv: Vec<Move>,
+    /// `best` and `pv` before the last child if it was a test: a research replaces the test.
+    before_test: Option<(Option<f64>, Vec<Move>)>,
 }
 
 /// The iteration being searched.
@@ -283,6 +333,7 @@ struct Current {
     events: u64,
     tree: Vec<TraceNode>,
     truncated: bool,
+    attempts: Vec<Attempt>,
 }
 
 /// The tracer of `think` and `analyze`: statistics, iterations and, if asked, one tree.
@@ -331,7 +382,25 @@ impl Tracer for Recorder {
             events: 0,
             tree: Vec::new(),
             truncated: false,
+            attempts: Vec::new(),
         });
+    }
+
+    fn retry(&mut self, depth: u32, window: (f64, f64), value: f64, nodes: u64) {
+        let current = self.current.as_mut().expect("an iteration was started");
+        debug_assert_eq!(current.depth, depth);
+        debug_assert!(current.stack.is_empty(), "the try's root has been left");
+        current.attempts.push(Attempt {
+            window,
+            value,
+            nodes,
+        });
+        // Only the try that counts keeps its root moves and its tree.
+        current.root.clear();
+        current.entered = 0;
+        current.events = 0;
+        current.tree.clear();
+        current.truncated = false;
     }
 
     fn iteration_end(&mut self, depth: u32, completed: bool, nodes: u64) {
@@ -356,6 +425,7 @@ impl Tracer for Recorder {
             nodes,
             ms: (self.clock)() - current.start_ms,
             root: current.root,
+            attempts: current.attempts,
         });
     }
 
@@ -363,6 +433,17 @@ impl Tracer for Recorder {
         let records = self.requested();
         let max_nodes = self.request.map_or(0, |r| r.max_nodes);
         let current = self.current.as_mut().expect("an iteration was started");
+        // A research replaces its test in what the parent knows; the tree shows both.
+        let mut test_nodes = 0;
+        if node.pass == Pass::Research {
+            let parent = current.stack.last_mut().expect("a research has a parent");
+            let (best, pv) = parent.before_test.take().expect("a test came before");
+            (parent.best, parent.pv) = (best, pv);
+            parent.children -= 1;
+            if parent.ply == 0 {
+                test_nodes = current.root.pop().expect("a test came before").nodes;
+            }
+        }
         let parent = current.stack.last().and_then(|f| f.id);
         let parent_recorded = current.stack.is_empty() || parent.is_some();
         let id = if records && parent_recorded && current.tree.len() < max_nodes {
@@ -383,6 +464,7 @@ impl Tracer for Recorder {
                 children: Vec::new(),
                 legal: 0,
                 order: node.mv.map(|_| node.reason),
+                pass: node.pass,
                 cutoff: false,
                 tt: None,
                 repetition: false,
@@ -403,10 +485,13 @@ impl Tracer for Recorder {
             ply: node.ply,
             window: node.window,
             reason: node.reason,
+            pass: node.pass,
             entered_before: current.entered,
+            test_nodes,
             children: 0,
             best: None,
             pv: Vec::new(),
+            before_test: None,
         });
         current.entered += 1;
     }
@@ -494,9 +579,12 @@ impl Tracer for Recorder {
                 bound: root_bound,
                 order: parent.children,
                 reason: frame.reason,
-                nodes: sub,
+                nodes: sub + frame.test_nodes,
                 pv: pv.clone(),
             });
+        }
+        if frame.pass == Pass::Scout {
+            parent.before_test = Some((parent.best, parent.pv.clone()));
         }
         if improves {
             parent.best = Some(value);

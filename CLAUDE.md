@@ -38,7 +38,9 @@ match kish 1.1.2, and every number in our Assignment 3 talk came from it.
   with the colours swapped; `--schedule legacy` repeats the old rows and `bench/playgame_log.js`. The games are the
   same with any `--threads`; measure time per move with `--threads 1` (pinned with `taskset`)
 - Search speed and depth (541 fixed positions, pin with `taskset -c 2`): `target/release/examples/search ab6o ab6ot`
-  (nodes and time per move), `target/release/examples/depth idqrot:n20000:w=texel1` (depth reached within a budget)
+  (nodes and time per move), `target/release/examples/depth idqrot:n20000:w=texel1` (depth reached within a budget, and
+  how many positions stopped by proof), `target/release/examples/aspiration idqrotf:n20000:w=texel1:fs=1 0.25 0.5 1`
+  (how far the value moves between iterations, how often a window of each W would hold)
 - SPRT arena: `cargo run --release -p cli -- arena idqr:n2000:adv=0.1 idqr:n2000 --sprt --threads 6` stops when the
   test decides (defaults `--elo0 0 --elo1 20 --alpha 0.05 --beta 0.05`, at most `--games 2000`, no verdict before
   `--min-games 100`; paired schedule only). Use it for comparisons; fixed `--games N` stays for measurements
@@ -122,7 +124,11 @@ history; the same decisions at a fixed depth, so deeper within a budget), and a 
 (`ab6ot`, `idqrot:n20000`), and the game's other draw rules for a final `f` (`idqrotf:n20000`: a position of the
 search after 50 quiet plies, counted from the game's count from `Agent::observe`, or with one piece each, is a draw;
 `:fs=1` adds progress pressure, U scaled by (100 − quiet plies) / 100 at the depth limit, with the count in the table's
-key) (letters always in the order q, r, o, t, f). The table belongs to the agent, is cleared at
+key), and principal variation search for a final `p` (`ab6otp`, `idqrotfp:n20000`: all moves of a node but the first are
+tested with an empty window, those that land inside it searched again; the same decisions at a fixed depth) (letters
+always in the order q, r, o, t, f, p). Iterative deepening may have aspiration windows, `:asp=W` (`idqrotf:n20000:asp=0.5`:
+from depth 5, unless the last value is a win or a loss, the window is W around the last value in units of U, the side that
+fails widens W, 4W, open; the same decisions at the depth completed, tries count against the budget). The table belongs to the agent, is cleared at
 every game, is 16 MB unless `:hash=MB`, and does not keep a value that scored a repetition below it; `:tt=strict` is
 the referee's mode (same draft only and, with repetitions, only where the value cannot depend on the path), whose
 games equal those without a table: check new table ideas against it. Keep new search ideas there, behind the

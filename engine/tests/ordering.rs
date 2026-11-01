@@ -8,55 +8,10 @@
 
 mod common;
 
-use common::positions;
+use common::{compare, positions};
 use engine::{
-    Board, Color, Decision, Limits, Move, SearchOptions, U_EPSILON, Weights, alpha_beta_with,
-    iterative_deepening_with,
+    Board, Color, Limits, Move, SearchOptions, Weights, alpha_beta_with, iterative_deepening_with,
 };
-
-/// The differences between `ordered` and `plain`, the decision of alpha-beta in legal order.
-fn compare(label: &str, plain: &Decision, ordered: &Decision) -> Vec<String> {
-    let mut errors = Vec::new();
-    if ordered.top != plain.top {
-        errors.push(format!(
-            "{label}: top {:?}, in legal order {:?}",
-            ordered.top, plain.top
-        ));
-    }
-    if ordered.candidates.len() != plain.candidates.len() {
-        errors.push(format!("{label}: number of candidates differs"));
-        return errors;
-    }
-    let best = plain
-        .candidates
-        .iter()
-        .map(|c| c.u)
-        .fold(f64::NEG_INFINITY, f64::max);
-    for (i, (o, p)) in ordered.candidates.iter().zip(&plain.candidates).enumerate() {
-        let what = format!("{label}: move {} ({i})", p.mv);
-        if o.mv != p.mv || o.features != p.features {
-            errors.push(format!("{what}: move or features differ"));
-        }
-        if plain.top.contains(&i) && !o.exact {
-            errors.push(format!("{what}: a best move without an exact value"));
-        }
-        if o.exact && p.exact && o.u != p.u {
-            errors.push(format!(
-                "{what}: exact value {}, in legal order {}",
-                o.u, p.u
-            ));
-        }
-        // An exact value in legal order is the minimax value: the bound must be above it, and
-        // far enough below the best to rule the move out.
-        if !o.exact && (best - o.u <= U_EPSILON || (p.exact && o.u < p.u)) {
-            errors.push(format!(
-                "{what}: bound {}, in legal order {} (exact: {}), best {best}",
-                o.u, p.u, p.exact
-            ));
-        }
-    }
-    errors
-}
 
 /// Ordered against legal-order alpha-beta at `depth`, with and without quiescence and
 /// repetitions (an empty game: only the search path repeats), with the positions' weights and
@@ -75,6 +30,7 @@ fn same_decisions_at(depth: u32) {
                     quiescence,
                     order: false,
                     draws: None,
+                    ..SearchOptions::default()
                 };
                 let ordered = SearchOptions {
                     order: true,
@@ -139,6 +95,7 @@ fn same_decisions_after_a_repetition_in_the_game() {
                     quiescence,
                     order: false,
                     draws: None,
+                    ..SearchOptions::default()
                 };
                 let ordered = SearchOptions {
                     order: true,
@@ -178,6 +135,7 @@ fn deepening_decides_as_alpha_beta(limits: Limits, quiescence: bool, step: usize
             quiescence,
             order: true,
             draws: None,
+            ..SearchOptions::default()
         };
         let plain = SearchOptions {
             order: false,
