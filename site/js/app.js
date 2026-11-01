@@ -7,6 +7,10 @@
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const WIN = 1000;
   const START = '......../bbbbbbbb/bbbbbbbb/......../......../wwwwwwww/wwwwwwww/........';
+  // Milliseconds an agent move takes at least when agents play each other, thinking included: the decision
+  // stays on screen for a moment, then the move is made. A longer search (a time budget, depth 8) sets its
+  // own pace. A scene may set another (data/scenes.js, "speed").
+  const PACE = 1200;
 
   // ---------- opponents: five stages of our engine, each with its ladder Elo ----------
   const LEVELS = [
@@ -94,7 +98,8 @@
   const app = {
     eng: null, board: null, st: null, legal: [],
     players: { white: 'L5', black: 'L2' }, seed: 1,
-    auto: false, busy: false, speed: 1000, mode: 'user', tab: 'search',
+    auto: false, busy: false, pace: PACE, mode: 'user', tab: 'search',
+    hoverPreview: null, hoverEl: null, animating: false,
     thinkingSide: null, decisions: [], sel: null, routes: null,
     showAll: false, tree: { path: [0], legalCache: new Map() }, heat: false,
     budget: LADDER_BUDGET, timeOk: true,
@@ -146,7 +151,7 @@
     app.wi.result = null;
   }
   function newGame() {
-    app.auto = false; app.seed++; app.scene = null;
+    app.auto = false; app.seed++; app.scene = null; app.pace = PACE;
     app.st = app.eng.call('reset', START, 'white');
     clearGameState();
     for (const s of ['white', 'black']) if (isAgent(s)) setAgent(s);
@@ -175,7 +180,7 @@
     if (sc.whatif) Object.assign(app.wi, sc.whatif);
     if (sc.mode) app.mode = sc.mode;
     if (sc.tab) app.tab = sc.tab;
-    if (sc.speed) { app.speed = sc.speed; $('speedSel').value = String(sc.speed); }
+    app.pace = sc.speed || PACE;
     $('sceneSel').value = sc.id;
     refresh();
     render();
@@ -198,7 +203,7 @@
     if (!sc) { $('sceneSel').value = ''; return; }
     card.innerHTML = `<div class="scene-head"><span class="badge">Scene ${esc(sc.key)}</span><b>${esc(sc.title)}</b><button class="scene-x" id="sceneX" title="Leave the scene" aria-label="Leave the scene">×</button></div>
       <div class="scene-note">${esc(sc.note)}</div><div class="scene-src">${esc(sc.source)}</div>`;
-    $('sceneX').addEventListener('click', () => { app.scene = null; render(); });
+    $('sceneX').addEventListener('click', () => { app.scene = null; app.pace = PACE; render(); });
   }
   function refresh() { app.st = app.eng.call('state'); app.legal = app.st.status === 'playing' ? app.eng.call('legal') : []; }
 
@@ -213,6 +218,7 @@
   }
   async function agentMove(side) {
     if (app.busy || over() || !isAgent(side) || app.st.turn !== side) return;
+    const t0 = performance.now();
     app.busy = true; app.thinkingSide = side; app.sel = null; renderThinking(); renderControls();
     const lvl = levelOf(app.players[side]);
     let d;
@@ -229,19 +235,24 @@
       app.thinkingSide = null;
       app.tree.path = [0]; app.previewNode = null; app.wi.result = null;
       render();
-      await sleep(Math.min(900, app.speed * 0.6));
-      if (mv) await app.board.animate(mv, app.speed <= 100 ? 70 : 200);
+      // The decision stays on screen until 60% of the pace (at least a quarter of it after a long search).
+      await sleep(Math.max(app.pace * 0.25, t0 + app.pace * 0.6 - performance.now()));
+      // The board must show the game, not a hovered move, while the piece moves.
+      app.hoverPreview = null; app.hoverEl = null; app.animating = true;
+      renderBoard();
+      if (mv) await app.board.animate(mv, app.pace <= 100 ? 70 : 200);
+      app.animating = false;
       app.eng.call('play', report.best);
       refresh();
     } catch (e) {
-      app.thinkingSide = null;
+      app.thinkingSide = null; app.animating = false;
       showError(e);
     }
     app.busy = false;
     if (over()) app.auto = false;
     render();
     if (!over()) {
-      if (app.auto && isAgent(app.st.turn) && isAgent(other(app.st.turn))) { await sleep(app.speed); kick(); }
+      if (app.auto && isAgent(app.st.turn) && isAgent(other(app.st.turn))) { await sleep(Math.max(0, t0 + app.pace - performance.now())); kick(); }
       else kick();
     }
   }
@@ -313,6 +324,7 @@
     if (app.mode === 'user') renderUser(); else renderDev();
     renderRecord();
     renderScene();
+    dropStaleHover();
   }
   function renderControls() {
     const both = isAgent('white') && isAgent('black');
@@ -349,11 +361,39 @@
     }
     return out;
   }
+  // ---------- a move under the mouse is shown on the board, from the position where it was considered ----------
+  // An element with data-hv names that position by its ply in the game (data-ply), the moves from there that
+  // come before this one (data-line) and the move itself (data-mv); data-title goes on the banner.
+  const hv = (ply, line, mv, title) => ` data-hv data-ply="${ply}" data-line="${esc((line || []).join(' '))}" data-mv="${esc(mv)}" data-title="${esc(title || '')}"`;
+  const hvMove = (ply, line, mv, title, cls = 'line') => `<span class="${cls}"${hv(ply, line, mv, title)}>${esc(mv)}</span>`;
+  function hoverOn(t) {
+    app.hoverEl = t;
+    if (app.animating || !app.st) return;
+    const back = app.st.ply - Number(t.dataset.ply);
+    const line = t.dataset.line ? t.dataset.line.split(' ') : [];
+    let pos = null;
+    try { if (back >= 0) pos = app.eng.call('position', JSON.stringify({ back, line })); } catch (e) { pos = null; }
+    const m = pos && pos.legal.find((x) => x.move === t.dataset.mv);
+    if (!m) { if (app.hoverPreview) { app.hoverPreview = null; renderBoard(); } return; }
+    app.hoverPreview = {
+      board: pos.board, marks: moveMarks(m, 'node'),
+      arrows: [{ path: m.path, tone: 'cobalt', width: 13, opacity: 0.9 }],
+      title: t.dataset.title || `${sideWord(pos.turn)} · ${m.move}`,
+    };
+    renderBoard();
+  }
+  function hoverOff() {
+    app.hoverEl = null;
+    if (app.hoverPreview) { app.hoverPreview = null; renderBoard(); }
+  }
+  // After a re-render the element under the mouse may be gone, and its preview with it.
+  function dropStaleHover() { if (app.hoverEl && !app.hoverEl.isConnected) hoverOff(); }
+
   function renderBoard() {
     const b = app.board;
     const banner = $('previewBanner');
-    if (app.previewNode) {
-      const p = app.previewNode;
+    const p = app.hoverPreview || app.previewNode;
+    if (p) {
       b.setBoard(p.board);
       b.setHighlights(p.marks || []);
       b.setArrows(p.arrows || []);
@@ -417,7 +457,9 @@
     for (let i = 0; i < mv.length; i += 2) {
       const n = i / 2 + 1;
       const cls = (k) => 'm' + (k === mv.length - 1 ? ' last' : '');
-      html.push(`<span class="n">${n}.</span><span class="${cls(i)}">${esc(mv[i])}</span><span class="${cls(i + 1)}">${mv[i + 1] ? esc(mv[i + 1]) : ''}</span>`);
+      // The move of ply k was played from the position at ply k.
+      const cell = (k) => (mv[k] ? `<span class="${cls(k)}"${hv(k, [], mv[k], `Move ${n}${k % 2 ? '…' : '.'} ${mv[k]} · ply ${k}, ${k % 2 ? 'Black' : 'White'} to move`)}>${esc(mv[k])}</span>` : `<span class="${cls(k)}"></span>`);
+      html.push(`<span class="n">${n}.</span>${cell(i)}${cell(i + 1)}`);
     }
     for (const id of ['record', 'devRecord']) {
       const el = $(id);
@@ -444,8 +486,10 @@
       $('why').innerHTML = '<p class="muted">The explanation appears after an agent moves.</p>';
       $('evalW').style.width = '50%';
       $('evalText').textContent = '';
+      $('whyTree').hidden = true;
       return;
     }
+    $('whyTree').hidden = false;
     const t = agentTitle(d);
     dot.className = 'dot ' + (d.side === 'white' ? 'w' : 'b');
     $('whoName').textContent = t.name;
@@ -468,6 +512,7 @@
     $('evalText').textContent = isWin(wv) ? `${sideWord(wv > 0 ? 'white' : 'black')} has a forced win in its search.` : Math.abs(wv) < 0.05 ? 'About even, in its own judgement.' : `${sideWord(wv > 0 ? 'white' : 'black')} is ahead by ${Math.abs(wv).toFixed(2)} men, in its own judgement.`;
     renderCands(d);
     $('why').innerHTML = explain(d);
+    dropStaleHover();
   }
   function renderCands(d) {
     const r = d.report;
@@ -483,7 +528,9 @@
       const chosen = x.move === r.best;
       const tie = !chosen && ties.has(x.move);
       const bound = x.bound === 'upper' || x.bound === 'lower';
-      return `<div class="cand${chosen ? ' chosen' : ''}${bound ? ' bound' : ''}" data-move="${esc(x.move)}">
+      const vt = x.value === null ? 'not searched' : boundSym(x.bound) + fmtV(x.value);
+      const title = `${sideWord(d.side)} at ply ${d.ply}: ${x.move}${chosen ? ' (played)' : tie ? ' (tied)' : ''} · ${vt}`;
+      return `<div class="cand${chosen ? ' chosen' : ''}${bound ? ' bound' : ''}" data-move="${esc(x.move)}"${hv(d.ply, [], x.move, title)}>
         <span class="mv">${esc(x.move)}${chosen ? '<span class="tag">played</span>' : tie ? '<span class="tag tie" title="Same value as the move played; the agent picked among the tied moves at random">tied</span>' : ''}</span>
         <span class="bar"><span class="fill" style="width:${width(x.value).toFixed(1)}%"></span></span>
         <span class="val">${x.value === null ? 'not searched' : boundSym(x.bound) + fmtV(x.value)}</span></div>`;
@@ -494,13 +541,7 @@
     $('candsNote').innerHTML = r.depth > 1
       ? `Values are in men, from ${sideWord(d.side)}'s side, after a ${r.depth}-ply search.` + (anyBound ? ' Striped bars are upper bounds: alpha-beta proved those moves worse than the best one without working out their exact value.' : '')
       : `Values are U scores of the board after each move (men, kings and mobility), the Assignment 1 utility.`;
-    for (const row of $('cands').querySelectorAll('.cand')) {
-      row.addEventListener('mouseenter', () => {
-        const m = d.legal.find((x) => x.move === row.dataset.move);
-        if (m && d.ply === app.st.ply) app.board.setArrows([{ path: m.path, tone: 'cobalt', width: 12, opacity: 0.85 }]);
-      });
-      row.addEventListener('mouseleave', () => renderBoard());
-    }
+    $('candsNote').innerHTML += ' Point at a move to see it on the board.';
   }
   function topFeatures(e, side, n = 3) {
     if (!e) return [];
@@ -508,9 +549,9 @@
     return e.features.map((f) => ({ name: f.name, c: s * f.contribution })).filter((f) => Math.abs(f.c) >= 0.005).sort((a, b) => Math.abs(b.c) - Math.abs(a.c)).slice(0, n);
   }
   const tiesOf = (r) => new Set(r.ties && r.ties.length ? r.ties : [r.best]);
-  function tieText(r) {
+  function tieText(r, d) {
     if (!r.ties || r.ties.length < 2) return '';
-    const list = r.ties.map((m) => `<span class="line">${esc(m)}</span>`).join(' ');
+    const list = r.ties.map((m) => hvMove(d.ply, [], m, `Tied for the top value: ${m}`)).join(' ');
     return `<p>${r.ties.length} moves tie for the top value: ${list}. The agent picks one of them at random, from its seed for this game, exactly as in our arena and ladder games.</p>`;
   }
   function explain(d) {
@@ -518,17 +559,17 @@
     const out = [];
     const ties = tiesOf(r);
     const caps = d.legal.length && d.legal[0].captured.length;
-    if (d.legal.length === 1) out.push(`<p>Only one legal move: <span class="line">${esc(r.best)}</span>.</p>`);
+    if (d.legal.length === 1) out.push(`<p>Only one legal move: ${hvMove(d.ply, [], r.best, `The only legal move: ${r.best}`)}.</p>`);
     else if (caps) out.push(`<p>Capture is compulsory here: all ${d.legal.length} legal moves take ${caps} piece${caps > 1 ? 's' : ''}, the most any capture can.</p>`);
     if (r.depth <= 1) {
       const chosen = r.root.find((x) => x.move === r.best);
       const rest = r.root.filter((x) => !ties.has(x.move)).sort((a, b) => b.value - a.value);
-      out.push(`<p>This level looks one move ahead. It scores the board after each move with U = men + ${weightsOf(d.level.spec) === 'tuned' ? '2.5' : '3'} × kings − 0.05 × mobility and plays the highest score: <span class="line">${esc(r.best)}</span> at ${fmtV(chosen ? chosen.value : r.value)}.</p>`);
-      out.push(tieText(r));
-      if (rest.length) out.push(`<p>Next best: <span class="line">${esc(rest[0].move)}</span> at ${fmtV(rest[0].value)}. It cannot see the reply, so a capture that comes back one move later is invisible to it.</p>`);
+      out.push(`<p>This level looks one move ahead. It scores the board after each move with U = men + ${weightsOf(d.level.spec) === 'tuned' ? '2.5' : '3'} × kings − 0.05 × mobility and plays the highest score: ${hvMove(d.ply, [], r.best, `Played: ${r.best}`)} at ${fmtV(chosen ? chosen.value : r.value)}.</p>`);
+      out.push(tieText(r, d));
+      if (rest.length) out.push(`<p>Next best: ${hvMove(d.ply, [], rest[0].move, `Next best: ${rest[0].move}`)} at ${fmtV(rest[0].value)}. It cannot see the reply, so a capture that comes back one move later is invisible to it.</p>`);
       return out.join('');
     }
-    const line = r.pv.map((m, i) => `<span class="line">${esc(m)}</span>`).join(' ');
+    const line = r.pv.map((m, i) => hvMove(d.ply, r.pv.slice(0, i), m, `Expected line, move ${i + 1} of ${r.pv.length}: ${m}`)).join(' ');
     const qShare = r.nodes ? (100 * r.qnodes) / r.nodes : 0;
     out.push(`<p>${who} searched <b>${r.depth} plies</b> ahead, ${fmtInt(r.nodes)} positions, ${qShare.toFixed(0)}% of them in capture sequences past the depth limit. It expects ${line}.</p>`);
     if (isWin(r.value)) out.push(`<p>That line ${r.value > 0 ? 'wins' : 'loses'} by force: the opponent ${r.value > 0 ? 'runs out of moves' : 'cannot be stopped'} within the search.</p>`);
@@ -537,12 +578,13 @@
       const chips = feats.map((f) => `<span class="chip ${f.c >= 0 ? 'pos' : 'neg'}">${esc(f.name)} <b>${fmtV(f.c)}</b></span>`).join('');
       out.push(`<p>At the end of that line it judges the position <b>${fmtV(r.value)}</b> for ${who}. The biggest parts of that judgement:</p><div class="feat-chips">${chips || '<span class="chip">all features balanced</span>'}</div>`);
     }
-    out.push(tieText(r));
+    out.push(tieText(r, d));
     const rest = r.root.filter((x) => !ties.has(x.move) && x.value !== null).sort((a, b) => b.value - a.value);
     if (rest.length) {
       const x = rest[0];
-      if (x.bound === 'upper') out.push(`<p style="margin-top:10px">The next candidate, <span class="line">${esc(x.move)}</span>, is at most ${fmtV(x.value)}: once the search proved it could not beat ${esc(r.best)}, it stopped looking for its exact value.</p>`);
-      else out.push(`<p style="margin-top:10px">The next candidate, <span class="line">${esc(x.move)}</span>, scores ${fmtV(x.value)}, ${fmtD(r.value - x.value)} below the move it played.</p>`);
+      const nx = hvMove(d.ply, [], x.move, `The next candidate: ${x.move}`);
+      if (x.bound === 'upper') out.push(`<p style="margin-top:10px">The next candidate, ${nx}, is at most ${fmtV(x.value)}: once the search proved it could not beat ${esc(r.best)}, it stopped looking for its exact value.</p>`);
+      else out.push(`<p style="margin-top:10px">The next candidate, ${nx}, scores ${fmtV(x.value)}, ${fmtD(r.value - x.value)} below the move it played.</p>`);
     }
     return out.join('');
   }
@@ -567,6 +609,7 @@
     if (app.tab === 'eval') evalPanel(panel, d);
     if (app.tab === 'whatif') whatIfPanel(panel, d);
     if (app.tab === 'speed') speedPanel(panel);
+    dropStaleHover();
   }
   const stat = (k, v, title) => `<div class="stat"${title ? ` title="${esc(title)}"` : ''}><div class="k">${esc(k)}</div><div class="v">${v}</div></div>`;
   function searchPanel(d) {
@@ -580,8 +623,9 @@
       ${stat('First-move cuts', s.beta_cutoffs ? pct(s.first_move_cutoffs, s.beta_cutoffs) : '—', 'Share of cutoffs made by the first move tried: how good the move ordering is')}
       ${stat('Time', `${Math.round(r.ms)} ms`)}
     </div>`;
-    const it = r.iterations.map((x) => `<tr${x.depth === r.depth ? ' class="best"' : ''}><td class="r">${x.depth}</td><td class="mv">${esc(x.best || '')}</td><td class="r mono">${fmtV(x.value)}</td><td class="r num">${fmtInt(x.nodes)}</td><td class="pv">${esc((x.pv || []).join(' '))}</td></tr>`).join('');
-    const roots = r.root.slice().sort((a, b) => a.order - b.order).map((x) => `<tr${x.move === r.best ? ' class="best"' : ''}><td class="r">${x.order}</td><td class="mv">${esc(x.move)}</td><td><span class="reason ${esc(x.reason)}">${esc(reasonText(x.reason))}</span></td><td class="r mono">${x.value === null ? '—' : boundSym(x.bound) + fmtV(x.value)}</td><td class="r num">${fmtInt(x.nodes)}</td></tr>`).join('');
+    const pvCells = (x) => (x.pv || []).map((m, i) => hvMove(d.ply, x.pv.slice(0, i), m, `Iteration ${x.depth}, expected line, move ${i + 1}: ${m}`, 'pvm')).join(' ');
+    const it = r.iterations.map((x) => `<tr${x.depth === r.depth ? ' class="best"' : ''}><td class="r">${x.depth}</td><td class="mv"${x.best ? hv(d.ply, [], x.best, `Iteration ${x.depth}: best move ${x.best}`) : ''}>${esc(x.best || '')}</td><td class="r mono">${fmtV(x.value)}</td><td class="r num">${fmtInt(x.nodes)}</td><td class="pv">${pvCells(x)}</td></tr>`).join('');
+    const roots = r.root.slice().sort((a, b) => a.order - b.order).map((x) => `<tr${x.move === r.best ? ' class="best"' : ''}><td class="r">${x.order}</td><td class="mv"${hv(d.ply, [], x.move, `Root move ${x.order}: ${x.move} · ${x.value === null ? 'not searched' : boundSym(x.bound) + fmtV(x.value)}`)}>${esc(x.move)}</td><td><span class="reason ${esc(x.reason)}">${esc(reasonText(x.reason))}</span></td><td class="r mono">${x.value === null ? '—' : boundSym(x.bound) + fmtV(x.value)}</td><td class="r num">${fmtInt(x.nodes)}</td></tr>`).join('');
     const ties = r.ties && r.ties.length > 1
       ? `<p class="hint">${r.ties.length} moves tie at the top of the deciding iteration (${r.ties.map(esc).join(', ')}). The table shows the first of them; the agent picked <b class="mono">${esc(r.best)}</b> among them at random, from its seed.</p>`
       : '';
@@ -605,10 +649,7 @@
         <p class="hint" style="margin-top:8px">The replay uses the same settings but an empty transposition table, so it can differ slightly from the search that chose the move. Decisions made while this view is open are recorded exactly.</p>`;
       $('recBtn').addEventListener('click', async () => {
         $('recBtn').disabled = true;
-        try {
-          const rep = await app.eng.slow('analyze', d.level.spec, JSON.stringify({ back: app.st.ply - d.ply, seed: 1, trace: { iteration: -1, max_nodes: 80000 } }));
-          d.report.trace = rep.trace; d.report.traceReplay = true;
-        } catch (e) { showError(e); }
+        await recordTrace(d);
         renderDev();
       });
       return;
@@ -640,15 +681,51 @@
     const cutKid = cur.cutoff ? kids[kids.length - 1] : null;
     const searched = new Set(kids.map((k) => k.move));
     const pruned = legal.filter((m) => !searched.has(m.move));
-    const rows = kids.map((k, i) => `<tr class="click${cutKid === k ? '' : ''}" data-id="${k.id}"><td class="r">${i + 1}</td><td class="mv">${esc(k.move)}</td><td><span class="reason ${esc(k.order || 'none')}">${esc(reasonText(k.order))}</span></td><td class="r mono">${boundSym(k.bound)}${fmtV(k.value)}</td><td class="r num">${fmtInt(k.sub)}</td><td>${cutKid === k ? '<span class="cutmark">cutoff</span>' : k.draw ? esc(k.draw) : k.tt === 'cut' ? 'from table' : ''}</td></tr>`).join('')
+    const rows = kids.map((k, i) => `<tr class="click${cutKid === k ? '' : ''}" data-id="${k.id}"><td class="r">${i + 1}</td><td class="mv"${hv(d.ply, line, k.move, `Search tree: ${['root'].concat(line, [k.move]).join(' › ')} · ${boundSym(k.bound)}${fmtV(k.value)}`)}>${esc(k.move)}</td><td><span class="reason ${esc(k.order || 'none')}">${esc(reasonText(k.order))}</span></td><td class="r mono">${boundSym(k.bound)}${fmtV(k.value)}</td><td class="r num">${fmtInt(k.sub)}</td><td>${cutKid === k ? '<span class="cutmark">cutoff</span>' : k.draw ? esc(k.draw) : k.tt === 'cut' ? 'from table' : ''}</td></tr>`).join('')
       + pruned.map((m) => `<tr class="dim"><td class="r">—</td><td class="mv">${esc(m.move)}</td><td colspan="4">not searched: cut off</td></tr>`).join('');
-    panel.innerHTML = `<p class="hint">${d.report.traceReplay ? 'Replayed with a fresh agent (empty table). ' : 'The exact search that chose the move. '}Iteration ${tr.iteration}, ${fmtInt(tr.nodes_total)} positions${tr.truncated ? ', cut short for display' : ''}. Values are from ${sideWord(d.side)}'s side: MAX picks the highest, MIN the lowest.</p>
+    panel.innerHTML = `<div class="tree-open"><button class="btn primary" id="treeDiag" title="The same search drawn as a branching tree (T)">Open as a tree diagram</button><span class="hint">every root move, the replies to the best one, and any node you open</span></div>
+      <p class="hint">${d.report.traceReplay ? 'Replayed with a fresh agent (empty table). ' : 'The exact search that chose the move. '}Iteration ${tr.iteration}, ${fmtInt(tr.nodes_total)} positions${tr.truncated ? ', cut short for display' : ''}. Values are from ${sideWord(d.side)}'s side: MAX picks the highest, MIN the lowest.</p>
       <div class="crumbs">${crumbs}</div>${card}
       <div class="why-node">${nodeStory(cur, kids, pruned.length, maxNode)}</div>
       <div class="tbl-wrap"><table class="tbl"><thead><tr><th class="r">#</th><th>Move</th><th>Why tried there</th><th class="r">Value</th><th class="r">Positions</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="6" class="muted">Leaf: no moves searched below this node.</td></tr>'}</tbody></table></div>`;
     for (const b of panel.querySelectorAll('.crumbs button')) b.addEventListener('click', () => { app.tree.path = app.tree.path.slice(0, +b.dataset.depth + 1); renderTreePreview(d); renderDev(); });
     for (const tr2 of panel.querySelectorAll('tr.click')) tr2.addEventListener('click', () => { app.tree.path = app.tree.path.concat(+tr2.dataset.id); renderTreePreview(d); renderDev(); });
+    $('treeDiag').addEventListener('click', () => openTree(d));
     renderTreePreview(d, true);
+  }
+
+  // ---------- the search tree as a picture (js/treeview.js) ----------
+  // Records the tree of a decision made without one (outside the developer view): the same spec searches the
+  // decision position again with a fresh agent, so its table starts empty.
+  async function recordTrace(d) {
+    try {
+      const spec = d.report.spec || withBudget(d.level.spec, d.budget || LADDER_BUDGET);
+      const rep = await app.eng.slow('analyze', spec, JSON.stringify({ back: app.st.ply - d.ply, seed: 1, trace: { iteration: -1, max_nodes: 80000 } }));
+      d.report.trace = rep.trace; d.report.traceReplay = true;
+      return !!(rep.trace && rep.trace.nodes && rep.trace.nodes.length);
+    } catch (e) { showError(e); return false; }
+  }
+  async function openTree(d) {
+    d = d || [...app.decisions].reverse().find((x) => !x.human);
+    if (!d || !window.TreeView || app.busy) return;
+    if (app.auto) { app.auto = false; renderControls(); }
+    const tr0 = d.report.trace;
+    if (!tr0 || !tr0.nodes || !tr0.nodes.length) {
+      if (!(await recordTrace(d))) return;
+      if (app.mode === 'dev') renderDev();
+    }
+    const tr = d.report.trace, l = d.level;
+    const how = d.report.traceReplay ? 'replayed with a fresh agent (empty table), so it can differ slightly from the search that chose the move' : 'the search that chose the move';
+    window.TreeView.open({
+      nodes: tr.nodes,
+      pv: d.report.pv && d.report.pv.length ? d.report.pv : [d.report.best],
+      side: d.side,
+      flip: app.board.flip,
+      title: `Search tree · ${sideWord(d.side)} plays ${d.report.best}`,
+      sub: `${l.title} (${l.ver}, ${l.what}) · ply ${d.ply} · iteration ${tr.iteration} · ${fmtInt(tr.nodes_total)} positions${tr.truncated ? ' (the first 80,000 recorded)' : ''} · ${how} · values in men from ${sideWord(d.side)}'s side`,
+      position: (line) => app.eng.call('position', JSON.stringify({ back: app.st.ply - d.ply, line })),
+      story: nodeStory, fmtV, boundSym, fmtInt, esc, moveMarks, sideWord, other,
+    });
   }
   function nodeStory(n, kids, nPruned, maxNode) {
     if (n.draw === 'repetition') return 'This position already occurred on the way here, so it counts as a draw (0) without searching further.';
@@ -739,8 +816,8 @@
       const R = wi.result;
       const same = R.alt.best === R.full.best;
       res = `<div class="compare">
-        <div class="cmp${same ? '' : ' diff'}"><div class="hint" style="margin:0">With these settings</div><div class="big">${esc(R.alt.best)}</div><div class="muted">${fmtV(R.alt.value)} in its own eyes · depth ${R.alt.depth} · ${fmtInt(R.alt.nodes)} positions</div></div>
-        <div class="cmp"><div class="hint" style="margin:0">Full engine (${esc(R.fullSpec)})</div><div class="big">${esc(R.full.best)}</div><div class="muted">${fmtV(R.full.value)} · depth ${R.full.depth} · ${fmtInt(R.full.nodes)} positions</div></div>
+        <div class="cmp${same ? '' : ' diff'}"><div class="hint" style="margin:0">With these settings</div><div class="big"${hv(R.ply, [], R.alt.best, `What if: with these settings, ${R.alt.best}`)}>${esc(R.alt.best)}</div><div class="muted">${fmtV(R.alt.value)} in its own eyes · depth ${R.alt.depth} · ${fmtInt(R.alt.nodes)} positions</div></div>
+        <div class="cmp"><div class="hint" style="margin:0">Full engine (${esc(R.fullSpec)})</div><div class="big"${hv(R.ply, [], R.full.best, `What if: the full engine, ${R.full.best}`)}>${esc(R.full.best)}</div><div class="muted">${fmtV(R.full.value)} · depth ${R.full.depth} · ${fmtInt(R.full.nodes)} positions</div></div>
       </div>` + (same
         ? `<div class="verdict same">Both choose the same move here: switching those parts off costs nothing in this position. The badges above give the average cost over 400 games.</div>`
         : verdict(R));
@@ -867,7 +944,7 @@
     const f = R.pair && R.pair.root.find((x) => x.move === R.full.best);
     const k = app.wi.lineK || 0;
     const punish = R.line && R.line.pv && R.line.pv.length > 1
-      ? ` The line it expects after it:<div class="lineplay"><button class="btn" id="lpPrev" aria-label="Previous move of the line"${k ? '' : ' disabled'}>◀</button><button class="btn" id="lpNext" aria-label="Next move of the line"${k < R.line.pv.length ? '' : ' disabled'}>▶</button><span class="lp-moves">${R.line.pv.map((m, i) => `<span class="${i < k ? 'done' : ''}${i === k - 1 ? ' cur' : ''}">${esc(m)}</span>`).join(' ')}</span></div>`
+      ? ` The line it expects after it:<div class="lineplay"><button class="btn" id="lpPrev" aria-label="Previous move of the line"${k ? '' : ' disabled'}>◀</button><button class="btn" id="lpNext" aria-label="Next move of the line"${k < R.line.pv.length ? '' : ' disabled'}>▶</button><span class="lp-moves">${R.line.pv.map((m, i) => `<span class="${i < k ? 'done' : ''}${i === k - 1 ? ' cur' : ''}"${hv(R.ply, R.line.pv.slice(0, i), m, `Line after ${R.alt.best}, move ${i + 1} of ${R.line.pv.length}: ${m}`)}>${esc(m)}</span>`).join(' ')}</span></div>`
       : '';
     if (!a || !f || a.value === null || f.value === null) return `<div class="verdict bad">The settings above would play <b class="mono">${esc(R.alt.best)}</b> instead.${punish}</div>`;
     const depth = `searching only these two moves, to depth ${R.pair.depth}`;
@@ -902,14 +979,22 @@
     $('undoBtn').addEventListener('click', undo);
     $('autoBtn').addEventListener('click', () => { app.auto = !app.auto; renderControls(); if (app.auto) kick(); });
     $('stepBtn').addEventListener('click', () => { if (!app.busy && isAgent(app.st.turn)) agentMove(app.st.turn); });
-    $('speedSel').addEventListener('change', (e) => { app.speed = +e.target.value; });
     $('flipBtn').addEventListener('click', () => { app.board.setFlip(!app.board.flip); renderBoard(); });
+    $('whyTree').addEventListener('click', () => openTree());
+    document.addEventListener('mouseover', (e) => {
+      const t = e.target.closest ? e.target.closest('[data-hv]') : null;
+      if (t === app.hoverEl) return;
+      if (t) hoverOn(t); else hoverOff();
+    });
+    document.addEventListener('mouseout', (e) => { if (!e.relatedTarget && app.hoverEl) hoverOff(); });
     $('modeUser').addEventListener('click', () => { app.mode = 'user'; app.previewNode = null; render(); });
     $('modeDev').addEventListener('click', () => { app.mode = 'dev'; render(); });
     for (const b of document.querySelectorAll('.tabs button')) b.addEventListener('click', () => { app.tab = b.dataset.tab; app.previewNode = null; app.wi.lineK = 0; render(); });
     document.addEventListener('keydown', (e) => {
+      if (window.TreeView && window.TreeView.isOpen()) { window.TreeView.key(e); return; }
       if (e.target.closest('select, input, textarea')) return;
       if (e.key === ' ') { e.preventDefault(); $('autoBtn').click(); }
+      else if (e.key === 't' || e.key === 'T') openTree();
       else if (e.key === 'ArrowRight') { e.preventDefault(); $('stepBtn').click(); }
       else if (e.key === 'd' || e.key === 'D') { app.mode = app.mode === 'user' ? 'dev' : 'user'; app.previewNode = null; render(); }
       else if (e.key === 'u' || e.key === 'U') undo();

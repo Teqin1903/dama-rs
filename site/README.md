@@ -17,7 +17,28 @@ Every move, value and tree on the page comes from our Rust engine, compiled to W
 
   then open http://localhost:8000.
 
-Keys: Space play or pause, Right arrow one move, D switch view, U undo, F flip, N new game, Esc cancel.
+Keys: Space play or pause, Right arrow one move, D switch view, T search tree, U undo, F flip, N new game,
+Esc cancel.
+
+When agents play each other, a move takes at least 1.2 s, thinking included: the decision stays on screen
+for a moment, then the piece moves. A longer search (a time budget, depth 8) sets its own pace; scene 3
+plays fast.
+
+Point at a move anywhere on the page (the moves considered, the expected line, the game record, the search
+tables, the tree) and the board shows it with an arrow, from the position where it was considered; a banner
+names it. Move away and the game comes back.
+
+## The search tree as a picture
+
+T, the Search tree button (user view) or Open as a tree diagram (Tree tab) draws the search behind the last
+agent move as a tree that branches from left to right (`js/treeview.js`): MAX nodes (the agent to move) and
+MIN nodes (the opponent), each with its move and its value, ≤ and ≥ for bounds, the expected line in blue,
+the move that cut a node off and how many moves were never searched, answers from the transposition table,
+captures past the depth limit. It opens with every root move and the replies to the best one; click a node
+to open or close it, drag to move, scroll (or + and −) to zoom, Fit or 0 for the whole tree, Esc to close.
+The node under the mouse is shown on a small board with its window, value and why it ended where it did.
+A decision made in the user view has no recorded tree, so it is searched again with a fresh agent (an
+empty table), as the subtitle says; in the developer view the tree is the search that chose the move.
 
 ## Search budget
 
@@ -49,6 +70,7 @@ same way every time. `tools/scenes.js` rebuilds `data/scenes.js` from replayed g
 |---|---|
 | `index.html`, `css/site.css`, `fonts/`, `img/` | the page |
 | `js/board.js` | the SVG board: pieces, highlights, arrows, labels, move animation, clicks |
+| `js/treeview.js` | the search tree as a picture: layout, drawing, pan and zoom, the node's position |
 | `js/app.js` | game flow, the user view and the developer view; every number comes from the engine calls |
 | `pkg/` | the engine (`dama_web.js`, `dama_web_bg.wasm`), built from `web/` by `scripts/build-web.sh`; never edit |
 | `data/results.js` | the Elo ladder, the ablation and one minute of search (`results/*/…json`); written by `node site/tools/data.js` |

@@ -37,13 +37,6 @@
       <button class="btn" id="undoBtn" title="Undo (U)">Undo</button>
       <button class="btn primary" id="autoBtn" title="Play or pause agent against agent (Space)">Play</button>
       <button class="btn" id="stepBtn" title="One agent move (→)">Step</button>
-      <label class="sr" for="speedSel">Speed</label>
-      <select class="btn" id="speedSel" title="Pause between agent moves">
-        <option value="1800">Slow</option>
-        <option value="1000" selected>Normal</option>
-        <option value="400">Fast</option>
-        <option value="60">Instant</option>
-      </select>
       <button class="btn" id="flipBtn" title="Flip the board (F)">Flip</button>
     </div>
   </div>
@@ -78,7 +71,7 @@
           <div class="cands-note" id="candsNote"></div>
         </div>
         <div class="card why">
-          <h2>Why this move</h2>
+          <div class="card-h"><h2>Why this move</h2><button class="btn small" id="whyTree" title="The search behind this move, drawn as a tree (T)" hidden>Search tree</button></div>
           <div id="why"><p class="muted">The explanation appears after an agent moves.</p></div>
         </div>
         <div class="card">
@@ -115,10 +108,41 @@
     </section>
   </main>
 </div>
+
+<div class="modal" id="treeModal" role="dialog" aria-modal="true" aria-labelledby="tmTitle" tabindex="-1" hidden>
+  <div class="tm-box">
+    <div class="tm-head">
+      <div class="tm-titles"><h2 id="tmTitle">Search tree</h2><div class="tm-sub" id="tmSub"></div></div>
+      <div class="spacer"></div>
+      <button class="btn" id="tmPv" title="Open every node of the expected line">Expected line</button>
+      <button class="btn" id="tmCollapse" title="Close everything below the root">Collapse</button>
+      <button class="btn" id="tmFit" title="Fit the tree to the window (0)">Fit</button>
+      <button class="btn tm-x" id="tmClose" title="Close (Esc)" aria-label="Close">×</button>
+    </div>
+    <div class="tm-body">
+      <div class="tm-canvas" id="tmCanvas"><svg id="tmSvg" aria-label="Search tree"><g id="tmWorld"></g></svg></div>
+      <aside class="tm-side">
+        <div class="tm-board" id="tmBoard"></div>
+        <div id="tmInfo"></div>
+      </aside>
+    </div>
+    <div class="tm-legend">
+      <span><svg width="14" height="12" viewBox="0 0 14 12"><path d="M1,11 L7,1 L13,11 Z" class="tm-max"/></svg> MAX: the agent, takes the highest</span>
+      <span><svg width="14" height="12" viewBox="0 0 14 12"><path d="M1,1 L13,1 L7,11 Z" class="tm-min"/></svg> MIN: the opponent, takes the lowest</span>
+      <span><b class="tm-key pv">blue</b> expected line</span>
+      <span><b class="tm-key cut">cut</b> refuted its node, the rest not searched</span>
+      <span><b class="tm-key tt">table</b> from the transposition table</span>
+      <span><b class="tm-key q">green</b> capture past the depth limit</span>
+      <span class="muted">click: open · drag: move · scroll: zoom</span>
+    </div>
+  </div>
+</div>
+
 <script src="data/results.js"></script>
 <script src="data/scenes.js"></script>
 <script src="pkg/dama_web.js"></script>
 <script src="js/board.js"></script>
+<script src="js/treeview.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>
