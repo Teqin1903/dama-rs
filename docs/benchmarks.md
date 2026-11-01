@@ -151,3 +151,105 @@ taskset -c 2 target/release/examples/minute
 ```
 
 `--seconds S` changes the time per search; `--out PATH` writes the JSON elsewhere.
+
+## Principal variation search and aspiration windows
+
+The letter `p` and `:asp=W` (docs/decisions.md, `engine/src/search.rs`) change nodes, never decisions. V11 is
+`idqrotf:n20000:w=texel1:fs=1`. Nodes are the same on every run; times depend on the machine and the moment.
+
+### Nodes and time at a fixed depth
+
+541 positions, each with its own weights; 3 samples, the median sample's time.
+
+| search | nodes per move | µs per move | slowest position, µs | with `p`: nodes | with `p`: time |
+|---|---|---|---|---|---|
+| ab6o | 22033.1 | 40792.9 | 361345 | | |
+| ab6op | 30614.6 | 56782.0 | 618122 | +38.9% | +39.2% |
+| ab6ot | 14795.9 | 26500.9 | 288303 | | |
+| ab6otp | 14255.8 | 25392.5 | 224930 | −3.7% | −4.2% |
+| ab7ot | 55537.2 | 104232.9 | 1547644 | | |
+| ab7otp | 52309.9 | 87377.7 | 792496 | −5.8% | −16.2% |
+
+Without a table, `p` costs more than it saves: a test that lands inside the window is searched twice from nothing.
+With a table the second search finds the first one's moves and bounds, and `p` pays a little. The time gain at
+ab7ot is larger than its node gain and comes from one set of 3 samples; trust the nodes.
+
+A root move above its test is searched again with the iteration's window (L, H). The tighter (max(L, best − 2ε), H)
+was tried on a copy: 30423.9 nodes at ab6op (−0.6%), 14215.4 at ab6otp (−0.3%), 17588.6 at ab5p (−2.1% from 17969.6),
+and the same mean depth with V11+p+asp=0.5, so it was not kept.
+
+### Choosing W
+
+`aspiration` on 541 positions with V11's own weights. A row covers the positions that completed that depth with no win
+or loss on either side (`wins` is how many had one). |Δ| is the change of the best value from the iteration before, in
+units of U (a man = 1); node share is of all completed iterations; "holds" is the share where a window of that W around
+the previous value would count (L ≤ best − 2ε and best < H).
+
+| depth | positions | wins | \|Δ\| p50 | p90 | p99 | node share | holds W=0.25 | W=0.5 | W=1 |
+|---|---|---|---|---|---|---|---|---|---|
+| 2 | 515 | 5 | 0.4645 | 1.1367 | 2.4538 | 0.005 | 0.219 | 0.544 | 0.889 |
+| 3 | 510 | 10 | 0.3803 | 0.6999 | 1.8122 | 0.027 | 0.302 | 0.698 | 0.949 |
+| 4 | 505 | 15 | 0.3280 | 0.6206 | 1.4427 | 0.085 | 0.337 | 0.762 | 0.962 |
+| 5 | 482 | 23 | 0.3116 | 0.5792 | 1.4143 | 0.322 | 0.353 | 0.826 | 0.971 |
+| 6 | 327 | 21 | 0.2845 | 0.5595 | 1.0885 | 0.366 | 0.437 | 0.841 | 0.985 |
+| 7 | 108 | 10 | 0.2475 | 0.6539 | 1.5027 | 0.138 | 0.509 | 0.769 | 0.926 |
+| 8 | 32 | 2 | 0.2487 | 0.4191 | 0.4915 | 0.036 | 0.500 | 1.000 | 1.000 |
+| 9 | 12 | 1 | 0.1814 | 0.5215 | 0.7939 | 0.013 | 0.583 | 0.833 | 1.000 |
+| 10 | 3 | 1 | 0.3521 | 0.4981 | 0.5309 | 0.005 | 0.333 | 0.667 | 1.000 |
+| 11 | 1 | 0 | 0.8270 | 0.8270 | 0.8270 | 0.002 | 0.000 | 0.000 | 1.000 |
+| **5+** | 965 | 58 | 0.2963 | 0.5730 | 1.4243 | 0.882 | 0.406 | 0.829 | 0.972 |
+
+So the window starts at depth 5: depths 2 to 4 hold 11.7% of the nodes and fail most. W = 0.5 is about the 83rd
+percentile of |Δ|. The agent really searching with each W, over the completed iterations that had a window:
+
+| W | iterations with a window | first window held | failed tries per iteration | most failed tries | nodes in failed tries |
+|---|---|---|---|---|---|
+| 0.25 | 991 | 41.4% | 0.630 | 2 | 8.3% |
+| 0.5 | 990 | 82.4% | 0.192 | 2 | 2.8% |
+| 1 | 989 | 95.7% | 0.060 | 2 | 0.6% |
+
+### Depth within 20,000 nodes
+
+541 positions with V11's weights, no game history, a table emptied before each position; nodes per move 19224 in every row.
+Mean depth is the sum of the completed depths over 541. "Proved" stopped because the last iteration reached no leaf at the
+depth limit: it is 21 in every row, all of them at depth 1, so early proofs do not change the comparison.
+
+| agent | mean depth | sum of depths | mean depth, not proved | proved | ms per move |
+|---|---|---|---|---|---|
+| V11 | 5.774 | 3124 | 5.97 | 21 | 32.04 |
+| V11+p | 5.828 | 3153 | 6.02 | 21 | 31.67 |
+| V11+asp=0.25 | 5.793 | 3134 | 5.99 | 21 | 31.70 |
+| V11+asp=0.5 | 5.789 | 3132 | 5.98 | 21 | 31.77 |
+| V11+asp=1 | 5.787 | 3131 | 5.98 | 21 | 32.01 |
+| V11+p+asp=0.25 | 5.830 | 3154 | 6.03 | 21 | 31.72 |
+| V11+p+asp=0.5 | 5.837 | 3158 | 6.03 | 21 | 31.74 |
+| V11+p+asp=1 | 5.837 | 3158 | 6.03 | 21 | 31.82 |
+
+W = 0.5 and W = 1 tie with `p`, to the ply. The best combination gains 0.063 plies on V11; at about 4.5 times the nodes
+per ply (above), that is what 4.5^0.063 ≈ 10% more nodes would buy.
+
+### Arena
+
+`idqrotfp:n20000:w=texel1:fs=1:asp=0.5` against V11, seed 1, SPRT with the default bounds (`results/arena.csv`): no
+verdict after 2000 games (the maximum), LLR 0.870 within ±2.944; +789 =487 −724, Elo of A over B +11.3 ± 10.7 (95%), 1689 s
+with 6 threads. The row's version says `-dirty` because the match ran before the commit that holds the code.
+
+### Machine and method
+
+- CPU: Intel Core i7-9750H @ 2.60GHz (laptop), pinned to CPU 2 with `taskset -c 2`; frequency governor
+  `powersave` (intel_pstate); load average 1.2 to 2.0 during the run, nothing else of ours running.
+- OS: CachyOS, Linux 7.2.9-1-cachyos. Rust: rustc 1.99.1, `cargo build --release`.
+- The fixed-depth searches ran from 20:36 to 20:48, the depth runs from 20:48 to 20:51, UTC+3, 2026-11-01.
+
+### Reproduce
+
+```
+cargo build --release --all-targets
+taskset -c 2 target/release/examples/search ab6o ab6op ab6ot ab6otp ab7ot ab7otp
+taskset -c 2 target/release/examples/aspiration idqrotf:n20000:w=texel1:fs=1 0.25 0.5 1
+taskset -c 2 target/release/examples/depth idqrotf:n20000:w=texel1:fs=1 idqrotfp:n20000:w=texel1:fs=1 \
+    idqrotf:n20000:w=texel1:fs=1:asp=0.5 idqrotf:n20000:w=texel1:fs=1:asp=0.25 idqrotf:n20000:w=texel1:fs=1:asp=1 \
+    idqrotfp:n20000:w=texel1:fs=1:asp=0.5 idqrotfp:n20000:w=texel1:fs=1:asp=0.25 idqrotfp:n20000:w=texel1:fs=1:asp=1
+systemd-inhibit target/release/dama arena idqrotfp:n20000:w=texel1:fs=1:asp=0.5 idqrotf:n20000:w=texel1:fs=1 \
+    --sprt --threads 6 --seed 1
+```
