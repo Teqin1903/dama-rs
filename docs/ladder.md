@@ -371,6 +371,12 @@ Elo is each pairing's own (from the first agent's view); draws are repetition / 
   iterative deepening stops there (see `iterative_deepening`), so near the 50-ply limit a move is decided at a small
   depth that is already complete. Most likely that is the gap, not a weaker search; it is not measured move by move.
 
+**V10fs is V11.** On 2026-11-02 we adopted `idqrotf:n20000:w=texel1:fs=1` as the top agent under that name (tag
+`v11-draw-rules` on a49200d). One caveat goes with its +31 [+7, +56] against V10: part of it comes from games saved, not won.
+In the 50-ply draws above V10 was ahead in 23 of the 51 and V11 in 16, so V11, which sees the rule, often steered a
+worse position to the draw. We did not split the +31 between saved games and finished wins. The ladder was not run again:
+its ratings stop at V10, V11 is not on them, and +31 is this pairing's own Elo, measured against V10 alone.
+
 ### Scene 3 played on
 
 `cargo run --release --example scene -- fifty WHITE tuned [SEEDS] [--from PLY]` plays the scene's 67 moves (V10–V0,
