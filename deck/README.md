@@ -19,7 +19,7 @@ R replay the step, 1–9 jump to a slide, T restart the clock.
 
 `dist/` is not committed: it is built from the files here, so it cannot fall behind them.
 
-## Checks behind slide 8 (what we left out of our C++ agent)
+## Checks behind slide 7 (what we left out of our C++ agent)
 
 - Threads in the browser: a page posts a shared `WebAssembly.Memory` to a worker, in Chromium 141 (Playwright).
   Opened from disk and served over plain HTTP, `crossOriginIsolated` is false, `SharedArrayBuffer` is undefined and

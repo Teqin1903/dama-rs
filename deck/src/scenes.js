@@ -209,11 +209,12 @@ const S3 = {
 };
 const s3w = (e) => (Math.max(0, e) * S3.w) / S3.max;
 SCENES.push({
-  beats: [20, 18, 20],
+  beats: [20, 18, 20, 190],
   notes: [
     'Then the other direction: we switched each part of V10 off and played 400 games against the full agent. The weights and quiescence carry most of it; repetitions are worth nothing measurable any more.',
     'Added and removed are not the same number. Quiescence brought 53 when we added it, and costs 265 when we take it out of the full agent.',
     'So we tested why: with the old weights quiescence is still worth 53. The Texel weights were fitted on quiet positions only, so without quiescence they judge positions they never saw.',
+    'Over to the demo in the browser (a little over three minutes): the user view, pointing at a move to see it on the board, and Move values with a pick for the agent; the developer view and the search drawn as a tree with T; then the scenes with keys 1 to 4. Come back with the next slide.',
   ],
   render(beat, t) {
     const A = mkA(beat, t);
@@ -279,36 +280,7 @@ SCENES.push({
 });
 
 // =====================================================================
-// 4. Live demo
-// =====================================================================
-SCENES.push({
-  beats: [190],
-  notes: [
-    'Over to the demo (a little over three minutes): the user view, pointing at a move to see it on the board; the developer view; the search drawn as a tree with T; then the three scenes with keys 1, 2 and 3. Come back with the next slide.',
-  ],
-  render(beat, t) {
-    const A = mkA(beat, t);
-    chrome(4, 'Live demo: what it considers, and why', A, 'site/dist/dama.html: the Rust engine compiled to WebAssembly, in one file that opens without a server. Scenes: site/data/scenes.js, each from a replayed game of results/ablation/games.');
-    const p1 = A(0, 0.1, 0.6), p2 = A(0, 0.3, 0.6), p3 = A(0, 0.5, 0.6);
-    card(120, 220, 800, 460, { a: p1 });
-    T('User view', 160, 280, { f: 'serif', size: 36, a: p1 });
-    ['The moves it considered, each with its value', 'Upper bounds: what alpha–beta never had to finish', 'Why it plays the one it plays, and the line it expects', 'Point at any move: the board shows it', 'Five opponents: our versions V0, V2, V6, V8 and V10'].forEach((s, k) => checkItem(160, 345 + k * 62, s, { size: 23, a: p1 }));
-    card(1000, 220, 800, 460, { a: p2, stroke: C.cobalt, lw: 2.5 });
-    T('Developer view', 1040, 280, { f: 'serif', size: 36, a: p2 });
-    ['Search: iterative deepening, one row per depth', 'The search drawn as a tree (T): windows, cutoffs', 'Evaluation: each feature, each piece', 'What if: switch a part off in this very position'].forEach((s, k) => checkItem(1040, 345 + k * 62, s, { size: 23, a: p2 }));
-    T('Scenes from our own games', 120, 760, { size: 24, w: 600, a: p3 });
-    [['1', 'One ply is blind'], ['2', 'Quiescence and the horizon'], ['3', 'Ahead, and still a draw']].forEach(([k, s], i) => {
-      const x = 120 + i * 560;
-      card(x, 790, 520, 110, { a: p3 });
-      ctx.save(); ctx.globalAlpha = p3; rr(x + 28, 818, 54, 54, 12); ctx.fillStyle = C.cobalt; ctx.fill(); ctx.restore();
-      T(k, x + 55, 857, { size: 30, w: 600, c: C.paper, al: 'center', a: p3 });
-      T(s, x + 104, 856, { size: 24, w: 600, a: p3 });
-    });
-  },
-});
-
-// =====================================================================
-// 5. Why alpha-beta, not Monte Carlo tree search? (A3 feedback; measured: results/mcts)
+// 4. Why alpha-beta, not Monte Carlo tree search? (A3 feedback; measured: results/mcts)
 // =====================================================================
 const S5 = {
   forms: [['MC', 'Flat Monte Carlo', 'random games'], ['UCT', 'UCT', 'random games'], ['UCTe', 'UCT', 'texel1 at the leaves'], ['UCTq', 'UCT', 'texel1 + quiescence']],
@@ -328,7 +300,7 @@ SCENES.push({
   render(beat, t) {
     const A = mkA(beat, t);
     const games = MCTS.pairings.reduce((n, p) => n + p.games, 0);
-    chrome(5, 'Why alpha–beta, and not Monte Carlo tree search?', A, `Monte Carlo: four forms, 20,000 positions a move, ${MCTS.pairings[0].games} games a pairing, paired openings; results/mcts/mcts.json (${MCTS.meta.commit}), docs/ladder.md. Moves, captures: deck/facts.json. AIMA 4th ed. §6.4.`);
+    chrome(4, 'Why alpha–beta, and not Monte Carlo tree search?', A, `Monte Carlo: four forms, 20,000 positions a move, ${MCTS.pairings[0].games} games a pairing, paired openings; results/mcts/mcts.json (${MCTS.meta.commit}), docs/ladder.md. Moves, captures: deck/facts.json. AIMA 4th ed. §6.4.`);
     // the book's test, against our game
     const pa = A(0, 0.1, 0.6);
     T('Monte Carlo search pays off when…', 120, 220, { size: 22, w: 600, c: C.ink2, a: pa });
@@ -380,7 +352,7 @@ SCENES.push({
 });
 
 // =====================================================================
-// 6. Learning the weights from our own games (Ch 19, 23, 4)
+// 5. Learning the weights from our own games (Ch 19, 23, 4)
 // =====================================================================
 const S6 = {
   boxes: [
@@ -399,7 +371,7 @@ SCENES.push({
   ],
   render(beat, t) {
     const A = mkA(beat, t);
-    chrome(6, 'Learning the weights from our own games', A, 'Texel tuning (Österlund 2014, Chess Programming Wiki): dama texel --seed 1, 3,000 games; second run seed 2, 6,000 games. Errors and weights: docs/decisions.md (2026-10-28), engine/src/eval.rs. Elo: results/ladder/ladder.json.');
+    chrome(5, 'Learning the weights from our own games', A, 'Texel tuning (Österlund 2014, Chess Programming Wiki): dama texel --seed 1, 3,000 games; second run seed 2, 6,000 games. Errors and weights: docs/decisions.md (2026-10-28), engine/src/eval.rs. Elo: results/ladder/ladder.json.');
     S6.boxes.forEach((b, k) => {
       const p = A(0, 0.1 + 0.15 * k, 0.6);
       card(b.x, 220, 360, 190, { a: p, stroke: k === 3 ? C.cobalt : C.hair, lw: k === 3 ? 2.5 : 1.5 });
@@ -439,7 +411,7 @@ SCENES.push({
 });
 
 // =====================================================================
-// 7. After the ladder: the 50-ply rule, found in our games and taught to the search (V11)
+// 6. After the ladder: the 50-ply rule, found in our games and taught to the search (V11)
 // =====================================================================
 // Scene 3 played on (examples/scene.rs, site seeds 1000/1001): docs/ladder.md, "Scene 3 played on".
 const SCENE3 = { from: 67, draw: 77, win: 91 };
@@ -453,7 +425,7 @@ SCENES.push({
   ],
   render(beat, t) {
     const A = mkA(beat, t);
-    chrome(7, 'After the ladder: the 50-ply rule, found and fixed', A, `V10 against V0: results/ablation/ablation.json. V11 (V10fs there) and V10f: results/fifty/fifty.json (${FIFTY.meta.commit}), 400 games a pairing. Scene 3 played on: docs/ladder.md. PVS and the extension: results/arena.csv, docs/decisions.md.`);
+    chrome(6, 'After the ladder: the 50-ply rule, found and fixed', A, `V10 against V0: results/ablation/ablation.json. V11 (V10fs there) and V10f: results/fifty/fifty.json (${FIFTY.meta.commit}), 400 games a pairing. Scene 3 played on: docs/ladder.md. PVS and the extension: results/arena.csv, docs/decisions.md.`);
     const y0 = 214, H = 540;
     // what the games showed
     const p1 = A(0, 0.1, 0.6), x1 = 120;
@@ -516,7 +488,7 @@ SCENES.push({
 });
 
 // =====================================================================
-// 8. What we left out of our C++ agent, and why
+// 7. What we left out of our C++ agent, and why
 // =====================================================================
 const sig2 = (x) => Number(x.toPrecision(2)).toLocaleString('en-US');
 // MB and GB of 2^20 and 2^30 bytes, as docs/roadmap.md gives them.
@@ -530,7 +502,7 @@ SCENES.push({
   ],
   render(beat, t) {
     const A = mkA(beat, t);
-    chrome(8, 'What we left out of our C++ agent, and why', A, 'Tables: 2 bits a position with symmetries, as docs/roadmap.md counts them (deck/tools/data.js). Engine: site/pkg. Endgames: results/minute/minute.json. Threads: Chess Programming Wiki, wasm-bindgen-rayon, Chromium 141 (deck/README.md).');
+    chrome(7, 'What we left out of our C++ agent, and why', A, 'Tables: 2 bits a position with symmetries, as docs/roadmap.md counts them (deck/tools/data.js). Engine: site/pkg. Endgames: results/minute/minute.json. Threads: Chess Programming Wiki, wasm-bindgen-rayon, Chromium 141 (deck/README.md).');
     const y0 = 214, H = 740;
     // several threads
     const p1 = A(0, 0.1, 0.6), xa = 120, w1 = 820;
@@ -572,7 +544,7 @@ SCENES.push({
 });
 
 // =====================================================================
-// 9. Next steps, and thank you
+// 8. Next steps, and thank you
 // =====================================================================
 SCENES.push({
   beats: [18, 6],
@@ -582,7 +554,7 @@ SCENES.push({
   ],
   render(beat, t) {
     const A = mkA(beat, t);
-    chrome(9, 'Next steps', A, 'Repetitions when added: V6 against V4, results/ladder/ladder.json; now: results/ablation/ablation.json. PVS and the extension: docs/decisions.md.');
+    chrome(8, 'Next steps', A, 'Repetitions when added: V6 against V4, results/ladder/ladder.json; now: results/ablation/ablation.json. PVS and the extension: docs/decisions.md.');
     const items = [
       ['A network of our own, and TD self-play', 'Ch 22 and 23, trained on the positions we already have.'],
       ['Why repetitions stopped mattering', `${eloTxt(VER.V6.elo - VER.V4.elo)} Elo when added (V4 → V6), ${r0(-ABV['V10-r'].elo)} now, not significant.`],

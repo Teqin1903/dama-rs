@@ -65,7 +65,7 @@
   setInterval(tickClock, 500);
 
   function printScript() {
-    const titles = ['Our agent on one page', 'Since Assignment 3: ten versions on one scale', 'Ablation: switch one part off', 'Live demo', 'Why alpha–beta, and not Monte Carlo tree search?', 'Learning the weights from our own games', 'After the ladder: the 50-ply rule, found and fixed', 'What we left out of our C++ agent, and why', 'Next steps'];
+    const titles = ['Our agent on one page', 'Since Assignment 3: ten versions on one scale', 'Ablation: switch one part off, then the demo', 'Why alpha–beta, and not Monte Carlo tree search?', 'Learning the weights from our own games', 'After the ladder: the 50-ply rule, found and fixed', 'What we left out of our C++ agent, and why', 'Next steps'];
     let cum = 0; const mmss = (x) => `${Math.floor(x / 60)}:${String(Math.round(x % 60)).padStart(2, '0')}`;
     const rows = SCENES.slice(0, SLIDE_COUNT).map((sc, i) => {
       const items = sc.notes.map((n, j) => { cum += sc.beats[j]; return `<li>${n} <small>(${Math.round(sc.beats[j])} s, by ${mmss(cum)})</small></li>`; }).join('');
