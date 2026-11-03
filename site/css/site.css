@@ -73,6 +73,9 @@ button, select, input { font: inherit; color: inherit; }
 .budget { display: inline-flex; align-items: center; gap: 8px; margin-left: 6px; }
 .budget .lab { font-size: .82em; color: var(--ink3); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
 .budget select { border: 1px solid var(--hair); border-radius: var(--r-s); background: var(--panel2); padding: 6px 8px; font: inherit; }
+.toggle.vals { margin-left: 4px; font-weight: 500; color: var(--ink2); }
+.vals-note { color: var(--cobalt); font-weight: 600; }
+.pick-note { background: var(--cobalt-t); border-radius: var(--r-s); padding: 6px 10px; }
 .status { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: .92em; color: var(--ink2); min-height: 1.6em; }
 .status .turn { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: var(--ink); }
 .status .result { font-weight: 700; color: var(--turq); }

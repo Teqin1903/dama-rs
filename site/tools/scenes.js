@@ -1,4 +1,4 @@
-// Writes data/scenes.js: three positions from our own games for the live demo, each checked here
+// Writes data/scenes.js: four positions from our own games for the live demo, each checked here
 // with the engine (pkg/) exactly as the page uses it: the moves from the start, then fresh agents
 // with fixed seeds. The games come from replaying two ablation pairings with move logs:
 //   dama arena idqrot:n20000:w=texel1 tuned --games 160 --seed 1 --log DIR/v10_v0.tsv --csv DIR/a.csv
@@ -36,6 +36,7 @@ function readLog(file) {
 }
 
 const V10 = 'idqrot:n20000:w=texel1';
+const V11 = 'idqrotf:n20000:w=texel1:fs=1';
 const dir = process.argv[2] || '.';
 const logs = { v0: readLog(path.join(dir, 'v10_v0.tsv')), q: readLog(path.join(dir, 'v10_v10q.tsv')) };
 const game = (set, id) => logs[set].find((g) => g.game === id);
@@ -107,6 +108,25 @@ const scenes = [];
     replay: 'dama arena idqrot:n20000:w=texel1 tuned --games 160 --seed 1 --log games.tsv',
     moves: g.moves.slice(0, ply), white: 'L5', black: 'L1', seeds: { white: 1000, black: 1001 }, mode: 'user', speed: 60,
     expect: { status: 'draw', reason: 'fifty', ply: st.ply },
+  });
+}
+
+// 4. The same position with V11 as White: its search applies the 50-ply rule and progress pressure, and it wins
+// (docs/ladder.md, "Scene 3 played on": ply 91 with these seeds).
+{
+  const g = game('v0', 128), ply = 67;
+  const s = session(g.moves.slice(0, ply));
+  J(s.set_agent('white', V11, 1000)); J(s.set_agent('black', 'tuned', 1001));
+  let st = J(s.state());
+  while (st.status === 'playing') st = J(s.play(J(s.think(st.turn, '{}')).best));
+  check(st.status === 'white', `V11 as White wins, at ply ${st.ply} (${st.reason})`);
+  scenes.push({
+    id: 'fixed', key: '4', title: 'The same position with V11',
+    note: `Scene 3 again, with V11 as White. Its search knows the 50-ply rule, and a lead counts for less as the count grows, so it captures instead of moving its kings to and fro: White wins at ply ${st.ply}.`,
+    source: 'V10–V0, game 128, from ply 67 as in scene 3; V11 = V10 with the draw rules in its search · docs/ladder.md, results/fifty/fifty.json',
+    replay: 'dama arena idqrot:n20000:w=texel1 tuned --games 160 --seed 1 --log games.tsv',
+    moves: g.moves.slice(0, ply), white: 'L6', black: 'L1', seeds: { white: 1000, black: 1001 }, mode: 'user', speed: 60,
+    expect: { status: 'white', ply: st.ply },
   });
 }
 

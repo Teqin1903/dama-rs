@@ -132,7 +132,7 @@
       g.replaceChildren();
       for (const l of list || []) {
         const [cx, cy] = this.center(sqIndex(l.sq));
-        const w = Math.max(44, l.text.length * 15 + 14);
+        const w = Math.max(44, l.text.length * 12 + 16); // 19px mono: about 11.4 per character
         el('rect', { x: cx - w / 2, y: cy + 16, width: w, height: 28, rx: 14, class: 'lab lab-' + (l.tone || 'ink') }, g);
         el('text', { x: cx, y: cy + 36, 'text-anchor': 'middle', class: 'lab-text' }, g).textContent = l.text;
       }

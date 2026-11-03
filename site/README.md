@@ -17,8 +17,8 @@ Every move, value and tree on the page comes from our Rust engine, compiled to W
 
   then open http://localhost:8000.
 
-Keys: Space play or pause, Right arrow one move, D switch view, T search tree, U undo, F flip, N new game,
-Esc cancel.
+Keys: Space play or pause, Right arrow one move, D switch view, T search tree, V move values, U undo, F flip,
+N new game, Esc cancel.
 
 When agents play each other, a move takes at least 1.2 s, thinking included: the decision stays on screen
 for a moment, then the piece moves. A longer search (a time budget, depth 8) sets its own pace; scene 3
@@ -27,6 +27,18 @@ plays fast.
 Point at a move anywhere on the page (the moves considered, the expected line, the game record, the search
 tables, the tree, the capture routes to choose from) and the board shows it with an arrow, from the position where it was considered; a banner
 names it. Move away and the game comes back.
+
+## Move values, and choosing the agent's move
+
+Move values (top bar, or V) writes on each piece of the side to move the value of its best move, as that
+side's agent sees it (Level 6's settings for a human): a fresh agent searches the position with the agent's
+spec, so the agent that plays is left as it was, and the result is kept for the position. Values are the
+mover's, in men; ≤ marks an upper bound, a move alpha-beta proved worse than the best without its exact value;
+green is the best. A time or depth budget is valued at 20,000 positions, so the board does not wait.
+
+Clicking a piece on an agent's turn shows its moves, with their values when Move values is on; clicking a
+square plays that move as the agent's move (agents playing each other pause at the click and go on after
+the move). The panels then show the user's pick and the move the agent's search preferred.
 
 ## The search tree as a picture
 
@@ -42,7 +54,7 @@ empty table), as the subtitle says; in the developer view the tree is the search
 
 ## Search budget
 
-The Budget menu sets how long levels 3 to 5 (iterative deepening) search each move: positions (2,000, 20,000 as
+The Budget menu sets how long levels 3 to 6 (iterative deepening) search each move: positions (2,000, 20,000 as
 in the ladder, 200,000), time (0.1 to 3 s) or depth (4, 6 or 8 plies; a depth search also stops at 1,000,000
 positions, since the page waits for the engine). The Elo in the menus was measured at 20,000 positions; with
 another budget the badge says so. Time budgets are offered when the engine accepts them (checked at start).
@@ -53,13 +65,15 @@ measures this browser for one second on the current position.
 
 ## Scenes for the demo
 
-Keys 1 to 3 (or the Scenes menu) load three positions from our own games, each checked with the engine:
+Keys 1 to 4 (or the Scenes menu) load four positions from our own games, each checked with the engine:
 
 1. **One ply is blind**: V0, the A3 agent, plays e4-e5 and the reply takes three men and crowns a king.
 2. **Quiescence and the horizon**: What if, with quiescence off, picks b4-c4 at +1.97; the full engine,
    searching captures past the depth limit, scores it at most −2.61. Walk the line on the board.
 3. **Ahead, and still a draw**: V10 is a man and two kings ahead, yet ten plies later the 50-ply rule ends
    the game: its search does not apply that rule.
+4. **The same position with V11**: V11's search applies the 50-ply rule and feels the count, so it captures
+   instead of moving its kings to and fro, and White wins at ply 91 (docs/ladder.md, Scene 3 played on).
 
 Each scene names its source game. The agents join after the moves with fixed seeds, so a scene plays the
 same way every time. `tools/scenes.js` rebuilds `data/scenes.js` from replayed games (see its header).
@@ -73,15 +87,17 @@ same way every time. `tools/scenes.js` rebuilds `data/scenes.js` from replayed g
 | `js/treeview.js` | the search tree as a picture: layout, drawing, pan and zoom, the node's position |
 | `js/app.js` | game flow, the user view and the developer view; every number comes from the engine calls |
 | `pkg/` | the engine (`dama_web.js`, `dama_web_bg.wasm`), built from `web/` by `scripts/build-web.sh`; never edit |
-| `data/results.js` | the Elo ladder, the ablation and one minute of search (`results/*/…json`); written by `node site/tools/data.js` |
+| `data/results.js` | the Elo ladder, the ablation, one minute of search and V11's pairings (`results/*/…json`); written by `node site/tools/data.js` |
 | `tools/data.js` | writes `data/results.js`; run it after every `ladder rate` |
 | `tools/bundle.js` | packs everything, the engine included, into `dist/dama.html` |
 | `data/scenes.js`, `tools/scenes.js` | the demo scenes, and the script that finds and checks them |
 
-## The five opponents
+## The six opponents
 
 Our ladder versions, with their Elo from `results/ladder/ladder.json` shown in the menus:
 Level 1 `tuned` (V0, the A3 agent), Level 2 `ab5` (V2), Level 3 `idqr:n20000` (V6),
-Level 4 `idqr:n20000:w=texel1` (V8), Level 5 `idqrot:n20000:w=texel1` (V10, the full engine).
+Level 4 `idqr:n20000:w=texel1` (V8), Level 5 `idqrot:n20000:w=texel1` (V10, the full engine), and
+Level 6 `idqrotf:n20000:w=texel1:fs=1` (V11, the draw rules in its search), which is not on the ladder: its
+badge is its own pairing against V10 (+31 [7, 56], 400 games, `results/fifty/fifty.json`, V10fs there).
 The what-if badges are the ablation from `results/ablation/ablation.json`: V10 against itself with one
-part off, 400 games each.
+part off, 400 games each; for a V11 decision, Draw rules is V11 against V10.

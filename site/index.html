@@ -19,6 +19,7 @@
     <div class="spacer"></div>
     <label class="sr" for="sceneSel">Scene</label>
     <select class="btn scene-sel" id="sceneSel" title="Load a prepared position from our games (keys 1 to 3)" hidden><option value="">Scenes</option></select>
+    <label class="toggle vals" title="Write on each piece of the side to move the value of its best move, as its agent's search sees it (V). Click a piece to see each of its moves; click a square to play that move, for the agent too."><input type="checkbox" id="valuesT"> Move values</label>
     <span class="engine-chip" id="engineChip">Engine loading</span>
     <div class="seg" role="group" aria-label="View">
       <button id="modeUser" aria-pressed="true">User</button>
@@ -30,7 +31,7 @@
     <label class="player" title="White"><span class="dot w"></span><span class="sr">White player</span><select id="whiteSel"></select></label>
     <span class="vs">vs</span>
     <label class="player" title="Black"><span class="dot b"></span><span class="sr">Black player</span><select id="blackSel"></select></label>
-    <label class="budget" title="How long levels 3 to 5 search each move: positions, time or depth. The Elo in the menus was measured at 20,000 positions a move."><span class="lab">Budget</span><select id="budgetSel"></select></label>
+    <label class="budget" title="How long levels 3 to 6 search each move: positions, time or depth. The Elo in the menus was measured at 20,000 positions a move."><span class="lab">Budget</span><select id="budgetSel"></select></label>
     <div class="spacer"></div>
     <div class="btns">
       <button class="btn" id="newBtn" title="New game (N)">New game</button>

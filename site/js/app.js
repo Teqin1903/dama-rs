@@ -12,15 +12,16 @@
   // own pace. A scene may set another (data/scenes.js, "speed").
   const PACE = 1200;
 
-  // ---------- opponents: five stages of our engine, each with its ladder Elo ----------
+  // ---------- opponents: six stages of our engine, each with its ladder Elo (V11: its own pairing) ----------
   const LEVELS = [
     { key: 'L1', level: 1, ver: 'V0', title: 'Level 1', what: 'A3 agent, one ply', spec: 'tuned' },
     { key: 'L2', level: 2, ver: 'V2', title: 'Level 2', what: 'alpha-beta, 5 plies', spec: 'ab5' },
     { key: 'L3', level: 3, ver: 'V6', title: 'Level 3', what: 'repetition-aware search', spec: 'idqr:n20000' },
     { key: 'L4', level: 4, ver: 'V8', title: 'Level 4', what: 'Texel-tuned evaluation', spec: 'idqr:n20000:w=texel1' },
     { key: 'L5', level: 5, ver: 'V10', title: 'Level 5', what: 'full engine', spec: 'idqrot:n20000:w=texel1' },
+    { key: 'L6', level: 6, ver: 'V11', title: 'Level 6', what: 'draw rules', spec: 'idqrotf:n20000:w=texel1:fs=1' },
   ];
-  // Search budget of the iterative-deepening levels (3 to 5): positions, time or depth. The ladder measured
+  // Search budget of the iterative-deepening levels (3 to 6): positions, time or depth. The ladder measured
   // every level at 20,000 positions a move. A depth budget also stops at DEPTH_CAP positions, since the page
   // waits for the engine while it searches.
   const LADDER_BUDGET = 'n20000';
@@ -48,6 +49,10 @@
   const VER = {};
   for (const v of LADDER.versions || []) VER[v.id] = v;
   const levelOf = (key) => LEVELS.find((l) => l.key === key) || null;
+  // V11 is not on the ladder: it was measured in its own pairings (results/fifty/fifty.json, where it is V10fs).
+  const FIFTY = window.FIFTY || { versions: [], pairings: [] };
+  const V11P = (FIFTY.pairings || []).find((p) => p.a === 'V10fs' && p.b === 'V10') || null;
+  const v11Text = () => (V11P ? `${fmtElo(V11P.elo_diff)} vs V10` : '');
 
   // ---------- formatting ----------
   const isWin = (v) => Math.abs(v) >= WIN - 200;
@@ -97,13 +102,14 @@
   // ---------- state ----------
   const app = {
     eng: null, board: null, st: null, legal: [],
-    players: { white: 'L5', black: 'L2' }, seed: 1,
+    players: { white: 'L6', black: 'L2' }, seed: 1,
     auto: false, busy: false, pace: PACE, mode: 'user', tab: 'search',
     hoverPreview: null, hoverEl: null, animating: false,
+    values: false, mvCache: null, resumeAuto: false,
     thinkingSide: null, decisions: [], sel: null, routes: null,
     showAll: false, tree: { path: [0], legalCache: new Map() }, heat: false,
     budget: LADDER_BUDGET, timeOk: true,
-    wi: { q: true, r: true, o: true, t: true, w: 'texel1', budget: LADDER_BUDGET, result: null, busy: false, feat: { mob: true, adv: true, back: true, cen: true, edge: true, qmob: true } },
+    wi: { q: true, r: true, o: true, t: true, f: true, w: 'texel1', budget: LADDER_BUDGET, result: null, busy: false, feat: { mob: true, adv: true, back: true, cen: true, edge: true, qmob: true } },
     evalWeights: null, previewNode: null, scene: null, linePreview: null,
   };
   const WI_DEFAULT = JSON.stringify(app.wi);
@@ -119,7 +125,7 @@
       const o = document.createElement('option');
       const v = VER[l.ver];
       o.value = l.key;
-      o.textContent = `${l.title} · ${l.ver} ${l.what}` + (v ? ` · ${fmtElo(v.elo)} Elo` : '');
+      o.textContent = `${l.title} · ${l.ver} ${l.what}` + (v ? ` · ${fmtElo(v.elo)} Elo` : l.ver === 'V11' && V11P ? ` · ${v11Text()}` : '');
       sel.appendChild(o);
     }
     sel.value = app.players[side];
@@ -148,6 +154,7 @@
   }
   function clearGameState() {
     app.decisions = []; app.sel = null; app.routes = null; app.previewNode = null; app.linePreview = null; app.tree.path = [0];
+    app.resumeAuto = false; app.mvCache = null;
     app.wi.result = null;
   }
   function newGame() {
@@ -267,6 +274,41 @@
     refresh(); render();
     kick();
   }
+  // The user picks an agent's move (see onSquare). It is played as the agent's move and recorded with the search
+  // behind the move values (a fresh agent with the agent's settings), so the panels show what the agent preferred.
+  async function pickForAgent(mv) {
+    if (app.busy) return;
+    const side = app.st.turn, lvl = levelOf(app.players[side]);
+    const R = moveValues();
+    app.busy = true;
+    app.sel = null; app.routes = null; app.hoverPreview = null; app.hoverEl = null;
+    try {
+      let d = { side, human: true, move: mv, ply: app.st.ply };
+      if (R && lvl) {
+        const w = weightsOf(lvl.spec);
+        const line = R.pv && R.pv.length ? R.pv : [];
+        d = {
+          side, level: lvl, budget: /^id/.test(lvl.spec) ? app.mvCache.budget : null, report: R,
+          endEval: line.length ? app.eng.call('eval', w, JSON.stringify({ line })) : null,
+          nowEval: app.eng.call('eval', w, JSON.stringify({ line: [] })),
+          move: mv, ply: app.st.ply, legal: app.legal.slice(), pick: true,
+        };
+      }
+      app.decisions.push(d);
+      app.tree.path = [0]; app.previewNode = null; app.wi.result = null;
+      render();
+      app.animating = true;
+      await app.board.animate(mv, 180);
+      app.animating = false;
+      app.eng.call('play', mv.move);
+      refresh();
+    } catch (e) { app.animating = false; showError(e); }
+    app.busy = false;
+    if (app.resumeAuto) { app.auto = true; app.resumeAuto = false; }
+    render();
+    kick();
+  }
+  const playPicked = (mv) => (isAgent(app.st.turn) ? pickForAgent(mv) : humanPlay(mv));
   function undo() {
     if (app.busy) return;
     app.auto = false;
@@ -287,16 +329,22 @@
   }
 
   // ---------- human input ----------
+  // On a human's turn a click plays the human's move; on an agent's turn it chooses the agent's move instead of
+  // letting it search (agents against each other pause until a move is played, then go on).
   function onSquare(sq) {
-    if (app.busy || over() || isAgent(app.st.turn) || app.previewNode) return;
+    if (app.busy || over() || app.previewNode) return;
     const mine = app.legal.filter((m) => m.from === sq);
     if (!app.sel) {
-      if (mine.length) { app.sel = { from: sq, moves: mine }; render(); }
+      if (mine.length) {
+        if (isAgent(app.st.turn) && app.auto) { app.auto = false; app.resumeAuto = true; }
+        app.sel = { from: sq, moves: mine };
+        render();
+      }
       return;
     }
     if (sq === app.sel.from) { app.sel = null; app.routes = null; render(); return; }
     const hits = app.sel.moves.filter((m) => m.to === sq);
-    if (hits.length === 1) return void humanPlay(hits[0]);
+    if (hits.length === 1) return void playPicked(hits[0]);
     if (hits.length > 1) { app.routes = hits; renderRoutes(); return; }
     if (mine.length) { app.sel = { from: sq, moves: mine }; app.routes = null; render(); return; }
     app.sel = null; app.routes = null; render();
@@ -313,7 +361,7 @@
       b.className = 'btn mono'; b.textContent = m.move;
       // Pointing at a route draws it on the board (see hoverOn).
       Object.assign(b.dataset, { hv: '', ply: String(app.st.ply), line: '', mv: m.move, title: `Capture route ${m.move}` });
-      b.addEventListener('click', () => humanPlay(m));
+      b.addEventListener('click', () => playPicked(m));
       box.appendChild(b);
     }
     wrap.appendChild(box);
@@ -394,6 +442,40 @@
   // After a re-render the element under the mouse may be gone, and its preview with it.
   function dropStaleHover() { if (app.hoverEl && !app.hoverEl.isConnected) hoverOff(); }
 
+  // ---------- move values on the board (the Move values toggle) ----------
+  // The search of the side to move with its agent's settings (Level 6's for a human), by a fresh agent, so the
+  // agent that plays is left as it was; kept for the position. A time or depth budget is valued at 20,000
+  // positions instead, so that the board does not wait for it.
+  function moveValues() {
+    if (!app.st || over()) return null;
+    const side = app.st.turn;
+    const lvl = levelOf(app.players[side]) || levelOf('L6');
+    const budget = app.budget[0] === 'n' ? app.budget : LADDER_BUDGET;
+    const spec = withBudget(lvl.spec, budget);
+    const key = `${app.st.ply}|${app.st.board}|${side}|${spec}`;
+    if (app.mvCache && app.mvCache.key === key) return app.mvCache.report;
+    if (app.busy) return null;
+    let report = null;
+    try { report = app.eng.call('analyze', spec, JSON.stringify({ back: 0, seed: app.seed * 2 + (side === 'black' ? 1 : 0) })); } catch (e) { report = null; }
+    app.mvCache = { key, report, spec, budget, level: lvl };
+    return report;
+  }
+  const shortV = (x) => (x.bound === 'upper' ? '≤' : x.bound === 'lower' ? '≥' : '') + fmtV(x.value, { short: true });
+  // On each piece that can move, its best move's value; with a piece selected, each of its moves on the square it
+  // ends on. Values are the mover's, in men; ≤ is an upper bound (alpha-beta proved the move worse than the best).
+  function valueLabels(R) {
+    const val = new Map(R.root.filter((x) => x.value !== null).map((x) => [x.move, x]));
+    const tops = new Set(R.ties && R.ties.length ? R.ties : [R.best]);
+    const shown = new Map();
+    for (const m of app.sel ? app.sel.moves : app.legal) {
+      const x = val.get(m.move);
+      if (!x) continue;
+      const sq = app.sel ? m.to : m.from, y = shown.get(sq);
+      if (!y || x.value > y.value) shown.set(sq, x);
+    }
+    return [...shown].map(([sq, x]) => ({ sq, text: shortV(x), tone: tops.has(x.move) ? 'turq' : x.bound === 'upper' ? 'ink' : 'cobalt' }));
+  }
+
   function renderBoard() {
     const b = app.board;
     const banner = $('previewBanner');
@@ -423,11 +505,14 @@
     }
     b.setHighlights(marks);
     // arrows: the line the agent expects, drawn from the position where it decided
-    const pending = d && !d.human && d.ply === app.st.ply && app.busy;
+    const pending = d && !d.human && !d.pick && d.ply === app.st.ply && app.busy;
     if (d && !d.human && (pending || d.ply === app.st.ply - 1) && app.mode === 'user') {
       b.setArrows(pending ? pvArrows(d) : []);
     } else b.setArrows([]);
-    if (app.heat && app.mode === 'dev' && app.tab === 'eval') {
+    if (app.values && !over() && !app.busy) {
+      const R = moveValues();
+      b.setLabels(R ? valueLabels(R) : []);
+    } else if (app.heat && app.mode === 'dev' && app.tab === 'eval') {
       try {
         const w = app.evalWeights || 'texel1';
         const e = app.eng.call('eval', w, JSON.stringify({ line: [] }));
@@ -447,7 +532,10 @@
     }
     const who = isAgent(st.turn) ? `${levelOf(app.players[st.turn]).title} (${levelOf(app.players[st.turn]).ver})` : 'Human';
     const forced = app.legal.length && app.legal[0].captured.length ? ` · capture is compulsory (${app.legal[0].captured.length})` : '';
-    el.innerHTML = `<span class="turn"><span class="dot ${st.turn === 'white' ? 'w' : 'b'}" style="width:14px;height:14px;border-radius:50%;border:2px solid var(--ink);display:inline-block;background:${st.turn === 'white' ? 'var(--piece-w)' : 'var(--piece-b)'}"></span>${sideWord(st.turn)} to move</span><span>${esc(who)}</span><span class="muted">ply ${st.ply} · ${st.quiet_plies} quiet · ${app.legal.length} legal${forced}</span>`;
+    const mc = app.mvCache;
+    const vals = app.values && mc && mc.report && !app.busy
+      ? `<span class="vals-note">values: ${esc(mc.level.ver)}'s search${isAgent(st.turn) ? ' · click a piece to choose its move' : ''}</span>` : '';
+    el.innerHTML = `<span class="turn"><span class="dot ${st.turn === 'white' ? 'w' : 'b'}" style="width:14px;height:14px;border-radius:50%;border:2px solid var(--ink);display:inline-block;background:${st.turn === 'white' ? 'var(--piece-w)' : 'var(--piece-b)'}"></span>${sideWord(st.turn)} to move</span><span>${esc(who)}</span><span class="muted">ply ${st.ply} · ${st.quiet_plies} quiet · ${app.legal.length} legal${forced}</span>${vals}`;
   }
   function renderThinking() {
     const t = app.thinkingSide;
@@ -497,18 +585,21 @@
     $('whyTree').hidden = false;
     const t = agentTitle(d);
     dot.className = 'dot ' + (d.side === 'white' ? 'w' : 'b');
-    $('whoName').textContent = t.name;
+    $('whoName').textContent = t.name + (d.pick ? ' · your pick' : '');
     const r = d.report;
     const wantDepth = d.budget && d.budget[0] === 'd' ? +d.budget.slice(1) : null;
     const short = wantDepth && r.depth < wantDepth ? ` (stopped at ${fmtInt(DEPTH_CAP)} positions, before ${wantDepth})` : '';
     $('whoMeta').textContent = r.depth > 1 ? `searched ${r.depth} plies${short} · ${fmtInt(r.nodes)} positions · ${Math.round(r.ms)} ms` : `looked one move ahead · ${r.root.length} moves`;
-    const v = VER[d.level.ver];
+    const v = VER[d.level.ver], v11 = d.level.ver === 'V11' && V11P;
     const eb = $('eloBadge');
-    eb.hidden = !v;
+    eb.hidden = !v && !v11;
+    const atLadder = !d.budget || d.budget === LADDER_BUDGET;
     if (v) {
-      const atLadder = !d.budget || d.budget === LADDER_BUDGET;
       eb.textContent = atLadder ? `${fmtElo(v.elo)} Elo vs V1 [${Math.round(v.ci[0])}, ${Math.round(v.ci[1])}]` : `${fmtElo(v.elo)} Elo at 20,000 positions`;
       eb.title = 'From our Elo ladder: 25 pairings, 6,800 games, every level at 20,000 positions a move (results/ladder/ladder.json)' + (atLadder ? '' : '. This search had another budget, so its strength differs.');
+    } else if (v11) {
+      eb.textContent = `${fmtElo(V11P.elo_diff)} Elo vs V10 [${Math.round(V11P.ci[0])}, ${Math.round(V11P.ci[1])}]` + (atLadder ? '' : ' at 20,000 positions');
+      eb.title = `V11 is not on the ladder: its own pairing, ${V11P.games} games against V10 at 20,000 positions a move, ${V11P.w} wins, ${V11P.d} draws, ${V11P.l} losses (results/fifty/fifty.json, V10fs there)` + (atLadder ? '' : '. This search had another budget, so its strength differs.');
     }
     // evaluation bar from White's side
     const wv = d.side === 'white' ? r.value : -r.value;
@@ -522,7 +613,9 @@
   function renderCands(d) {
     const r = d.report;
     let rows = r.root.map((x) => ({ ...x }));
-    rows.sort((a, b) => (b.move === r.best) - (a.move === r.best) || (b.value ?? -1e9) - (a.value ?? -1e9));
+    // The move played first: the agent's choice, or the user's pick (then the agent's choice is marked too).
+    const played = d.move ? d.move.move : r.best;
+    rows.sort((a, b) => (b.move === played) - (a.move === played) || (b.value ?? -1e9) - (a.value ?? -1e9));
     const shown = app.showAll ? rows : rows.slice(0, 8);
     const ties = tiesOf(r);
     const vals = shown.filter((x) => x.value !== null && !isWin(x.value)).map((x) => x.value);
@@ -530,13 +623,16 @@
     const lo = Math.min(...vals, top - 0.5), hi = top + 0.02;
     const width = (v) => (v === null ? 0 : isWin(v) ? (v > 0 ? 100 : 3) : 6 + (94 * (v - lo)) / (hi - lo || 1));
     $('cands').innerHTML = shown.map((x) => {
-      const chosen = x.move === r.best;
-      const tie = !chosen && ties.has(x.move);
+      const chosen = x.move === played;
+      const its = d.pick && x.move === r.best;
+      const tie = !chosen && !its && ties.has(x.move);
       const bound = x.bound === 'upper' || x.bound === 'lower';
       const vt = x.value === null ? 'not searched' : boundSym(x.bound) + fmtV(x.value);
-      const title = `${sideWord(d.side)} at ply ${d.ply}: ${x.move}${chosen ? ' (played)' : tie ? ' (tied)' : ''} · ${vt}`;
-      return `<div class="cand${chosen ? ' chosen' : ''}${bound ? ' bound' : ''}" data-move="${esc(x.move)}"${hv(d.ply, [], x.move, title)}>
-        <span class="mv">${esc(x.move)}${chosen ? '<span class="tag">played</span>' : tie ? '<span class="tag tie" title="Same value as the move played; the agent picked among the tied moves at random">tied</span>' : ''}</span>
+      const what = chosen ? (d.pick ? ' (your pick)' : ' (played)') : its ? ' (its choice)' : tie ? ' (tied)' : '';
+      const tag = chosen ? `<span class="tag">${d.pick ? 'your pick' : 'played'}</span>` : its ? '<span class="tag tie">its choice</span>'
+        : tie ? '<span class="tag tie" title="Same value as the move played; the agent picked among the tied moves at random">tied</span>' : '';
+      return `<div class="cand${chosen ? ' chosen' : ''}${bound ? ' bound' : ''}" data-move="${esc(x.move)}"${hv(d.ply, [], x.move, `${sideWord(d.side)} at ply ${d.ply}: ${x.move}${what} · ${vt}`)}>
+        <span class="mv">${esc(x.move)}${tag}</span>
         <span class="bar"><span class="fill" style="width:${width(x.value).toFixed(1)}%"></span></span>
         <span class="val">${x.value === null ? 'not searched' : boundSym(x.bound) + fmtV(x.value)}</span></div>`;
     }).join('') + (rows.length > 8 ? `<button class="more" id="moreBtn">${app.showAll ? 'Show fewer' : `Show all ${rows.length}`}</button>` : '');
@@ -564,6 +660,14 @@
     const out = [];
     const ties = tiesOf(r);
     const caps = d.legal.length && d.legal[0].captured.length;
+    if (d.pick) {
+      const x = r.root.find((y) => y.move === d.move.move);
+      const xv = x && x.value !== null ? boundSym(x.bound) + fmtV(x.value) : 'not searched';
+      const mine = hvMove(d.ply, [], d.move.move, `Your pick: ${d.move.move}`);
+      out.push(d.move.move === r.best
+        ? `<p class="pick-note"><b>You chose ${mine} for ${who}</b>, the move its search preferred too (${fmtV(r.value)}).</p>`
+        : `<p class="pick-note"><b>You chose ${mine} for ${who}.</b> Its search, with the same settings and a fresh table, preferred ${hvMove(d.ply, [], r.best, `Its choice: ${r.best}`)} at ${fmtV(r.value)}; your move: ${xv}. Below: its search.</p>`);
+    }
     if (d.legal.length === 1) out.push(`<p>Only one legal move: ${hvMove(d.ply, [], r.best, `The only legal move: ${r.best}`)}.</p>`);
     else if (caps) out.push(`<p>Capture is compulsory here: all ${d.legal.length} legal moves take ${caps} piece${caps > 1 ? 's' : ''}, the most any capture can.</p>`);
     if (r.depth <= 1) {
@@ -600,7 +704,7 @@
     if (d) {
       const t = agentTitle(d);
       $('devDot').className = 'dot ' + (d.side === 'white' ? 'w' : 'b');
-      $('devName').textContent = t.name;
+      $('devName').textContent = t.name + (d.pick ? ' · your pick' : '');
       const back = app.st.ply - d.ply;
       $('devMeta').textContent = `${t.meta} · decision at ply ${d.ply}` + (back > 0 ? ` (${back} ${back === 1 ? 'ply' : 'plies'} ago)` : '');
     } else {
@@ -813,7 +917,9 @@
     const base = d && lettersOf(d.level.spec) ? d.level : levelOf('L5');
     const FEATS = wi.w === 'texel1' ? [['mob', 'mobility'], ['adv', 'advancement'], ['back', 'back row'], ['cen', 'centre'], ['edge', 'edge'], ['qmob', 'quiet mobility']] : [['mob', 'mobility']];
     const off = FEATS.filter(([k]) => !wi.feat[k]).map(([k]) => `:${k}=0`).join('');
-    const spec = `id${wi.q ? 'q' : ''}${wi.r ? 'r' : ''}${wi.o ? 'o' : ''}${wi.t ? 't' : ''}${budgetPart(wi.budget)}:w=${wi.w}${off}`;
+    // V11 (letter f, progress pressure fs=1) adds the draw rules; the toggle appears when the decision was V11's.
+    const hasF = /^idqrotf/.test(base.spec), f = hasF && wi.f;
+    const spec = `id${wi.q ? 'q' : ''}${wi.r ? 'r' : ''}${wi.o ? 'o' : ''}${wi.t ? 't' : ''}${f ? 'f' : ''}${budgetPart(wi.budget)}:w=${wi.w}${f ? ':fs=1' : ''}${off}`;
     const back = d ? app.st.ply - d.ply : 0;
     const box = (k, label, title) => `<label class="toggle" title="${esc(title)}"><input type="checkbox" data-k="${k}"${wi[k] ? ' checked' : ''}> ${label} ${ablBadge(k)}</label>`;
     let res = '';
@@ -833,6 +939,7 @@
         ${box('r', 'Repetition', 'A repeated position counts as a draw inside the search')}
         ${box('o', 'Move ordering', 'Previous best move, promotions, killers and history first')}
         ${box('t', 'Table', 'Transposition table')}
+        ${hasF ? box('f', 'Draw rules', 'The 50-ply and one-piece-each rules inside the search, with progress pressure (V11)') : ''}
         <label>Weights <select id="wiW">${['texel1', 'tuned'].map((x) => `<option${x === wi.w ? ' selected' : ''}>${x}</option>`).join('')}</select> ${ablBadge('w')}</label>
         <label>Budget <select id="wiN">${budgetOptions(wi.budget)}</select></label>
       </div>
@@ -936,6 +1043,12 @@
   const ABL = window.ABLATION || { versions: [], pairings: [] };
   const ABL_ID = { q: 'V10-q', r: 'V10-r', o: 'V10-o', t: 'V9', w: 'V10-w' };
   function ablBadge(key) {
+    if (key === 'f') {
+      // V11 against V10, its own pairing (results/fifty/fifty.json): what switching the draw rules off costs.
+      if (!V11P) return '';
+      const title = `V11 against V10 (V11 without the draw rules): ${V11P.games} games, ${V11P.w} wins, ${V11P.d} draws, ${V11P.l} losses. 95% interval [${Math.round(V11P.ci[0])}, ${Math.round(V11P.ci[1])}] Elo. Source: results/fifty/fifty.json`;
+      return `<span class="badge coral" title="${esc(title)}">${fmtElo(-V11P.elo_diff)} Elo</span>`;
+    }
     const v = (ABL.versions || []).find((x) => x.id === ABL_ID[key]);
     if (!v) return '';
     const p = (ABL.pairings || []).find((x) => x.b === v.id);
@@ -982,7 +1095,8 @@
     fillScenes();
     $('newBtn').addEventListener('click', newGame);
     $('undoBtn').addEventListener('click', undo);
-    $('autoBtn').addEventListener('click', () => { app.auto = !app.auto; renderControls(); if (app.auto) kick(); });
+    $('autoBtn').addEventListener('click', () => { app.auto = !app.auto; app.resumeAuto = false; if (app.auto) app.sel = null; render(); if (app.auto) kick(); });
+    $('valuesT').addEventListener('change', (e) => { app.values = e.target.checked; e.target.blur(); render(); });
     $('stepBtn').addEventListener('click', () => { if (!app.busy && isAgent(app.st.turn)) agentMove(app.st.turn); });
     $('flipBtn').addEventListener('click', () => { app.board.setFlip(!app.board.flip); renderBoard(); });
     $('whyTree').addEventListener('click', () => openTree());
@@ -1000,6 +1114,7 @@
       if (e.target.closest('select, input, textarea')) return;
       if (e.key === ' ') { e.preventDefault(); $('autoBtn').click(); }
       else if (e.key === 't' || e.key === 'T') openTree();
+      else if (e.key === 'v' || e.key === 'V') { app.values = !app.values; $('valuesT').checked = app.values; render(); }
       else if (e.key === 'ArrowRight') { e.preventDefault(); $('stepBtn').click(); }
       else if (e.key === 'd' || e.key === 'D') { app.mode = app.mode === 'user' ? 'dev' : 'user'; app.previewNode = null; render(); }
       else if (e.key === 'u' || e.key === 'U') undo();
