@@ -516,7 +516,63 @@ SCENES.push({
 });
 
 // =====================================================================
-// 8. Next steps, and thank you
+// 8. What we left out of our C++ agent, and why
+// =====================================================================
+const sig2 = (x) => Number(x.toPrecision(2)).toLocaleString('en-US');
+// MB and GB of 2^20 and 2^30 bytes, as docs/roadmap.md gives them.
+const sizeTxt = (b) => { const mb = b / 2 ** 20; return mb < 1 ? `${mb.toFixed(2)} MB` : mb < 1000 ? `${sig2(mb)} MB` : `${sig2(mb / 1024)} GB`; };
+const T6 = TABLES.sizes.find((x) => x.pieces === 6);
+SCENES.push({
+  beats: [18, 18],
+  notes: [
+    'Two features of our C++ agent we left out. Several threads, Lazy SMP: they share one table without locks, so a run cannot be repeated, and our measurements rest on repeatable games. And in the browser threads need shared memory, which Chromium gives only to cross-origin isolated pages: our one-file site cannot be one.',
+    `Endgame tables: up to six pieces they take ${sizeTxt(T6.bytes).replace('GB', 'gigabytes')}, for an engine of a quarter of a megabyte, and every visitor would download them. A deeper search sees more of an ending by itself, and what made tables look necessary, the side ahead not winning, was a rule: V11 fixed it against our A3 agent.`,
+  ],
+  render(beat, t) {
+    const A = mkA(beat, t);
+    chrome(8, 'What we left out of our C++ agent, and why', A, 'Tables: 2 bits a position with symmetries, as docs/roadmap.md counts them (deck/tools/data.js). Engine: site/pkg. Endgames: results/minute/minute.json. Threads: Chess Programming Wiki, wasm-bindgen-rayon, Chromium 141 (deck/README.md).');
+    const y0 = 214, H = 740;
+    // several threads
+    const p1 = A(0, 0.1, 0.6), xa = 120, w1 = 820;
+    card(xa, y0, w1, H, { a: p1 });
+    T('Several threads (Lazy SMP)', xa + 36, y0 + 56, { f: 'serif', size: 32, a: p1 });
+    let y = y0 + 122;
+    const item = (text) => { const n = dotItem(xa + 36, y, text, { wrap: w1 - 110, size: 21, a: p1, dot: C.coral }); y += n * 28 + 22; };
+    item('The threads share one table without locks: the gain comes from that race, so no run can be repeated.');
+    item('Our measurements rest on repeatable games: the paired SPRT, the ladder, the site replaying the arena, the demo scenes.');
+    item('In the browser threads must share memory with a worker. Chromium allows it only on cross-origin isolated pages, served with COOP and COEP headers; our one-file site, opened from disk, cannot be one.');
+    item('Rust threads in WebAssembly still need a nightly compiler and a rebuilt standard library.');
+    ctx.save(); ctx.globalAlpha = p1; rr(xa + 36, y - 6, w1 - 72, 76, 12); ctx.fillStyle = 'rgba(201,58,43,0.08)'; ctx.fill(); ctx.restore();
+    T('Chromium, our page opened from disk, a worker asked to share memory:', xa + 58, y + 24, { size: 16, w: 600, c: C.ink3, a: p1 });
+    T('SharedArrayBuffer transfer requires self.crossOriginIsolated', xa + 58, y + 54, { f: 'mono', size: 18, c: C.coral, a: p1 });
+    checkItem(xa + 36, y + 122, 'The cores still work: the arena plays 6 games at once.', { size: 21, a: p1, wrap: w1 - 110 });
+    // endgame tables
+    const p2 = A(1, 0.1, 0.6), xb = 1000, w2 = 820;
+    card(xb, y0, w2, H, { a: p2, stroke: C.cobalt, lw: 2.5 });
+    T('Endgame tables', xb + 36, y0 + 56, { f: 'serif', size: 32, a: p2 });
+    T('every position up to n pieces, 2 bits each', xb + 36, y0 + 96, { size: 17, w: 600, c: C.ink3, a: p2 });
+    const rows = [{ label: 'our engine', bytes: TABLES.engine_bytes, c: C.turq }]
+      .concat(TABLES.sizes.map((x) => ({ label: `≤ ${x.pieces} pieces`, bytes: x.bytes, c: x.pieces === 7 ? 'rgba(39,71,163,0.45)' : C.cobalt })));
+    const bx = xb + 190, BW = 470, lx = (mb) => bx + (BW * (Math.log10(mb) + 1)) / 7; // 0.1 MB to 1 TB, log
+    rows.forEach((r, i) => {
+      const yy = y0 + 146 + i * 54, xe = lx(r.bytes / 2 ** 20), p = A(1, 0.15 + 0.08 * i, 0.5), own = i === 0;
+      T(r.label, xb + 36, yy + 8, { size: 19, w: own ? 600 : 400, c: own ? '#0F6E68' : C.ink, a: p });
+      ctx.save(); ctx.globalAlpha = p; rr(bx, yy - 12, Math.max(4, xe - bx), 26, 5); ctx.fillStyle = r.c; ctx.fill(); ctx.restore();
+      T(sizeTxt(r.bytes), xe + 12, yy + 8, { size: 19, f: 'mono', w: 500, c: own ? '#0F6E68' : C.ink, a: p });
+    });
+    const ya = y0 + 146 + rows.length * 54 - 16;
+    seg(bx, ya, bx + BW, ya, C.hair, 1.5, p2);
+    [[1, '1 MB'], [1024, '1 GB'], [2 ** 20, '1 TB']].forEach(([mb, s]) => { const x = lx(mb); seg(x, ya - 6, x, ya + 6, C.ink3, 1.5, p2); T(s, x, ya + 26, { size: 14, c: C.ink3, al: 'center', a: p2 }); });
+    let y2 = y0 + 492;
+    const item2 = (text, a) => { const n = dotItem(xb + 36, y2, text, { wrap: w2 - 110, size: 21, a, dot: C.cobalt }); y2 += n * 28 + 20; };
+    item2(`Every visitor would download them and a server would keep them, for an engine of ${sizeTxt(TABLES.engine_bytes)}.`, A(1, 0.6, 0.6));
+    item2(`A deeper search sees more of an ending by itself: in a minute, ${MINUTE_END.depth[0]}–${MINUTE_END.depth[1]} plies with ${MINUTE_END.pieces[0]}–${MINUTE_END.pieces[1]} pieces.`, A(1, 0.7, 0.6));
+    item2(`What made tables look necessary was a rule: V11 converts its lead (50-ply draws against our A3 agent: ${V10V0.draws_by.fifty} → ${V11V0.draws_by.fifty}).`, A(1, 0.8, 0.6));
+  },
+});
+
+// =====================================================================
+// 9. Next steps, and thank you
 // =====================================================================
 SCENES.push({
   beats: [18, 6],
@@ -526,7 +582,7 @@ SCENES.push({
   ],
   render(beat, t) {
     const A = mkA(beat, t);
-    chrome(8, 'Next steps', A, 'Repetitions when added: V6 against V4, results/ladder/ladder.json; now: results/ablation/ablation.json. PVS and the extension: docs/decisions.md.');
+    chrome(9, 'Next steps', A, 'Repetitions when added: V6 against V4, results/ladder/ladder.json; now: results/ablation/ablation.json. PVS and the extension: docs/decisions.md.');
     const items = [
       ['A network of our own, and TD self-play', 'Ch 22 and 23, trained on the positions we already have.'],
       ['Why repetitions stopped mattering', `${eloTxt(VER.V6.elo - VER.V4.elo)} Elo when added (V4 → V6), ${r0(-ABV['V10-r'].elo)} now, not significant.`],

@@ -298,7 +298,7 @@ function miniBoard(x, y, size, b, o = {}) {
 }
 
 // ---------- slide chrome ----------
-const SLIDE_COUNT = 8; // main slides; the backup slides after them carry no number
+const SLIDE_COUNT = 9; // main slides; the backup slides after them carry no number
 function chrome(n, title, A, foot) {
   const pa = A(0, 0, 0.5);
   if (title) T(title, 120, 132, { f: 'serif', size: 54, c: C.ink, a: pa });
